@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>골렘 실험실</title>
+<!-- 개발용: StoneGolem 모델·동작 확인 (게임에는 안 들어감). window.__gl 로 조작 -->
+<script type="importmap">{"imports":{"three":"../../vendor/three.module.min.js"}}</script>
+<style>html, body { margin: 0; height: 100%; background: #111; overflow: hidden; } #info { position: fixed; left: 8px; top: 8px; color: #ddd; font: 13px monospace; }</style>
+</head>
+<body>
+<div id="info">loading…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from '../../vendor/GLTFLoader.js';
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.9;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color('#2a2c33');
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(3.2, 3.0, 4.2); camera.lookAt(0, 1.0, 0);
+scene.add(new THREE.HemisphereLight('#fff', '#333', 1.4));
+const sun = new THREE.DirectionalLight('#fff', 2.2); sun.position.set(-3, 6, 4); scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStandardMaterial({ color: '#444' }));
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+const loader = new GLTFLoader();
+const base = '../../assets/fab/';
+const [body, hammer, shield, anims] = await Promise.all(['StoneGolem/StoneGolem.glb', 'StoneGolem/Hammer.glb', 'StoneGolem/Shield.glb', 'anims/SKEL_StoneGolem.anims.glb'].map(u => loader.loadAsync(base + u)));
+const rig = body.scene; scene.add(rig);
+const bones = {}; rig.traverse(o => { if (o.isBone) bones[o.name] = o; });
+const hm = hammer.scene, sh = shield.scene;
+bones.weapon_r.add(hm); bones.weapon_l.add(sh);
+const mixer = new THREE.AnimationMixer(rig);
+const clips = Object.fromEntries(anims.animations.map(c => [c.name, c]));
+let act = null, camFollow = true; const camOff = new THREE.Vector3(3.0, 2.2, 1.6);
+function pose(name, t) {
+  if (act) act.stop();
+  act = mixer.clipAction(clips[name]); act.reset(); act.play(); act.paused = false;
+  mixer.setTime(t); rig.updateMatrixWorld(true);
+  if (camFollow) { const r = new THREE.Vector3(); bones.pelvis.getWorldPosition(r); camera.position.set(r.x + camOff.x, camOff.y, r.z + camOff.z); camera.lookAt(r.x, 0.9, r.z); }
+}
+const wp = (b) => { const v = new THREE.Vector3(); bones[b].getWorldPosition(v); return v; };
+window.__gl = {
+  clips: () => anims.animations.map(c => [c.name, +c.duration.toFixed(2)]),
+  pose(name, t) { pose(name, t); renderer.render(scene, camera); return { root: wp('root').toArray().map(v => +v.toFixed(2)), pelvis: wp('pelvis').toArray().map(v => +v.toFixed(2)), hand_r: wp('hand_r').toArray().map(v => +v.toFixed(2)), hand_l: wp('hand_l').toArray().map(v => +v.toFixed(2)) }; },
+  // 동작 하나를 n개로 잘라 오른손·골반 높이/위치를 본다 (내려찍기 순간 찾기)
+  sample(name, n = 12) {
+    const d = clips[name].duration, out = [];
+    for (let k = 0; k <= n; k++) { const t = d * k / n; pose(name, t); const h = wp('hand_r'), p = wp('pelvis'), r = wp('root'); out.push([+t.toFixed(2), +h.y.toFixed(2), +h.z.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), +r.z.toFixed(2)]); }
+    return out;
+  },
+  cam(x, y, z) { camOff.set(x, y, z); },
+  weapons(on) { hm.visible = sh.visible = on; renderer.render(scene, camera); },
+  stats() { let tris = 0; rig.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; }); return { tris, bones: Object.keys(bones).length, size: new THREE.Box3().setFromObject(rig).getSize(new THREE.Vector3()).toArray().map(v => +v.toFixed(2)) }; },
+  render() { renderer.render(scene, camera); },
+  bone: (b) => wp(b).toArray().map(v => +v.toFixed(3)),
+};
+pose('AS_StoneGolem_idle2', 0);
+document.getElementById('info').textContent = 'ready';
+</script>
+</body>
+</html>

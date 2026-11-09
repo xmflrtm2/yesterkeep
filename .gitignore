@@ -1,0 +1,20 @@
+# Paid Fab marketplace assets (Fab Standard License) - not redistributable.
+# See README.md for the list of packs needed to run the game locally.
+assets/fab/
+
+# Generated devlog video output (TTS audio, frames, mp4)
+devlog/out/
+
+# Release builds (uploaded to itch.io separately)
+build/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS / editor junk
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
+*.bak

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko" translate="no">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="google" content="notranslate" />
+<title>어제의 성채</title>
+<script src="lang/en.js"></script>
+<script>
+/* ───────── 언어 ─────────
+   다른 게임들과 같은 방식: 화면 글자는 한국어 원문을 키로 lang/*.js 사전에서 찾는다 ($t('{0}m', n)).
+   데이터 표 안의 글자는 N('...')로 표시만 해 두고(lang/check.py가 찾는다) 그릴 때 $t()로 바꾼다.
+   게임 코드는 src/*.js (ES 모듈)에 있고, 여기 전역 $t / N 을 그대로 쓴다.
+   언어: 직접 고른 것(yk-lang) → 브라우저 언어 → 영어 */
+window.I18N = window.I18N || {};
+const LANGS = [['ko', '한국어'], ['en', 'English'], ['zh-CN', '简体中文'], ['zh-TW', '繁體中文'], ['ja', '日本語'], ['es', 'Español'], ['pt', 'Português'], ['fr', 'Français'], ['de', 'Deutsch'], ['ru', 'Русский']].filter(([c]) => c === 'ko' || I18N[c]);
+const hasLang = c => LANGS.some(([x]) => x === c);
+function matchLang(list) {
+  for (const l of list) {
+    const s = String(l || '').toLowerCase();
+    const c = s.startsWith('zh') ? (/tw|hk|mo|hant/.test(s) ? 'zh-TW' : 'zh-CN') : s.split('-')[0];
+    if (hasLang(c)) return c;
+  }
+  return hasLang('en') ? 'en' : 'ko';
+}
+const savedLang = () => { try { const v = localStorage.getItem('yk-lang'); return hasLang(v) ? v : null; } catch (e) { return null; } };
+let LANG = savedLang() || matchLang(navigator.languages || [navigator.language]);
+document.documentElement.lang = LANG;
+window.__i18nMiss = new Set(); // 테스트용: 사전에 없던 글자
+const N = k => k;
+function $t(k, ...a) {
+  const d = LANG === 'ko' ? null : I18N[LANG];
+  let s = k;
+  if (d) { if (d[k]) s = d[k]; else window.__i18nMiss.add(k); }
+  return a.length ? s.replace(/\{(\d+)\}/g, (m, i) => (i < a.length ? a[i] : m)) : s;
+}
+function setLang(code) {
+  try { localStorage.setItem('yk-lang', code); } catch (e) { /* 이번만 */ }
+  location.reload();
+}
+const TITLE_KO = document.title;
+function i18nDom(root) {
+  document.title = $t(TITLE_KO);
+  for (const el of root.querySelectorAll('[data-t]')) {
+    if (el.__ko == null) el.__ko = el.innerHTML.replace(/\s+/g, ' ').trim();
+    el.innerHTML = $t(el.__ko);
+  }
+}
+</script>
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<style>
+  :root { --gold: #ffd27a; --teal: #7fe8ff; --ink: #f4ead8; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--ink);
+    font-family: 'Segoe UI', 'Malgun Gothic', 'Apple SD Gothic Neo', system-ui, sans-serif; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  #hearts { position: absolute; left: 18px; top: 14px; font-size: 26px; letter-spacing: 2px; text-shadow: 0 2px 4px #000; }
+  #hearts .off { opacity: .22; }
+  #shards { position: absolute; left: 20px; top: 48px; font-size: 15px; color: var(--gold); text-shadow: 0 2px 4px #000; }
+  #obj { position: absolute; left: 20px; top: 72px; font-size: 15px; color: #ffb3a8; text-shadow: 0 2px 4px #000; display: none; }
+  #era .ptime { margin-top: 6px; font-size: 14px; color: var(--gold); text-shadow: 0 1px 3px #000; }
+  body.now #era .ptime { color: var(--teal); opacity: .8; }
+  #gate { display: none; margin-top: 10px; font-size: 13px; color: var(--gold); text-shadow: 0 1px 3px #000; }
+  #gate .bar { margin: 4px 0 0 auto; width: 120px; height: 6px; border-radius: 3px; background: #ffffff22; overflow: hidden; }
+  #gate .bar i { display: block; height: 100%; background: var(--gold); }
+  #gate.frozen { color: var(--teal); }
+  #gate.frozen .bar i { background: var(--teal); }
+  #era { position: absolute; right: 18px; top: 12px; text-align: right; }
+  #era .name { font-size: 26px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 2px 6px #000; }
+  #era .sub { font-size: 13px; opacity: .75; text-shadow: 0 1px 3px #000; }
+  #era .cd { margin: 6px 0 0 auto; width: 120px; height: 5px; border-radius: 3px; background: #ffffff22; overflow: hidden; }
+  #era .cd i { display: block; height: 100%; width: 100%; background: currentColor; }
+  body.past #era .name { color: var(--gold); }
+  body.now #era .name { color: var(--teal); }
+  #roomTitle { position: absolute; left: 0; right: 0; top: 18%; text-align: center; font-size: 34px; font-weight: 700;
+    text-shadow: 0 3px 10px #000; opacity: 0; transition: opacity .6s; }
+  #roomTitle small { display: block; font-size: 15px; font-weight: 400; opacity: .8; margin-top: 6px; }
+  #hint { position: absolute; left: 0; right: 0; bottom: 64px; text-align: center; font-size: 17px; text-shadow: 0 2px 5px #000; opacity: .92; padding: 0 16px; }
+  #hint.tip { color: var(--gold); }
+  #hint.tip::before { content: '💡 '; }
+  #prompt { position: absolute; left: 50%; top: 58%; transform: translateX(-50%); padding: 6px 14px; border-radius: 8px;
+    background: #000a; border: 1px solid #ffffff33; font-size: 16px; display: none; }
+  #toast { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font-size: 20px; text-shadow: 0 2px 6px #000;
+    opacity: 0; transition: opacity .25s; white-space: nowrap; }
+  #help { position: absolute; left: 18px; bottom: 14px; font-size: 13px; opacity: .7; text-shadow: 0 1px 3px #000; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 1; pointer-events: none; }
+  #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+  /* 쓰러졌을 때: 화면이 빛바래며 시간이 되감기고, 직전 자리에서 다시 시작 */
+  #down { position: fixed; inset: 0; pointer-events: none; opacity: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px;
+    backdrop-filter: grayscale(1) brightness(.35) blur(1px); -webkit-backdrop-filter: grayscale(1) brightness(.35) blur(1px); color: #cfefff; text-shadow: 0 2px 8px #000; }
+  #down .glyph { font-size: 64px; line-height: 1; opacity: .85; }
+  #down .txt { font-size: 16px; letter-spacing: 2px; opacity: .8; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-size: 18px; }
+  #loading .bar { width: 260px; height: 6px; background: #ffffff22; border-radius: 3px; overflow: hidden; }
+  #loading .bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .15s; }
+  #loading.done { display: none; }
+  #endCard { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
+    background: #000c; font-size: 18px; text-align: center; pointer-events: auto; }
+  #endCard h2 { margin: 0; font-size: 32px; color: var(--gold); }
+  #endCard button { margin-top: 10px; font: inherit; padding: 8px 22px; border-radius: 8px; border: 1px solid #ffffff55; background: #ffffff14; color: inherit; cursor: pointer; }
+</style>
+</head>
+<body class="now">
+<div id="hud">
+  <div id="hearts"></div>
+  <div id="shards"></div>
+  <div id="obj"></div>
+  <div id="era"><div class="name"></div><div class="sub"></div><div class="cd"><i></i></div><div class="ptime"></div>
+    <div id="gate"><div class="lbl"></div><div class="bar"><i></i></div></div></div>
+  <div id="roomTitle"></div>
+  <div id="hint"></div>
+  <div id="prompt"></div>
+  <div id="toast"></div>
+  <div id="help"><span data-t>WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift 시대 전환 · E 상호작용 · R 방 다시 시작</span></div>
+</div>
+<div id="flash"></div>
+<div id="down"><div class="glyph">⟲</div><div class="txt"><span data-t>시간을 되감는 중…</span></div></div>
+<div id="fade"></div>
+<div id="loading"><div><span data-t>불러오는 중…</span></div><div class="bar"><i></i></div></div>
+<div id="endCard">
+  <h2><span data-t>프로토타입 끝</span></h2>
+  <div id="endStats"></div>
+  <button id="endRestart"><span data-t>처음부터</span></button>
+</div>
+<script>i18nDom(document.body);</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
