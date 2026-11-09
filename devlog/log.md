@@ -45,7 +45,7 @@
 - 무엇: 저장소 이름을 `yesterkeep`으로 바꾸고, 소개 문구와 태그 9개(game-off, threejs 등)를 달았다.
 - README 맨 위에 같은 방을 어제(왼쪽)와 오늘(오른쪽)로 찍어 사선으로 이은 대표 이미지(1280×640)를 넣고, 어제/오늘 비교 스크린샷 4장 + 골렘 1장을 영어 화면으로 새로 찍었다.
 - 스크린샷은 손으로 안 찍는다: `tools/readme_shots.py`가 헤드리스 크롬으로 게임을 띄워 테스트 훅으로 장면을 맞추고 찍는다. `tools/readme_compose.py`가 대표 이미지를 합성.
-- 스크린샷: `docs/readme/banner.jpg`, `docs/readme/*.jpg`
+- 스크린샷: `docs/readme/banner.jpg`, `docs/readme/*.jpg`, GitHub 페이지 `devlog/shots/2026-11-10-github-readme.jpg`
 - 읽을 문장:
   - 저장소 주소가 하이픈 하나로 나와서, 이름을 Yesterkeep으로 바꿨어요.
   - 대표 이미지는 같은 방을 반으로 갈라, 왼쪽은 어제, 오른쪽은 오늘입니다.
