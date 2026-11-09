@@ -1,12 +1,37 @@
-# Yesterkeep (어제의 성채)
+<p align="center">
+  <img src="docs/readme/banner.jpg" alt="Yesterkeep: the same room in yesterday (left, torch-lit and intact) and today (right, ruined, with frozen red guard ghosts)" width="100%">
+</p>
 
-A GitHub **Game Off 2026** entry. Theme: **SHIFT**.
+<h1 align="center">Yesterkeep <sub>어제의 성채</sub></h1>
 
-Press **Shift** and the whole keep shifts between its golden past ("yesterday") and its ruined present ("today").
+<p align="center">
+  A stealth dagger game about one key.<br>
+  <b>GitHub Game Off 2026</b> · theme <b>SHIFT</b> · plays in the browser · three.js
+</p>
+
+---
+
+Press **Shift** and the whole keep shifts between its golden past (**yesterday**) and its ruined present (**today**).
 Guards only exist yesterday; today they stand frozen as red ghosts. The era you leave freezes in place,
 so you can hold a gate open, stop arrows mid-air, or slip behind a guard and strike from the other side of time.
 
-Built with plain JavaScript and [three.js](https://threejs.org/). No build step.
+## One key, two keeps
+
+| Today | Yesterday |
+|---|---|
+| ![Today: the guard is a frozen red ghost, and you walk around behind it](docs/readme/ghost_today.jpg) | ![Yesterday: shift back and stab the guard in the back](docs/readme/backstab_yesterday.jpg) |
+| The guard is frozen. Walk around behind it. | Shift back. It never saw you coming. |
+| ![Today: yesterday's arrows hang frozen in the air](docs/readme/arrows_today.jpg) | ![Yesterday: the arrows fly](docs/readme/arrows_yesterday.jpg) |
+| Yesterday's arrows hang in midair while you are in today. | Step back into yesterday and they fly again. |
+
+![A stone golem winds up a slam after a front stab bounces off its shield](docs/readme/golem_slam.jpg)
+
+Stone golems exist only today. Stab one from the front and it bounces off the shield, then the hammer comes down.
+Shift to yesterday, where the golem freezes, get behind it, and shift back.
+
+**Score** = seconds spent in yesterday. Fewer seconds, fewer alarms, more stars.
+
+Built with plain JavaScript and [three.js](https://threejs.org/). No build step, no framework.
 
 ## Controls
 
@@ -45,6 +70,7 @@ To run the game from source, buy the packs yourself, convert them to GLB, and pl
 | Armored Stone Golem | Stone golem enemy, hammer and shield | `StoneGolem/`, `anims/SKEL_StoneGolem.anims.glb` |
 
 `tools/golem_pack.py` and `tools/shrink_tex.py` show how the GLB files were trimmed and compressed for the web.
+`tools/readme_shots.py` renders the screenshots on this page with headless Chrome, and `tools/readme_compose.py` builds the banner.
 
 ## Repository layout
 
@@ -55,7 +81,7 @@ To run the game from source, buy the packs yourself, convert them to GLB, and pl
 | `lang/` | UI translations (Korean is the source text) |
 | `vendor/` | three.js (MIT, see `vendor/three-LICENSE.txt`) |
 | `tools/` | Asset preparation scripts |
-| `docs/` | Progress screenshots |
+| `docs/` | Progress screenshots; `docs/readme/` holds the images on this page |
 | `devlog/` | Devlog notes and video scripts |
 | `DESIGN.md`, `NOTES.md` | Design document and technical notes (Korean) |
 
