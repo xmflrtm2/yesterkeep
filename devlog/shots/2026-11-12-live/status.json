@@ -1,0 +1,49 @@
+{
+ "result": "win",
+ "sec": 36.8,
+ "hits": 6,
+ "parries": 7,
+ "hurts": 1,
+ "deaths": 0,
+ "fps": {
+  "avg": 160.6,
+  "min": 121.1,
+  "last": [
+   163.2,
+   164.9,
+   165.1,
+   164.9,
+   165.2
+  ]
+ },
+ "peak": {
+  "points": 241,
+  "rocks": 51
+ },
+ "castFps": 48.3,
+ "errors": [],
+ "log": [
+  "2.4:parry slam",
+  "4.8:stab hp6 r d1.2",
+  "5.8:roll sweep",
+  "7.0:side charge",
+  "9.0:parry slam",
+  "10.5:stab hp5 w d1.9",
+  "12.2:roll sweep",
+  "13.6:parry slam",
+  "15.7:stab hp4 r d1.2",
+  "16.9:roll sweep",
+  "18.4:side charge",
+  "20.6:parry slam",
+  "22.2:stab hp3 r d1.2",
+  "24.2:parry quake",
+  "26.7:late",
+  "28.1:rock out",
+  "29.3:parry slam",
+  "30.6:stab hp2 w d1.3",
+  "31.9:parry slam",
+  "33.4:stab hp1 r d2.0",
+  "33.6:boss down",
+  "36.1:END win"
+ ]
+}

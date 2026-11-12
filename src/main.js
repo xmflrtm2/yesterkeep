@@ -1298,7 +1298,9 @@ function updatePlayer(dt) {
     const k = 1 - Math.exp(-dt * 16), sp = S.stabT > 0 ? SPEED * 0.2 : SPEED; // 찌르는 동안은 거의 멈춤
     S.vel.x += (ix * sp - S.vel.x) * k; S.vel.z += (iz * sp - S.vel.z) * k;
     vx = S.vel.x; vz = S.vel.z;
-    if (ix || iz) {
+    // 찌르는 동안(0.4초)은 몸 방향을 고정한다 — 판정은 누르고 0.12초 뒤라, 찌르자마자 빠지려고 방향키를 누르면
+    // 몸이 돌아가 적이 앞 60° 밖으로 벗어나 헛쳤다 (11/12 실시간 봇 시험에서 발견: 등 뒤 1.2m에서 10번 연속 헛침)
+    if ((ix || iz) && S.stabT <= 0) {
       const want = Math.atan2(ix, iz);
       let d = want - S.face; d = Math.atan2(Math.sin(d), Math.cos(d));
       S.face += d * (1 - Math.exp(-dt * 16));

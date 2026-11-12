@@ -10,7 +10,7 @@ import websockets
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from boss_sim import CDP, Quiet, free_port, CHROME, GAME  # noqa: E402
+from boss_sim import CDP, Quiet, Server, free_port, CHROME, GAME  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 CASES = [  # 곡, 시대, 초, 옵션
@@ -24,7 +24,7 @@ CASES = [  # 곡, 시대, 초, 옵션
 
 async def main(wav):
     port, dbg = free_port(), free_port()
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(Quiet, directory=GAME))
+    httpd = Server(('127.0.0.1', port), functools.partial(Quiet, directory=GAME))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     prof = tempfile.mkdtemp(prefix='yk-music-')
     ch = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={dbg}', f'--user-data-dir={prof}', '--no-first-run',

@@ -9,7 +9,7 @@ import websockets
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from boss_sim import CDP, Quiet, free_port, CHROME, GAME  # noqa: E402
+from boss_sim import CDP, Quiet, Server, free_port, CHROME, GAME  # noqa: E402
 
 sys.stdout.reconfigure(encoding='utf-8')
 ALL = ['slam', 'stab', 'arrive', 'death', 'wall', 'shift']
@@ -18,7 +18,7 @@ ALL = ['slam', 'stab', 'arrive', 'death', 'wall', 'shift']
 async def main(out, stages):
     os.makedirs(out, exist_ok=True)
     port, dbg = free_port(), free_port()
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(Quiet, directory=GAME))
+    httpd = Server(('127.0.0.1', port), functools.partial(Quiet, directory=GAME))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     ch = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={dbg}', f'--user-data-dir={tempfile.mkdtemp(prefix="yk-fx-")}', '--mute-audio',
                            '--use-angle=d3d11', '--enable-gpu', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

@@ -18,6 +18,12 @@ def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # 대기열 기본값 5면 게임 파일 100여 개를 한꺼번에 받을 때 일부가 거절돼 "Failed to fetch"·텍스처 오류·로딩 멈춤이 났다 (11/12)
+    request_queue_size = 128
+    daemon_threads = True
+
+
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -56,7 +62,7 @@ class CDP:
 
 async def main(jobs):
     port, dbg = free_port(), free_port()
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(Quiet, directory=GAME))
+    httpd = Server(('127.0.0.1', port), functools.partial(Quiet, directory=GAME))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     prof = tempfile.mkdtemp(prefix='yk-boss-')
     ch = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={dbg}', f'--user-data-dir={prof}', '--lang=ko-KR',
