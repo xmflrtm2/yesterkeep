@@ -32,7 +32,7 @@
 | 번역 빠짐 | ✅ 0 | `lang\check.py` 111개 문구 중 영어 0 빠짐 + 플레이 중 실제로 뜬 문구 0 빠짐 |
 | 방 13개 끝까지 | ✅ 13/13 | 경보 0, 피해 0(보스 방만 1). 아래 표 |
 | 첫 로딩 | ❌ **12.93MB** / 목표 6MB | 114개 파일. 골렘·보스 모델 2.0MB는 첫 방 뒤 백그라운드 |
-| 전체 | ✅ 14.94MB / 목표 15MB | 아슬아슬. zip 10.72MB, 풀면 15.07MB, 122개 파일 |
+| 전체 | ✅ 14.94MB / 목표 15MB | 아슬아슬. zip 10.72MB, 풀면 15.07MB, 122개 파일 (보스 규칙 변경 뒤 다시 빌드: 풀면 15.13MB, zip 10.75MB — 한도에 닿음) |
 | 안 쓰는 파일 | 4개, 0.16MB | 깃발 02, 가시 05, 텍스처 2장 — 빼도 되지만 작음 |
 | Fab 에셋 | ✅ | 빌드 zip에 111개 들어감, 저장소(origin/main)에는 0개, `.gitignore` 확인 |
 | 저장소 | ✅ | https://github.com/xmflrtm2/yesterkeep 공개, main = origin/main(보스 커밋 af0bf26·9ad2a4d까지 push됨) |
@@ -51,7 +51,9 @@
 | arrows 멈춘 화살 | 1.7 | 4 | 0 | 0 |
 | raft 멈춘 뗏목 | 7.86 | 10 | 0 | 0 |
 | blades 칼날 복도 | 6.63 | 4.5 | 0 | 0 (문 0.92초 남김) |
-| heart 성채의 심장(보스) | 15.12 | 18 | 0 | 1 (도착 7번) |
+| heart 성채의 심장(보스) | 15.12 → **21.4** | 18 | 0 | 1 → 하트 4개 남김, 쓰러짐 0 |
+
+> 11/12 오후(c62ee11) 보스 규칙이 "평소엔 0.35초 만에 내 쪽을 보고 따라옴, **공격 중에 바꿀 때만** 1.5초 묶임"으로 바뀌었다(Shift 연타로 15.2초에 이기던 문제). heart 풀이는 `src/dev/boss-bots.js`의 parry 봇으로 바뀌었고, 보스 세션이 잰 release_check 결과는 13/13, heart 21.4초, 전체 15.0MB(목표 한도), 첫 로딩 12.94MB. 위 표의 나머지 숫자는 1차(16:58~17:00) 측정.
 
 점검 중 알게 된 것 (게임 코드는 안 고침):
 - **끝 화면이 "End of the prototype"** — 제출 전에 엔딩 문구로 바꿔야 한다.
@@ -92,8 +94,10 @@ A STEALTH DAGGER GAME, NOT A PUZZLE BOX
 - Shift strike: arrive in an era and every guard within 3 m freezes for a moment. Strike from any side.
 - Stone golems exist only today and bounce a front stab off their shields. Go to yesterday,
   where they freeze, get behind them, and come back.
-- The Warden, the keep's last guardian, follows your shift 1.5 seconds late, arriving exactly where
-  and how it stood. Those 1.5 seconds are yours. If that spot is a pit in your era, it falls.
+- The Warden, the keep's last guardian, follows you through time and turns to face you. But shift
+  in the middle of its attack and it loses track of time: it stays locked in that swing for 1.5 seconds,
+  then arrives exactly where and how it stood and finishes the blow, back wide open.
+  If that spot is a pit in your era, it falls.
 
 TWO MAPS OF ONE KEEP
 Today the bridge is gone; yesterday it stands. Yesterday the bars are shut; today the wall beside them
@@ -134,7 +138,7 @@ Engine: three.js (MIT).
 1. `docs/readme/banner.jpg` — 같은 방 어제|오늘 사선 (커버 630×500으로 다시 잘라야 함)
 2. `docs/readme/ghost_today.jpg` + `docs/readme/backstab_yesterday.jpg` — 멈춘 경비 → 등 찌르기 (핵심 재미)
 3. `docs/readme/arrows_today.jpg` — 공중에 멈춘 화살
-4. `docs/boss/01-follow-ring.jpg` — 보스 멈춘 윤곽 + 도착 고리 + 등 뒤 구역
+4. `docs/boss/10-parry-locked.jpg` — 공격 중에 바꿔 묶인 보스(멈춘 윤곽 + 등 뒤 구역). 11/12 오후 규칙 변경 뒤 장면
 5. `docs/boss/05-charge-line.jpg` 또는 `docs/readme/golem_slam.jpg`
 - 피할 것: 레버·창살만 보이는 장면(These Four Walls와 첫인상이 겹침), 한국어 화면
 
@@ -155,7 +159,8 @@ Game description:
 ```
 A top-down stealth dagger game where one key shifts the whole keep between its golden past and its ruined present.
 The era you leave freezes: guards hang in place as red ghosts, arrows stop in midair, and you walk around behind
-them before shifting back to strike. Stone golems exist only today; the Warden follows your shift 1.5 seconds late.
+them before shifting back to strike. Stone golems exist only today; the Warden follows you through time,
+unless you shift in the middle of its attack.
 Score = seconds spent in yesterday. 13 rooms, about 15 minutes, plays in the browser.
 
 AI disclosure: the code was written with the AI coding assistant Claude, directed and reviewed by the developer.
@@ -202,5 +207,5 @@ AI 공개 문구 (개발자님이 정한 뜻 그대로):
 | ~~itch 초안을 Claude가 만들어도 되는지 답하기~~ → 11/12 "11/27에 만들어 줘" (예약 실행이 만듦) | 완료 |
 | 11/27 예약이 만든 itch 초안 확인 → Public 전환 → 잼 Submit | 11/27~29 |
 | 결정: 최종 제목(Yesterkeep 유지?), 코드 라이선스(All rights reserved 유지 추천), gltfpack 받기, 시작 화면/방 고르기 | 11/25 전 |
-| 손으로 처음부터 끝까지 한 판(특히 보스 1.5초가 넉넉한지) + 소감. 걸린 시간도 알려 주시면 문구의 "about 15 minutes"를 실측으로 고침(지금은 기획서 목표치, 봇은 2분 28초) | 11/27 전 |
+| 손으로 처음부터 끝까지 한 판(특히 보스: 공격 중에 바꿔 묶어 두는 게 읽히는지) + 소감. 걸린 시간도 알려 주시면 문구의 "about 15 minutes"를 실측으로 고침(지금은 기획서 목표치, 봇은 2분 28초) | 11/27 전 |
 | (선택) X·itch 게시판 홍보 문구 승인 | 제출 뒤 |
