@@ -4,6 +4,7 @@
 // 순간이동(tp)은 쓰지 않는다. 걷기·Shift·찌르기·E만 쓰고, 시간은 __yk.step으로만 흐른다.
 // 풀이는 방마다 "개발자가 의도한 풀이" 한 가지다(NOTES.md 사람 봇 표와 같은 길).
 import P from './play.js';
+import BossBots from './boss-bots.js';
 
 const Y = () => window.__yk;
 const st = () => Y().state();
@@ -228,35 +229,16 @@ const SOLVE = {
     exitAt(3, 1);
     return `gate ${gate0}s → ${gateLeft}s left at the last blade`;
   },
-  // 보스 성채지기: 내가 시대를 바꾸면 1.5초(2페이즈 1.1초) 늦게 멈춘 자리·방향 그대로 따라온다.
-  // 바꾸자마자 멈춘 자리의 등 뒤(두 시대 모두 바닥인 칸)로 가 있다가, 도착해서 휘청이는 0.7초에 등 찌르기 → 다시 바꾸기
+  // 보스 성채지기 (11/12 오후 규칙): 평소엔 0.35초 만에 내 쪽을 보고 따라온다 → Shift만으로는 등을 못 잡는다.
+  // 내려찍기 예비동작(붉은 부채꼴)에 Shift = 시간 회피 → 1.5초 묶임 → 멈춘 윤곽 등 뒤로 → 와서 마저 내려찍는 동안 등 찌르기.
+  // 풀이는 boss-bots.js의 parry 봇(사람 반응 0.25초, 휘두르기는 굴러 피함, 돌진은 옆으로)을 그대로 쓴다. 가끔 한 번 쓰러져 방을 다시 시작한다
   heart() {
     const B = () => Y().boss();
     P.waitUntil(() => B() && B() !== 'pending', 10, 0.1);
-    const behindPt = (b, d = 1.7) => {
-      for (const a of [0, 25, -25, 50, -50]) {
-        const ang = rad(b.yawDeg + 180 + a), x = b.x + Math.sin(ang) * d, z = b.z + Math.cos(ang) * d;
-        const i = Math.floor(x / 2), j = Math.floor(z / 2);
-        const ok = e => { const c = Y().cell(i, j, e); return c.floor && !c.solid; };
-        if (ok('past') && ok('now')) return { x, z, i, j };
-      }
-      return null;
-    };
-    const toBehind = () => { const pt = behindPt(B()); if (!pt) return false; go(pt.i, pt.j); P.moveTo(pt.x, pt.z, { exact: true, tol: 0.25, max: 1.5 }); return true; };
-    let rounds = 0;
-    // 깨우기: 어제에서(보스는 오늘에 멈춤) 등 뒤로 가서 오늘로 → 깨어나며 1초 휘청 → 등 찌르기
-    if (B().state === 'dormant') { shiftTo('past'); toBehind(); shiftTo('now'); P.react(); P.stab(); P.wait(0.5); }
-    while (B().alive && rounds++ < 40) {
-      if (B().era === st().era) shiftTo(OTHER[st().era]);
-      toBehind();
-      P.waitUntil(() => !B().alive || (B().era === st().era && B().daze > 0), 3, 1 / 60);
-      if (!B().alive) break;
-      P.react(); P.stab(); P.wait(0.45);
-    }
-    const hp = B().hp;
+    const r = BossBots.run('parry', 1)[0];
     P.wait(1.5);
-    exitAt(8, 1);
-    return `boss down after ${rounds} arrivals (hp ${hp})`;
+    if (!B().alive) exitAt(8, 1);
+    return `boss ${r.win ? 'down' : 'ALIVE'} in ${r.t}s: ${r.parries} parries, ${r.hits} hits, ${r.hurts} hurts, ${r.deaths} restarts`;
   },
 };
 

@@ -20,6 +20,7 @@ export const GCLIP = {
   charge: 'AS_StoneGolem_attack5',  // 보스: 방패를 앞세운 돌진 (원래 0.4~2.6초에 3.9m 나아감 — 이동은 코드가 한다)
   hit: 'AS_StoneGolem_gethit1',     // 보스: 등을 찔림 (1초)
   stagger: 'AS_StoneGolem_gethit2', // 보스: 크게 휘청 (도착·벽에 박힘·깨어남, 1.8초)
+  sweep: 'AS_StoneGolem_attack2',   // 보스: 뒤에서 앞으로 크게 휘두름 (1.3초 무렵 휘두르는 순간)
 };
 // 모델은 키 1.84m → 1.3배(≈2.4m). 동작 본래 속도(1.3배 기준): 걷기 ≈1.5m/s, 뛰기 ≈2.7m/s
 export const GOLEM_LOOK = { scale: 1.3, walkSpeed: 0.75, runSpeed: 0.95, slamHit: 1.55, slamSpeed: 1.41, height: 2.4 };

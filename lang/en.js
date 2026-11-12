@@ -96,11 +96,11 @@
 "시대 전환 {0}번": "Shifts: {0}",
 "추락 {0}번": "Falls: {0}",
 "성채의 심장": "Heart of the Keep",
-"성채지기는 내가 시대를 바꾸면 1.5초 늦게 따라와요. 그 사이 등 뒤로 가 있다가 찌르세요": "The Warden follows your shifts 1.5 s late. Get behind it in that moment, then stab",
-"붉은 고리 = 따라오면 떨어지는 자리. 어제에서 오늘의 꺼진 바닥 위로 끌어들인 뒤 오늘로 바꾸세요": "Red ring = it falls when it follows. In yesterday, lure it over today's broken floor, then shift to today",
+"성채지기는 공격하는 순간에만 시간을 놓쳐요. 내려찍기 직전에 시대를 바꾸고, 멈춘 윤곽의 등 뒤로 가세요": "The Warden only loses track of time while it attacks. Shift right before its slam, then get behind its frozen outline",
+"붉은 부채꼴이 보이면 Shift → 1.5초 뒤 하던 동작 그대로 와요. 어제 돌진하는 중에 바꾸면 오늘의 꺼진 바닥으로 떨어뜨릴 수도 있어요": "Red wedge? Shift → it arrives 1.5 s later still mid-swing. Shift during yesterday's charge and it may fall through today's broken floor",
 "성채지기": "THE WARDEN",
 "성채지기가 깨어났어요": "The Warden awakens",
-"따라오는 중 {0}초": "Following in {0}s",
+"공격에 묶여 따라오는 중 {0}초": "Stuck mid-attack — follows in {0}s",
 "떨어지는 중…": "Falling…",
 "쓰러뜨림": "Defeated",
 "벽에 박혔어요 — 지금 등 뒤로!": "Stuck in the wall — get behind it now!",
@@ -110,5 +110,6 @@
 "성채지기를 쓰러뜨렸어요 — 출구가 열렸어요": "The Warden falls — the exit is open",
 "성채지기에게 맞았어요": "Crushed by the Warden",
 "성채지기의 돌진에 받혔어요": "Rammed by the Warden",
-"충격파에 맞았어요": "Hit by the shockwave"
+"충격파에 맞았어요": "Hit by the shockwave",
+"성채지기가 휘둘렀어요": "Swept by the Warden"
 };

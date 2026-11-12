@@ -993,7 +993,7 @@ function tryShift() {
   S.era = to; S.shiftCd = SHIFT_CD; S.shifts++;
   S.shiftStrike = 0.6; // 전환 기습: 다른 시대로 넘어온 직후 0.6초 (어제의 경비, 오늘의 골렘 모두)
   // 시간 충격: 나타난 자리 3m(GUARD.shock) 안의 경비는 0.6초 얼어붙는다 (그 사이에 찌르면 앞에서도 한 방)
-  for (const g of enemies()) if (g.alive && g.era === to && Math.hypot(g.x - S.p.x, g.z - S.p.z) < GUARD.shock) { g.stun = 0.6; if (g.anim) g.anim.once('AS_Hit_F_Seq', { speed: 1.2, dur: 0.6 }); }
+  for (const g of enemies()) if (g.alive && g.era === to && g.kind !== 'boss' && Math.hypot(g.x - S.p.x, g.z - S.p.z) < GUARD.shock) { g.stun = 0.6; if (g.anim) g.anim.once('AS_Hit_F_Seq', { speed: 1.2, dur: 0.6 }); }
   sfx.shift(to); drawEra(); syncGhostVis();
   screenFlash(to === 'past' ? '#ffd27a' : '#7fe8ff', 0.1);
   return stand(to, cellOf(S.p.x), cellOf(S.p.z)) || onRaft() ? 'ok' : 'fall';
@@ -2099,19 +2099,29 @@ function updateGolemsView() {
   }
 }
 
-/* ───────── 성채지기 — 내가 있는 시대로 1.5초 늦게 따라오는 보스 (기획서 19장) ─────────
+/* ───────── 성채지기 — 공격하는 순간에만 시간을 놓치는 보스 (기획서 19장, 11/12 오후 고침) ─────────
    모델은 골렘과 같은 StoneGolem(1.6배). 뼈대 하나가 시대를 옮겨 다닌다: 오늘 = 돌, 어제 = 금박.
-   내가 다른 시대로 가면 떠난 시대에 그 자세로 멈춰 있다가 follow초 뒤 그 자리·그 방향 그대로 내 시대에 나타난다(daze초 휘청).
-   그 자리가 이쪽 시대에서 벽이면 가장 가까운 빈 칸으로, 구덩이면 떨어진다(2칸). 등 찌르기 1칸.
-   오늘: 느린 걸음 + 내려찍기. 어제: 빠른 뜀 + 내려찍기 + 돌진(벽에 박히면 멈춤). 3칸 이하(2페이즈): 더 빨리 따라오고, 도착 휘청임 끝에 충격파 */
+   내가 다른 시대로 가면 떠난 시대에 그 자세로 멈춘다. 평소엔 quick초 만에 따라와 **내 쪽을 보고** 나타난다 → Shift만 눌러서는 등을 못 잡는다.
+   공격(내려찍기·휘두르기 예비동작, 돌진) 중에 바꾸면 = 시간 회피: 그 동작에 묶여 follow초 뒤, 멈춘 자리·방향 그대로 나타나 하던 공격을 마저 한다.
+   그 사이 등 뒤로 가 있으면 찌를 수 있고, 그 자리가 이쪽에서 구덩이면 떨어진다(2칸). 시간 충격(전환 직후 경직)은 안 먹힌다.
+   내려찍기는 앞 120°(등 뒤는 안전), 등·옆에 붙어 있으면 몸을 돌려 휘두른다(둘레). 3칸 이하: 묶여도 더 빨리 따라오고, 나타날 때 충격파 */
 const BOSS = {
-  hp: 6, phase2: 3, follow: 1.5, follow2: 1.1, daze: 0.7, hurtCd: 1.0, stagger: 0.9, knock: 0.9, r: 0.8,
+  hp: 6, phase2: 3,
+  follow: 1.5, follow2: 1.2,  // 공격에 묶였을 때 따라오는 데 걸리는 시간 = 시간 회피의 틈
+  quick: 0.35,                // 평소에 따라오는 시간
+  appear: 0.3, appear2: 0.6,  // 평소에 나타난 뒤 못 움직이는 시간 (2페이즈는 끝에 충격파)
+  rise: 0.7,                  // 구덩이에서 올라온 뒤 휘청 (같은 방향 = 등이 열림)
+  hurtCd: 1.0, stagger: 0.9, knock: 0.9, r: 0.8,
   wake: 7, fallDmg: 2, fallBack: 1.6, shock: 2.3,
-  now: { run: 1.9, turn: 2.4, windup: 0.85, recover: 0.95, slamR: 2.5, attackAt: 2.0 },
-  past: { run: 3.3, turn: 3.6, windup: 0.6, recover: 0.75, slamR: 2.3, attackAt: 1.9 },
+  front: THREE.MathUtils.degToRad(60), // 내려찍기가 닿는 앞쪽 반각
+  now: { run: 1.9, turn: 3.0, windup: 0.85, recover: 1.0, slamR: 2.7, attackAt: 2.3 },
+  past: { run: 3.3, turn: 4.5, windup: 0.6, recover: 0.8, slamR: 2.5, attackAt: 2.1 },
+  sweep: { near: 2.5, after: 0.3, windup: 0.5, r: 2.4, recover: 0.8, cd: 1.2, hit: 1.3 }, // 등·옆에 after초 붙어 있으면 휘두름. hit = attack2에서 휘두르는 순간(초)
   charge: { min: 3.5, max: 10, tele: 0.6, speed: 12, over: 3.0, len: 12, hitW: 1.15, wallStun: 1.4, recover: 0.7, cd: 2.6 }, // 돌진: 겨눈 자리를 over m 지나칠 때까지(최대 len)
 };
-const bossFollow = b => (b.hp <= BOSS.phase2 ? BOSS.follow2 : BOSS.follow);
+const bossLocked = b => b.wind > 0 || (b.sweep && b.sweep.ph === 'wind') || (b.charge && b.charge.ph !== 'rec');
+const bossFollow = b => (bossLocked(b) ? (b.hp <= BOSS.phase2 ? BOSS.follow2 : BOSS.follow) : BOSS.quick);
+const inFrontOf = (b, x, z, half) => { const [fx, fz] = gFwd(b), dx = x - b.x, dz = z - b.z, d = Math.hypot(dx, dz); return d < 0.01 || (dx * fx + dz * fz) / d > Math.cos(half); };
 // 어제의 금박 몸: 돌 텍스처 위에 금빛을 곱하고 은은히 빛나게
 const bossGoldMats = new Map();
 function bossGoldMat(src) {
@@ -2130,9 +2140,12 @@ const discGeo1 = new THREE.CircleGeometry(1, 56);
 const laneGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5); // 앞(+z)으로 뻗는 띠
 // 등 뒤 구역: 찌르기가 '등 뒤'로 들어가는 140°(앞에서 110° 넘게) × 몸 밖~돌진 거리 3m. 바닥에 눕히면 θ=90°가 뒤(-z)
 const backGeo = new THREE.RingGeometry(1.05, GUARD.lunge, 40, 1, Math.PI / 2 - THREE.MathUtils.degToRad(70), THREE.MathUtils.degToRad(140)).rotateX(-Math.PI / 2);
+// 내려찍기 범위: 앞 120° 부채꼴 (θ=-90°가 앞(+z))
+const frontGeo = new THREE.CircleGeometry(1, 40, -Math.PI / 2 - BOSS.front, 2 * BOSS.front).rotateX(-Math.PI / 2);
+laneGeo.userData.flat = backGeo.userData.flat = frontGeo.userData.flat = true;
 function decal(geo, color) {
   const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
-  if (geo !== laneGeo && geo !== backGeo) m.rotation.x = -Math.PI / 2;
+  if (!geo.userData.flat) m.rotation.x = -Math.PI / 2;
   m.renderOrder = 4; m.visible = false; world.add(m);
   return m;
 }
@@ -2149,7 +2162,7 @@ function spawnBoss(room) {
   const def = room.boss;
   const b = { kind: 'boss', era: def.era || 'now', x: def.at[0] * T + 1, z: def.at[1] * T + 1, py: 0, yaw: THREE.MathUtils.degToRad(def.face || 0),
     hp: BOSS.hp, state: 'dormant', alive: true, sus: 0, wind: 0, rec: 0, stun: 0, daze: 0, stagger: 0, hurtCd: 0, followT: 0,
-    fall: null, charge: null, chargeCd: 1.2, replan: 0, step: null, shockArm: false, burst: null, hpShown: -1 };
+    fall: null, charge: null, chargeCd: 1.2, sweep: null, sweepCd: 0, flankT: 0, dazeMax: 0, rising: false, replan: 0, step: null, shockArm: false, burst: null, hpShown: -1 };
   const m = buildGolem(CHAR.golem, src => src);
   m.rig.scale.setScalar(BOSS_LOOK.scale);
   b.rig = m.rig; b.meshes = m.meshes; b.weapons = m.weapons; b.parts = m.meshes.concat(m.weapons);
@@ -2164,8 +2177,8 @@ function spawnBoss(room) {
   b.ghostWeapons = m.weapons.map(w => { const gm = new THREE.Mesh(w.geometry, golemGhostMat); gm.matrixAutoUpdate = false; gm.frustumCulled = false; gm.renderOrder = 8; b.ghost.add(gm); return gm; });
   b.ghost.visible = false; ghostActors.add(b.ghost);
   b.followRing = decal(ringGeo1, '#7fe8ff');  // 도착 시계: 줄어드는 고리 (구덩이 위면 붉게)
-  b.slamRing = decal(discGeo1, '#ff3020');   // 내려찍기 범위
-  b.shockRing = decal(ringGeo1, '#ff6a3a');  // 2페이즈 도착 충격파 범위
+  b.slamRing = decal(frontGeo, '#ff4a2a');   // 내려찍기 범위 (앞 120°)
+  b.shockRing = decal(ringGeo1, '#ff6a3a');  // 둘레 공격 범위: 휘두르기 · 2페이즈 나타날 때 충격파
   b.burstRing = decal(ringGeo1, '#ffffff');  // 도착·충격파 번쩍
   b.chargeLine = decal(laneGeo, '#ff3a20');  // 돌진 길
   b.backArc = decal(backGeo, '#7fe8ff');     // 등 뒤 구역 (멈춰 있거나 휘청일 때)
@@ -2213,6 +2226,27 @@ function startSlam(b) {
   b.anim.once(GCLIP.slam, { fade: 0.12, speed: L.slamSpeed, from: Math.max(0, L.slamHit - P.windup * L.slamSpeed), dur: P.windup + P.recover });
   sfx.windup();
 }
+// 휘두르기: 등·옆에 붙어 있으면 몸을 돌리며 둘레를 친다 (빙빙 돌며 등 잡기 막기)
+function startSweep(b) {
+  const W = BOSS.sweep;
+  b.sweep = { ph: 'wind', t: W.windup };
+  b.anim.once(GCLIP.sweep, { fade: 0.1, speed: 1, from: Math.max(0, W.hit - W.windup), dur: W.windup + W.recover });
+  sfx.windup();
+}
+function stepSweep(b, dt, dist, here) {
+  const W = BOSS.sweep, w = b.sweep;
+  w.t -= dt;
+  if (w.ph === 'wind') {
+    if (w.t <= 0) {
+      w.ph = 'rec'; w.t = W.recover;
+      S.shake = Math.max(S.shake, 0.3); sfx.slam(); bossBurst(b, '#ff5030', W.r);
+      if (here && dist < W.r) hurt($t('성채지기가 휘둘렀어요'));
+    }
+  } else {
+    if (w.t > W.recover - 0.3) turnTo(b, S.p.x, S.p.z, dt, 9); // 휘두르며 몸을 돌린다
+    if (w.t <= 0) { b.sweep = null; b.sweepCd = W.cd; b.flankT = 0; }
+  }
+}
 function startCharge(b) {
   const C = BOSS.charge;
   b.charge = { ph: 'tele', t: C.tele, dx: 0, dz: 0, went: 0, len: 0, want: C.len, wall: false, hit: false };
@@ -2244,14 +2278,26 @@ function stepCharge(b, dt, here) {
   } else if ((c.t -= dt) <= 0) endCharge(b);
 }
 function bossArrive(b) {
-  b.followT = 0; b.wind = 0; b.rec = 0; b.stun = 0; b.stagger = 0;
-  if (b.charge) endCharge(b);
-  const E = S.era, i = cellOf(b.x), j = cellOf(b.z);
+  const locked = bossLocked(b), E = S.era, i = cellOf(b.x), j = cellOf(b.z);
+  b.followT = 0; b.stun = 0; b.stagger = 0; b.daze = 0; b.rising = false;
   setBossEra(b, E);
-  if (solid(E, i, j)) [b.x, b.z] = nearestStand(E, i, j, (a, c) => a === cellOf(S.p.x) && c === cellOf(S.p.z));
-  else if (!floorAt(E, i, j)) { startBossFall(b); return; }
-  b.daze = BOSS.daze; b.shockArm = b.hp <= BOSS.phase2;
-  b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / (BOSS.daze + 0.2), dur: BOSS.daze });
+  if (locked) {
+    // 시간 회피: 공격에 묶인 채, 멈춘 자리·방향 그대로 와서 하던 공격을 마저 한다. 그 칸이 구덩이면 떨어짐
+    if (solid(E, i, j)) [b.x, b.z] = nearestStand(E, i, j, (a, c) => a === cellOf(S.p.x) && c === cellOf(S.p.z));
+    else if (!floorAt(E, i, j)) { b.wind = 0; b.rec = 0; b.sweep = null; if (b.charge) endCharge(b); startBossFall(b); return; }
+    const c = b.charge;
+    if (c && c.ph === 'dash') { const r = bodyRay(E, b.x, b.z, c.dx, c.dz, Math.max(0, c.len - c.went), BOSS.r); c.len = c.went + r.d; c.wall = r.wall; } // 이 시대의 벽·구덩이로 남은 길을 다시 잰다
+    bossBurst(b, E === 'past' ? '#ffd27a' : '#7fe8ff', 2.4);
+    sfx.arrive(E); S.shake = Math.max(S.shake, 0.22);
+    placeBoss(b); return;
+  }
+  // 평소: 금방 따라와 내 쪽을 보고 나타난다 (Shift만 눌러서는 아무것도 못 얻는다)
+  b.wind = 0; b.rec = 0; b.sweep = null; if (b.charge) endCharge(b);
+  if (!stand(E, i, j)) [b.x, b.z] = nearestStand(E, i, j, (a, c) => a === cellOf(S.p.x) && c === cellOf(S.p.z));
+  b.yaw = Math.atan2(S.p.x - b.x, S.p.z - b.z);
+  const ph2 = b.hp <= BOSS.phase2;
+  b.daze = b.dazeMax = ph2 ? BOSS.appear2 : BOSS.appear; b.shockArm = ph2;
+  b.anim.onceLeft = 0; b.anim.loop(GCLIP.idle, 0.1);
   bossBurst(b, E === 'past' ? '#ffd27a' : '#7fe8ff');
   sfx.arrive(E); S.shake = Math.max(S.shake, 0.22);
   placeBoss(b);
@@ -2274,8 +2320,8 @@ function stepBossFall(b, dt) {
   if (f.t >= BOSS.fallBack) {
     // 가장 가까운 바닥에서 다시 올라온다 — 같은 방향, 잠깐 휘청
     b.fall = null; b.py = 0; b.holder.visible = true; [b.x, b.z] = f.to;
-    b.daze = BOSS.daze; b.shockArm = b.hp <= BOSS.phase2;
-    b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / (BOSS.daze + 0.2), dur: BOSS.daze });
+    b.daze = b.dazeMax = BOSS.rise; b.rising = true; b.shockArm = b.hp <= BOSS.phase2;
+    b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / (BOSS.rise + 0.2), dur: BOSS.rise });
     bossBurst(b, b.era === 'past' ? '#ffd27a' : '#7fe8ff'); sfx.arrive(b.era);
     placeBoss(b);
   }
@@ -2298,9 +2344,10 @@ function stepBoss(b, dt) {
   const here = S.falling <= 0 && !S.trans;
   b.rig.rotation.z = 0;
   if (b.state === 'dormant') { b.anim.update(dt); if (here && dist < BOSS.wake) wakeBoss(b); placeBoss(b); return; }
-  if (b.stun > 0) { b.stun -= dt; b.rig.rotation.z = Math.sin(S.time * 40) * 0.02; placeBoss(b); return; } // 시간 충격: 그 자세로 떤다
+  b.stun = 0; // 시간 충격은 안 먹힌다
   if (b.daze > 0) {
     b.daze -= dt; b.anim.update(dt);
+    if (b.daze <= 0) b.rising = false;
     if (b.daze <= 0 && b.shockArm) {
       b.shockArm = false; bossBurst(b, '#ff6a3a', BOSS.shock * 1.15);
       S.shake = Math.max(S.shake, 0.35); sfx.slam();
@@ -2310,18 +2357,24 @@ function stepBoss(b, dt) {
   }
   if (b.stagger > 0) { b.stagger -= dt; b.anim.update(dt); placeBoss(b); return; }
   if (b.charge) { stepCharge(b, dt, here); b.anim.update(dt); placeBoss(b); return; }
+  if (b.sweep) { stepSweep(b, dt, dist, here); b.anim.update(dt); placeBoss(b); return; }
   if (b.wind > 0) {
     turnTo(b, S.p.x, S.p.z, dt, b.era === 'past' ? 2.2 : 1.4);
     b.wind -= dt; b.anim.update(dt);
     if (b.wind <= 0) {
       b.rec = P.recover; S.shake = Math.max(S.shake, 0.3); sfx.slam();
       bossBurst(b, '#ff5030', P.slamR);
-      if (here && dist < P.slamR) hurt($t('성채지기에게 맞았어요'));
+      if (here && dist < P.slamR && inFrontOf(b, S.p.x, S.p.z, BOSS.front)) hurt($t('성채지기에게 맞았어요'));
     }
     placeBoss(b); return;
   }
   if (b.rec > 0) { b.rec -= dt; b.anim.update(dt); placeBoss(b); return; }
-  if (here && dist < P.attackAt) startSlam(b);
+  // 등·옆에 붙어 있던 시간 → 휘두르기 / 앞에 있으면 내려찍기 / 어제 멀면 돌진 / 아니면 쫓기
+  const front = inFrontOf(b, S.p.x, S.p.z, BOSS.front);
+  b.flankT = here && dist < BOSS.sweep.near && !front ? b.flankT + dt : 0;
+  b.sweepCd = Math.max(0, b.sweepCd - dt);
+  if (here && b.flankT > BOSS.sweep.after && b.sweepCd <= 0) startSweep(b);
+  else if (here && dist < P.attackAt && front) startSlam(b);
   else if (here && b.era === 'past' && b.chargeCd <= 0 && dist > BOSS.charge.min && dist < BOSS.charge.max && rayLen(b.era, b.x, b.z, dx / dist, dz / dist, dist) >= dist - 0.05) startCharge(b);
   else {
     b.replan -= dt;
@@ -2342,7 +2395,7 @@ function hitBoss(b, how) {
   if (b.state === 'dormant') { b.state = 'alert'; sfx.wake(); }
   b.hp -= 1; b.hurtCd = BOSS.hurtCd;
   if (b.hp <= 0) { killBoss(b, how); return 'kill'; }
-  const busy = b.wind > 0 || b.rec > 0 || (b.charge && b.charge.ph !== 'tele');
+  const busy = b.wind > 0 || b.rec > 0 || !!b.sweep || (b.charge && b.charge.ph !== 'tele');
   if (b.daze > 0) b.shockArm = false; // 도착하자마자 찌르면 충격파가 취소된다
   if (!busy) {
     if (b.charge) endCharge(b);
@@ -2382,20 +2435,22 @@ function updateBossView() {
   if (following || (b.alive && b.fall && here)) {
     const k = following ? Math.min(1, b.followT / bossFollow(b)) : Math.min(1, b.fall.t / BOSS.fallBack);
     const [x, z] = following ? [b.x, b.z] : b.fall.to, ci = cellOf(x), cj = cellOf(z);
-    const pit = following && !floorAt(S.era, ci, cj) && !solid(S.era, ci, cj);
+    const pit = following && bossLocked(b) && !floorAt(S.era, ci, cj) && !solid(S.era, ci, cj); // 평소엔 구덩이를 피해 나타나므로 묶였을 때만
     fr.visible = true; fr.position.set(x, 0.08, z); fr.scale.setScalar(2.8 - 1.9 * k);
     fr.material.color.set(pit ? '#ff4a5a' : eraCol); fr.material.opacity = 0.35 + 0.5 * k;
   } else fr.visible = false;
   const P = BOSS[b.era];
   b.slamRing.visible = here && b.alive && b.wind > 0;
-  if (b.slamRing.visible) { const k = 1 - b.wind / P.windup; b.slamRing.position.set(b.x, 0.06, b.z); b.slamRing.scale.setScalar(P.slamR * (0.3 + 0.7 * k)); b.slamRing.material.opacity = 0.12 + 0.35 * k; }
-  b.shockRing.visible = here && b.alive && b.daze > 0 && b.shockArm;
-  if (b.shockRing.visible) { const k = 1 - b.daze / BOSS.daze; b.shockRing.position.set(b.x, 0.07, b.z); b.shockRing.scale.setScalar(BOSS.shock * (0.35 + 0.65 * k)); b.shockRing.material.opacity = 0.25 + 0.5 * k; }
+  if (b.slamRing.visible) { const k = 1 - b.wind / P.windup; b.slamRing.position.set(b.x, 0.06, b.z); b.slamRing.rotation.y = b.yaw; b.slamRing.scale.setScalar(P.slamR * (0.45 + 0.55 * k)); b.slamRing.material.opacity = 0.3 + 0.45 * k; }
+  const sw = b.sweep && b.sweep.ph === 'wind', shockOn = b.daze > 0 && b.shockArm;
+  b.shockRing.visible = here && b.alive && (sw || shockOn);
+  if (b.shockRing.visible) { const k = sw ? 1 - b.sweep.t / BOSS.sweep.windup : 1 - b.daze / Math.max(0.01, b.dazeMax), R = sw ? BOSS.sweep.r : BOSS.shock; b.shockRing.position.set(b.x, 0.07, b.z); b.shockRing.scale.setScalar(R * (0.35 + 0.65 * k)); b.shockRing.material.opacity = 0.25 + 0.5 * k; }
   const c = b.charge;
   b.chargeLine.visible = here && b.alive && !!c && c.ph === 'tele';
   if (b.chargeLine.visible) { const k = 1 - c.t / BOSS.charge.tele; b.chargeLine.position.set(b.x, 0.07, b.z); b.chargeLine.rotation.y = b.yaw; b.chargeLine.scale.set(BOSS.charge.hitW * 2, 1, c.len + BOSS.r); b.chargeLine.material.opacity = 0.12 + 0.4 * k; }
   // 등 뒤 구역: 다른 시대에 멈춰 있을 때(= 도착할 때 등이 될 자리) · 휘청이거나 벽에 박혔을 때
-  const open = b.alive && !b.fall && b.state !== 'dormant' && (following || (here && (b.daze > 0 || b.stagger > 0.25 || b.stun > 0)));
+  // 등 뒤 구역: 공격에 묶여 멈춰 있을 때(= 그대로 와서 마저 칠 방향의 반대) · 구덩이에서 올라올 때 · 벽에 박혔을 때 · 내려찍고 회복할 때
+  const open = b.alive && !b.fall && b.state !== 'dormant' && ((following && bossLocked(b)) || (here && (b.rising || b.stagger > 0.25 || b.rec > 0.15)));
   b.backArc.visible = open;
   if (open) { b.backArc.position.set(b.x, 0.075, b.z); b.backArc.rotation.y = b.yaw; b.backArc.material.color.set(eraCol); b.backArc.material.opacity = 0.3 + 0.1 * Math.sin(S.time * 6); }
   b.burstRing.visible = !!b.burst && here;
@@ -2407,7 +2462,7 @@ function updateBossView() {
   if (b.hpShown !== b.hp) { b.hpShown = b.hp; let s = ''; for (let k = 0; k < BOSS.hp; k++) s += `<i class="${k < b.hp ? '' : 'off'}"></i>`; hud.bossPips.innerHTML = s; }
   hud.boss.classList.toggle('angry', b.alive && b.hp <= BOSS.phase2);
   hud.boss.classList.toggle('down', !b.alive);
-  hud.bossFollow.textContent = !b.alive ? $t('쓰러뜨림') : b.fall ? $t('떨어지는 중…') : following ? $t('따라오는 중 {0}초', Math.max(0, bossFollow(b) - b.followT).toFixed(1)) : '';
+  hud.bossFollow.textContent = !b.alive ? $t('쓰러뜨림') : b.fall ? $t('떨어지는 중…') : following && bossLocked(b) ? $t('공격에 묶여 따라오는 중 {0}초', Math.max(0, bossFollow(b) - b.followT).toFixed(1)) : '';
 }
 
 /* ───────── 방 이동 · 점수(어제에서 쓴 시간) ───────── */
@@ -2569,7 +2624,7 @@ window.__yk = {
   golems() { return golems.map(g => ({ alive: g.alive, state: g.state, sus: +g.sus.toFixed(2), x: +g.x.toFixed(2), z: +g.z.toFixed(2), cell: [cellOf(g.x), cellOf(g.z)], yawDeg: Math.round(THREE.MathUtils.radToDeg(g.yaw)), wind: +g.wind.toFixed(2), stun: +g.stun.toFixed(2), anim: g.anim ? g.anim.curName.replace('AS_StoneGolem_', '') : 'blocks' })); },
   golemModel: () => !!CHAR.golem,
   boss() { const b = bosses[0]; if (!b) return S.bossPending ? 'pending' : null; return { alive: b.alive, era: b.era, state: b.state, hp: b.hp, x: +b.x.toFixed(2), z: +b.z.toFixed(2), py: +b.py.toFixed(2), cell: [cellOf(b.x), cellOf(b.z)], yawDeg: Math.round(THREE.MathUtils.radToDeg(b.yaw)),
-    followT: +b.followT.toFixed(2), daze: +b.daze.toFixed(2), stagger: +b.stagger.toFixed(2), wind: +b.wind.toFixed(2), rec: +b.rec.toFixed(2), stun: +b.stun.toFixed(2), hurtCd: +b.hurtCd.toFixed(2), charge: b.charge ? b.charge.ph : null, fall: !!b.fall, shockArm: b.shockArm, anim: b.anim.curName.replace('AS_StoneGolem_', '') }; },
+    followT: +b.followT.toFixed(2), daze: +b.daze.toFixed(2), stagger: +b.stagger.toFixed(2), wind: +b.wind.toFixed(2), rec: +b.rec.toFixed(2), stun: +b.stun.toFixed(2), hurtCd: +b.hurtCd.toFixed(2), charge: b.charge ? b.charge.ph : null, sweep: b.sweep ? b.sweep.ph : null, flankT: +b.flankT.toFixed(2), fall: !!b.fall, shockArm: b.shockArm, anim: b.anim.curName.replace('AS_StoneGolem_', '') }; },
   bossSet(o) { const b = bosses[0]; if (!b) return null; if (o.x != null) b.x = o.x; if (o.z != null) b.z = o.z; if (o.yawDeg != null) b.yaw = THREE.MathUtils.degToRad(o.yawDeg); if (o.hp != null) b.hp = o.hp; if (o.state) b.state = o.state; if (o.era && o.era !== b.era) setBossEra(b, o.era); placeBoss(b); render(); return this.boss(); },
   guards() { return guards.map(g => ({ alive: g.alive, state: g.state, sus: +g.sus.toFixed(2), x: +g.x.toFixed(2), z: +g.z.toFixed(2), cell: [cellOf(g.x), cellOf(g.z)], yawDeg: Math.round(THREE.MathUtils.radToDeg(g.yaw)), wind: +g.wind.toFixed(2) })); },
   guardSet(k, x, z, yawDeg) { const g = guards[k]; if (!g) return null; g.x = x; g.z = z; if (yawDeg != null) g.yaw = THREE.MathUtils.degToRad(yawDeg); placeGuard(g); updateCone(g); render(); return this.guards()[k]; },
