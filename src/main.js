@@ -2605,7 +2605,10 @@ window.__yk = {
     hud.loading.firstElementChild.textContent = $t('불러오기에 실패했어요');
     return;
   }
-  loadRoom(0);
+  // ?room=heart 처럼 방 이름(또는 1부터 센 번호)을 주면 그 방에서 시작 (손으로 시험할 때)
+  const want = new URLSearchParams(location.search).get('room');
+  const startIdx = want ? Math.max(0, /^\d+$/.test(want) ? +want - 1 : ROOMS.findIndex(r => r.id === want)) : 0;
+  loadRoom(startIdx);
   // 셰이더를 미리 컴파일해 첫 전환 때 끊기지 않게
   for (const E of ERAS) groups[E].visible = true;
   renderer.compile(scene, camera);
