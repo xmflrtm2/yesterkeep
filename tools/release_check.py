@@ -45,6 +45,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         pass
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # the stock listen backlog is 5; Chrome opens many requests at once while the GLBs pull their textures, and on
+    # Windows an overflow resets the connection -> "Couldn't load texture" with no HTTP status (11/12, seen 1 run in 3)
+    request_queue_size = 128
+    daemon_threads = True
+
+
 def case_ok(root, rel):
     """True if every path segment of rel exists in root with exactly this case."""
     cur = root
@@ -127,7 +134,7 @@ def net_summary(events, base):
 
 async def run(root, shots, json_out):
     port, dbg = free_port(), free_port()
-    httpd = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(Handler, directory=root))
+    httpd = Server(('127.0.0.1', port), functools.partial(Handler, directory=root))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     prof = tempfile.mkdtemp(prefix='yk-check-')
     ch = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={dbg}', f'--user-data-dir={prof}', '--lang=en-US',
@@ -213,6 +220,9 @@ async def run(root, shots, json_out):
             rep['console_expected_headless'] = len(expected)
             game_files = {k: v for k, v in files.items() if not k.startswith('src/dev/') and k != 'favicon.ico'}
             rep['http_errors'] = sorted(k for k, v in game_files.items() if v['status'] >= 400)
+            rid_url = {e['params']['requestId']: e['params']['request']['url'] for e in c.events if e['method'] == 'Network.requestWillBeSent'}
+            rep['failed_requests'] = sorted({f"{urllib.parse.unquote(rid_url.get(e['params']['requestId'], '?').replace(base, ''))} ({e['params']['errorText']})"
+                                             for e in c.events if e['method'] == 'Network.loadingFailed' and not e['params'].get('canceled')})
             rep['case_mismatch'] = sorted(k for k, v in game_files.items() if v['status'] < 400 and not case_ok(root, k))
             first = sum(first_list.values())
             total = sum(v['size'] for v in game_files.values())
@@ -243,6 +253,7 @@ def show(rep):
     for e in rep['console'][:10]:
         print('       ', e)
     print(f"  {ok(not rep['http_errors'])} missing files (HTTP >= 400): {rep['http_errors'] or 0}")
+    print(f"  {ok(not rep['failed_requests'])} requests that failed without an HTTP status: {rep['failed_requests'] or 0}")
     print(f"  {ok(not rep['case_mismatch'])} path case mismatches (itch CDN is case-sensitive): {rep['case_mismatch'] or 0}")
     print(f"  {ok(rep['lang'] == 'en')} default language for an en-US browser: {rep['lang']} (title '{rep['title']}')")
     print(f"  {ok(not rep['i18n_missing_at_runtime'])} translations missing while playing: {len(rep['i18n_missing_at_runtime'])}")
