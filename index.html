@@ -104,10 +104,19 @@ function i18nDom(root) {
   #loading .bar { width: 260px; height: 6px; background: #ffffff22; border-radius: 3px; overflow: hidden; }
   #loading .bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .15s; }
   #loading.done { display: none; }
-  #endCard { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px;
-    background: #000c; font-size: 18px; text-align: center; pointer-events: auto; }
+  /* 끝 화면: 안쪽 상자를 margin:auto로 가운데 → 창이 낮으면 잘리지 않고 스크롤 */
+  #endCard { position: fixed; inset: 0; display: none; overflow-y: auto; padding: 16px; box-sizing: border-box;
+    background: #000d; font-size: 18px; text-align: center; pointer-events: auto; }
+  #endCard .inner { margin: auto; max-width: 780px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-wrap: balance; }
+  body:has(#endCard[style*="flex"]) #hud { visibility: hidden; } /* 끝 화면 뒤로 토스트·힌트가 비치지 않게 */
   #endCard h2 { margin: 0; font-size: 32px; color: var(--gold); }
-  #endCard button { margin-top: 10px; font: inherit; padding: 8px 22px; border-radius: 8px; border: 1px solid #ffffff55; background: #ffffff14; color: inherit; cursor: pointer; }
+  #endCard .story { font-size: 17px; line-height: 1.5; opacity: .92; }
+  #endCard .thanks { font-size: 20px; color: var(--teal); }
+  #endStats { line-height: 1.55; margin-top: 4px; }
+  #endStats .score { font-size: 22px; color: var(--gold); }
+  #endStats .small { font-size: 14px; opacity: .75; }
+  #endCard button { margin-top: 6px; font: inherit; padding: 8px 22px; border-radius: 8px; border: 1px solid #ffffff55; background: #ffffff14; color: inherit; cursor: pointer; }
+  #endCard .credits { margin-top: 6px; font-size: 12px; line-height: 1.5; opacity: .6; }
 </style>
 </head>
 <body class="now">
@@ -128,11 +137,18 @@ function i18nDom(root) {
 <div id="down"><div class="glyph">⟲</div><div class="txt"><span data-t>시간을 되감는 중…</span></div></div>
 <div id="fade"></div>
 <div id="loading"><div><span data-t>불러오는 중…</span></div><div class="bar"><i></i></div></div>
-<div id="endCard">
-  <h2><span data-t>프로토타입 끝</span></h2>
+<div id="endCard"><div class="inner">
+  <h2><span data-t>성채를 빠져나왔어요</span></h2>
+  <div class="story"><span data-t>성채지기가 쓰러지자, 성채의 어제는 마침내 멈췄어요.</span><br><span data-t>오늘의 폐허에는 이제 바람 소리뿐이에요.</span></div>
+  <div class="thanks"><span data-t>플레이해 주셔서 고마워요!</span></div>
   <div id="endStats"></div>
   <button id="endRestart"><span data-t>처음부터</span></button>
-</div>
+  <div class="credits">
+    <div><span data-t>제작: xmflrtm2</span> · <span data-t>three.js로 만들었어요</span></div>
+    <div><span data-t>그림·3D 모델·동작: Fab의 FANTASTIC Dungeon Pack, Modular Stylized Character (Polyart), Dagger Animation Pack, Armored Stone Golem</span></div>
+    <div><span data-t>AI 공개: 코드는 AI 코딩 도우미 Claude로 작성하고 개발자가 지휘·검토했어요</span></div>
+  </div>
+</div></div>
 <script>i18nDom(document.body);</script>
 <script type="module" src="src/main.js"></script>
 </body>

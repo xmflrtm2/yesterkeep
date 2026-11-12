@@ -3,6 +3,7 @@
     py -I tools\\release_check.py                      -> checks this folder (needs assets/fab/)
     py -I tools\\release_check.py build\\itch\\web       -> checks the built upload folder (tools/build_itch.py)
     options: --shots <dir>   save screenshots (first room, end of run)
+             --size WxH      window size (default 1280x720)
              --json <file>   write the full report
 
 What it checks:
@@ -20,7 +21,7 @@ import websockets
 sys.stdout.reconfigure(encoding='utf-8')
 GAME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHROME = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
-W, H = 1280, 720
+W, H = 1280, 720   # --size WxH to check another window (e.g. 907x510, a small itch embed)
 FIRST_MB, TOTAL_MB = 6.0, 15.0
 
 
@@ -266,6 +267,9 @@ def main():
     args = sys.argv[1:]
     opt = lambda k: args[args.index(k) + 1] if k in args else None
     shots, json_out = opt('--shots'), opt('--json')
+    if opt('--size'):
+        global W, H
+        W, H = (int(x) for x in opt('--size').lower().split('x'))
     pos = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0 or not args[i - 1].startswith('--'))]
     root = os.path.abspath(pos[0]) if pos else GAME
     if not os.path.isfile(os.path.join(root, 'index.html')):

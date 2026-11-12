@@ -2495,7 +2495,7 @@ function updateExit() {
     // 기록: 이 방에서 어제에 머문 시간과 별
     const st = roomStars(), best = loadBest(), id = S.room.id, prev = best[id];
     if (!prev || S.pastTime < prev.t || st > prev.stars) { best[id] = { t: +S.pastTime.toFixed(2), stars: Math.max(st, prev ? prev.stars : 0) }; try { localStorage.setItem('yk-best', JSON.stringify(best)); } catch (e) { /* 이번만 */ } }
-    S.runPast += S.pastTime; S.runStars += st;
+    S.runPast += S.pastTime; S.runStars += st; S.runAlarms = (S.runAlarms || 0) + S.alarms;
     if (S.room.par != null || enemies().length) toast($t('어제 {0}초', S.pastTime.toFixed(1)) + '  ' + '★'.repeat(st) + '☆'.repeat(3 - st), 2.4);
     S.trans = { t: 0, next: S.roomIdx + 1 };
   }
@@ -2515,12 +2515,17 @@ function updateTrans(dt) {
 function showEnd() {
   S.ended = true;
   const m = Math.floor(S.time / 60), s = Math.floor(S.time % 60);
-  hud.endStats.innerHTML = `${$t('걸린 시간 {0}분 {1}초', m, s)}<br>${$t('시대 전환 {0}번', S.shifts)} · ${$t('추락 {0}번', S.falls)} · ${$t('함정 {0}번', S.hurts)}<br>${$t('모래시계 조각 {0} / {1}', S.got.size, SHARD_TOTAL)}<br>${$t('어제에서 쓴 시간 {0}초', S.runPast.toFixed(1))} · ${$t('쓰러뜨린 경비 {0}', S.kills)} · ★ ${S.runStars}`;
+  // 끝 화면 기록: 점수(어제에서 쓴 초)를 크게, 별·경보, 나머지는 작게. 별 최대 = 방마다 2개(+기준 시간이 있으면 1개)
+  const maxStars = ROOMS.reduce((a, r) => a + (r.par != null ? 3 : 2), 0);
+  hud.endStats.innerHTML = `<div class="score">${$t('어제에서 쓴 시간 {0}초', S.runPast.toFixed(1))}</div>`
+    + `<div>★ ${S.runStars} / ${maxStars} · ${$t('경보 {0}번', S.runAlarms || 0)}</div>`
+    + `<div class="small">${$t('걸린 시간 {0}분 {1}초', m, s)} · ${$t('시대 전환 {0}번', S.shifts)} · ${$t('쓰러뜨린 적 {0}', S.kills)}<br>`
+    + `${$t('모래시계 조각 {0} / {1}', S.got.size, SHARD_TOTAL)} · ${$t('추락 {0}번', S.falls)} · ${$t('함정 {0}번', S.hurts)}</div>`;
   hud.end.style.display = 'flex';
 }
 $('endRestart').addEventListener('click', () => {
   hud.end.style.display = 'none';
-  S.ended = false; S.hearts = 5; S.shifts = 0; S.falls = 0; S.blocked = 0; S.time = 0; S.hurts = 0; S.got.clear(); S.kills = 0; S.runPast = 0; S.runStars = 0;
+  S.ended = false; S.hearts = 5; S.shifts = 0; S.falls = 0; S.blocked = 0; S.time = 0; S.hurts = 0; S.got.clear(); S.kills = 0; S.runPast = 0; S.runStars = 0; S.runAlarms = 0;
   loadRoom(0);
 });
 
