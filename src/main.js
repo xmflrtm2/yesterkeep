@@ -929,7 +929,8 @@ function loadRoom(idx) {
   }
   // 장치의 시계는 그 장치가 있는 시대에 있을 때만 간다 (떠난 시대는 멈춘다)
   for (const sp of spikes) entities.push({ era: sp.era, t: 0, update(dt) { sp.t += dt; } });
-  if (gates.length) entities.push({ era: gates[0].era, t: 0, update(dt) { if (S.gateT > 0) S.gateT = Math.max(0, S.gateT - dt); } });
+  // 창살 칸에 몸이 걸쳐 있는 동안은 닫히지 않는다 (11/12: 지나가는 중에 닫혀 문 앞으로 밀려나 갇힌 것처럼 보였다)
+  if (gates.length) entities.push({ era: gates[0].era, t: 0, update(dt) { if (S.gateT > 0) S.gateT = Math.max(gates.some(g => g.era === S.era && overlapCell(g.i, g.j)) ? 0.01 : 0, S.gateT - dt); } });
   for (const cr of crates) placeCrate(cr, true);
   for (const E of ERAS) if (launchers.some(l => l.era === E)) {
     const ent = { era: E, t: 0, update(dt) { stepArrows(E, dt, false); } };
@@ -1774,7 +1775,15 @@ function killGuard(g, how) {
   const bones = makeMesh('bonePile', 'now'); bones.position.set(g.x, 0, g.z); bones.rotation.y = g.yaw; groups.now.add(bones);
   // 다른 경비가 쓰러지는 걸 보면 바로 경보
   for (const o of guards) if (o.alive && o.state !== 'alert' && canSee(o, g.x, g.z)) alertGuard(o, 'body');
-  if (!enemies().some(o => o.alive)) { toast($t('출구가 열렸어요'), 2); sfx.door(); }
+  if (!enemies().some(o => o.alive)) roomCleared();
+}
+// 방의 적을 다 쓰러뜨림. 출구 앞에 닫힌 창살이 있으면 "출구가 열렸어요" 대신 발판으로 열라고 알리고, 힌트도 발판 요령으로 바꾼다
+// (11/12: 초소에서 "열렸다"는데 창살이 닫혀 있어 버그처럼 보였다)
+function roomCleared() {
+  const gated = gates.length > 0 && S.gateT <= 0;
+  toast(gated ? $t('모두 쓰러뜨렸어요 — 이제 발판으로 창살을 여세요') : $t('출구가 열렸어요'), gated ? 2.8 : 2);
+  sfx.door();
+  if (gated && S.room.gateTip) { hud.hint.textContent = $t(S.room.gateTip); hud.hint.classList.add('tip'); S.tipShown = true; }
 }
 // 찌르기: 앞쪽 1.6m·60° 안의 가장 가까운 경비 한 명
 function stab() {
@@ -2062,7 +2071,7 @@ function killGolem(g, how) {
   }
   }
   for (const o of enemies()) if (o !== g && o.alive && o.era === g.era && o.state !== 'alert' && o.kind === 'golem' && Math.hypot(o.x - g.x, o.z - g.z) < GOLEM.sense) alertGolem(o);
-  if (!enemies().some(o => o.alive)) { toast($t('출구가 열렸어요'), 2); sfx.door(); }
+  if (!enemies().some(o => o.alive)) roomCleared();
 }
 function stepCrumble(g, dt) {
   if (!g.crumble) return;

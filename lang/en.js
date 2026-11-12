@@ -121,5 +121,7 @@
 "충격파에 맞았어요": "Hit by the shockwave",
 "성채지기가 휘둘렀어요": "Swept by the Warden",
 "음악 켬": "Music on",
-"음악 끔": "Music off"
+"음악 끔": "Music off",
+"모두 쓰러뜨렸어요 — 이제 발판으로 창살을 여세요": "All down — now open the gate with the pressure plate",
+"발판(왼쪽)을 어제에 밟고 바로 오늘로 — 오늘엔 창살 시간이 멈춰요. 오늘에서 창살 앞까지 걸어간 뒤 어제로 바꿔 지나가세요": "Step on the plate (left) in yesterday, then shift to today right away — the gate's timer stands still today. Walk up to the gate in today, then shift back to yesterday and go through"
 };
