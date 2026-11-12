@@ -1,7 +1,7 @@
 // English. Keys are the Korean text passed to $t() / N() / shown in the HTML; a missing key falls back to Korean.
 (window.I18N = window.I18N || {})['en'] = {
 "어제의 성채": "Yesterkeep",
-"WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift 시대 전환 · E 상호작용 · R 방 다시 시작": "WASD Move · J/Click Stab · Space Roll · Shift Time shift · E Interact · R Restart room",
+"WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악": "WASD Move · J/Click Stab · Space Roll · Shift Time shift · E Interact · R Restart room · M Music",
 "멈춘 문": "The Held Gate",
 "발판을 밟으면 창살이 잠깐 내려가요. 내가 없는 동안 어제의 시간은 멈춰요": "The plate lowers the gate for a moment. While you're away, yesterday stands still",
 "가시 회랑": "The Spike Hall",
@@ -111,5 +111,7 @@
 "성채지기에게 맞았어요": "Crushed by the Warden",
 "성채지기의 돌진에 받혔어요": "Rammed by the Warden",
 "충격파에 맞았어요": "Hit by the shockwave",
-"성채지기가 휘둘렀어요": "Swept by the Warden"
+"성채지기가 휘둘렀어요": "Swept by the Warden",
+"음악 켬": "Music on",
+"음악 끔": "Music off"
 };

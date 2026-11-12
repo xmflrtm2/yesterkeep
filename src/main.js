@@ -7,6 +7,7 @@ import { SHIFT, ERA_U, eraMaterial, eraPlain } from './eramat.js';
 import { ROOMS } from './rooms.js';
 import { LOOKS, RIG_URL, EXTRA_ANIMS_URL, DAGGER_URL, loadLook, assemble, prepClips, Animator } from './hero.js';
 import { loadGolem, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK } from './golem.js';
+import { music } from './music.js';
 
 const HERO_LOOK = 'rogueF', GUARD_LOOK = 'guardM'; // 플레이어 / 경비병 외형 (hero.js LOOKS)
 const CHAR = { rig: null, clips: null, dagger: null, hero: null, guard: null, golem: null }; // 불러 둔 캐릭터 재료 (golem은 첫 방 뒤 백그라운드)
@@ -96,7 +97,15 @@ let AC = null;
 function ac() {
   if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
   if (AC && AC.state === 'suspended') AC.resume();
+  if (AC) music.attach(AC); // 배경 음악은 첫 입력(소리 허락) 뒤에 시작 (src/music.js)
   return AC;
+}
+// 배경 음악에 지금 상황을 알린다: 쫓기는 중 · 보스 페이즈(0 없음 · 1 · 2 · -1 쓰러뜨림) · 되감는 중
+function musicTick(dt) {
+  const b = bosses[0];
+  const boss = !b || b.state === 'dormant' ? 0 : !b.alive ? -1 : b.hp <= BOSS.phase2 ? 2 : 1;
+  const danger = !b && enemies().some(g => g.alive && g.state === 'alert' && g.era === S.era);
+  music.update(dt, { danger, boss, down: !!S.down });
 }
 function noiseBuf(a, sec) { const b = a.createBuffer(1, Math.floor(a.sampleRate * sec), a.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
 const sfx = {
@@ -937,6 +946,7 @@ function loadRoom(idx) {
   spawnBoss(room);
   S.roomHurt = 0;
   if (room.boss) S.hearts = 5;
+  music.setSong(room.boss ? 'boss' : 'keep');
   // 시작 위치
   let si = 1, sj = 1;
   for (let j = 0; j < S.H; j++) for (let i = 0; i < S.W; i++) if (G[room.startEra][j][i] === '@') { si = i; sj = j; }
@@ -964,6 +974,7 @@ function setEraInstant(e) {
   for (const E of ERAS) { groups[E].visible = E === e; ERA_U[E].side.value = -1; }
   SHIFT.radius.value = 1e5;
   drawEra(); syncGhostVis(); applyLook(S.eraW);
+  music.setEra(e);
 }
 
 /* ───────── 시대 전환 ───────── */
@@ -995,6 +1006,7 @@ function tryShift() {
   // 시간 충격: 나타난 자리 3m(GUARD.shock) 안의 경비는 0.6초 얼어붙는다 (그 사이에 찌르면 앞에서도 한 방)
   for (const g of enemies()) if (g.alive && g.era === to && g.kind !== 'boss' && Math.hypot(g.x - S.p.x, g.z - S.p.z) < GUARD.shock) { g.stun = 0.6; if (g.anim) g.anim.once('AS_Hit_F_Seq', { speed: 1.2, dur: 0.6 }); }
   sfx.shift(to); drawEra(); syncGhostVis();
+  music.setEra(to); // 떠난 시대의 노래는 그 박자에 멈추고, 이 시대의 노래가 멈췄던 자리에서 이어진다
   screenFlash(to === 'past' ? '#ffd27a' : '#7fe8ff', 0.1);
   return stand(to, cellOf(S.p.x), cellOf(S.p.z)) || onRaft() ? 'ok' : 'fall';
 }
@@ -1086,6 +1098,7 @@ addEventListener('keydown', e => {
   if (code === 'KeyE') interact();
   if (code === 'KeyJ' || code === 'KeyF') stab();
   if (code === 'KeyR' && S.ready && !S.trans && !S.ended) { restartRoom(false); toast($t('방을 처음부터')); }
+  if (code === 'KeyM') toast(music.toggle() ? $t('음악 켬') : $t('음악 끔'), 1.2);
 });
 addEventListener('pointerdown', e => { if (e.button === 0 && e.target === renderer.domElement) { ac(); stab(); } });
 addEventListener('keyup', e => keys.delete(codeOf(e)));
@@ -2529,7 +2542,7 @@ function update(dt) {
     stepDown(dt); animatePlayer(dt); drawPlayer(dt);
     camTarget.lerp(_v.set(S.p.x, 0, S.p.z), 1 - Math.exp(-dt * 5));
     camera.position.copy(camTarget).add(camOff); camera.lookAt(camTarget.x, 0.6, camTarget.z);
-    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView();
+    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt);
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) hud.toast.style.opacity = 0; }
     if (flashA > 0) { flashA = Math.max(0, flashA - dt * 0.8); hud.flash.style.opacity = flashA; }
     return;
@@ -2550,7 +2563,7 @@ function update(dt) {
   for (const e of entities) if (e.era === 'both' || e.era === S.era) e.update(dt, e);
   updateRing(dt);
   updateLights(dt);
-  updateGuardsView(); updateGolemsView(); updateBossView();
+  updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt);
   hud.ptime.textContent = $t('어제 {0}초', S.pastTime.toFixed(1));
   // 카메라 (조금 늦게 따라옴). 깨어 있는 보스가 있으면 둘 사이 쪽으로 조금 당겨 둘 다 보이게
   _v.set(S.p.x, 0, S.p.z);
