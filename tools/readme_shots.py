@@ -5,7 +5,7 @@
 Starts its own static server for this folder (needs assets/fab/ in place), switches the game to English,
 pauses the sim and stages each shot through window.__yk. Shot recipes are the JS snippets in SHOTS.
 """
-import asyncio, base64, json, os, shutil, socket, subprocess, sys, tempfile, time, urllib.request
+import asyncio, base64, functools, http.server, json, os, shutil, socket, subprocess, sys, tempfile, threading, time, urllib.request
 import websockets
 
 GAME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,6 +64,18 @@ SHOTS = {
 }
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # `python -m http.server` listens with a backlog of 5; Chrome's burst of texture requests overflowed it on Windows
+    # ("Failed to fetch" / "Couldn't load texture", sometimes the game never became ready) -> 128, as in release_check.py
+    request_queue_size = 128
+    daemon_threads = True
+
+
+class QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); p = s.getsockname()[1]; s.close(); return p
 
@@ -103,8 +115,8 @@ class CDP:
 async def run(out_dir, names):
     os.makedirs(out_dir, exist_ok=True)
     port, dbg = free_port(), free_port()
-    srv = subprocess.Popen([sys.executable, '-I', '-m', 'http.server', str(port), '--bind', '127.0.0.1', '--directory', GAME],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    srv = Server(('127.0.0.1', port), functools.partial(QuietHandler, directory=GAME))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
     prof = tempfile.mkdtemp(prefix='yk-chrome-')
     ch = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={dbg}', f'--user-data-dir={prof}', '--lang=en-US',
                            '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--mute-audio',
@@ -143,7 +155,7 @@ async def run(out_dir, names):
                     f.write(base64.b64decode(shot['data']))
                 print('saved', out, os.path.getsize(out), flush=True)
     finally:
-        ch.kill(); ch.wait(); srv.kill(); srv.wait()
+        ch.kill(); ch.wait(); srv.shutdown(); srv.server_close()
         shutil.rmtree(prof, ignore_errors=True)
 
 
