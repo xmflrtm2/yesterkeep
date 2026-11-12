@@ -8,6 +8,7 @@ import { ROOMS } from './rooms.js';
 import { LOOKS, RIG_URL, EXTRA_ANIMS_URL, DAGGER_URL, loadLook, assemble, prepClips, Animator } from './hero.js';
 import { loadGolem, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK } from './golem.js';
 import { music } from './music.js';
+import { fx as FX } from './fx.js'; // 타격감 이펙트 (지역 변수 fx와 겹치지 않게 FX)
 
 const HERO_LOOK = 'rogueF', GUARD_LOOK = 'guardM'; // 플레이어 / 경비병 외형 (hero.js LOOKS)
 const CHAR = { rig: null, clips: null, dagger: null, hero: null, guard: null, golem: null }; // 불러 둔 캐릭터 재료 (golem은 첫 방 뒤 백그라운드)
@@ -68,6 +69,7 @@ const abyss = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBa
 abyss.rotation.x = -Math.PI / 2;
 abyss.position.y = -6;
 scene.add(abyss);
+FX.init(scene, camera); // 알갱이·파편·바닥 금·순간 빛 (src/fx.js) — 빛 하나를 미리 넣어 두어 첫 컴파일에 들어가게
 
 /* ───────── 화면(HUD) ───────── */
 const $ = id => document.getElementById(id);
@@ -106,6 +108,68 @@ function musicTick(dt) {
   const boss = !b || b.state === 'dormant' ? 0 : !b.alive ? -1 : b.hp <= BOSS.phase2 ? 2 : 1;
   const danger = !b && enemies().some(g => g.alive && g.state === 'alert' && g.era === S.era);
   music.update(dt, { danger, boss, down: !!S.down });
+}
+
+/* ───────── 타격감 이펙트 (src/fx.js) — 11/12 밤 개발자님: "이펙트가 부족해서 밋밋하다" ───────── */
+// 시대마다 먼지·불꽃·돌·빛 색 (어제 = 따뜻한 금빛, 오늘 = 차가운 청회색)
+const FXC = {
+  past: { dust: '#dcc296', spark: ['#ffe2a0', '#ffb347'], rock: ['#b39a74', '#8c7658'], glow: ['#ffd27a', '#fff0c0'], light: '#ffb060' },
+  now: { dust: '#b0bac9', spark: ['#d8f8ff', '#7fe8ff'], rock: ['#8a919c', '#5e646e'], glow: ['#7fe8ff', '#d8f8ff'], light: '#9fd8ff' },
+};
+// 무거운 것이 땅에 닿음: 먼지 고리 · 돌 조각 · 불꽃 · 바닥 금 · 빛 · 카메라 펀치 (big = 세기 배율)
+function impactFx(x, z, E, r = 1.8, big = 1) {
+  const c = FXC[E];
+  FX.dustRing(x, z, r, { color: c.dust, n: Math.round(22 * big), speed: 3 + r });
+  FX.debris(x, 0.2, z, { n: Math.round(8 * big), color: c.rock, speed: 2.5 + r, up: 5 });
+  FX.sparks(x, 0.3, z, { n: Math.round(7 * big), color: ['#ffb060', '#ff7a3a'], speed: 5, up: 5 });
+  FX.crack(x, z, r * 0.85);
+  FX.flash(x, 1.4, z, c.light, 5 * big);
+  FX.punch(0.4 * big);
+}
+// 칼이 단단한 데 막힘: 맞닿은 자리에서 하얀 불꽃
+function clangFx(tx, tz) {
+  const x = (S.p.x + tx) / 2, z = (S.p.z + tz) / 2;
+  FX.sparks(x, 1.1, z, { n: 14, color: ['#ffffff', '#ffe2a0'], speed: 6, up: 3, size: 0.12, life: 0.3 });
+  FX.flash(x, 1.3, z, '#fff2d0', 2.5); FX.punch(0.2);
+}
+// 성채지기가 시간을 건너와 나타남 / 구덩이에서 올라옴: 빛 알갱이 기둥 + 먼지 + 빛
+function arriveFx(b, E) {
+  FX.motes(b.x, 0.2, b.z, { n: 34, color: FXC[E].glow, speed: 1.8, up: 3.2, spread: 0.7, life: 1.0 });
+  FX.dustRing(b.x, b.z, 1.2, { color: FXC[E].dust, n: 16, speed: 3.5 });
+  FX.flash(b.x, 1.6, b.z, FXC[E].light, 4); FX.punch(0.25);
+}
+// 성채지기 등을 찔렀다: 불꽃 · 돌 부스러기 · 하얀 빛 · 몸 번쩍 · 체력 막대 흔들림
+function hitFx(b) {
+  const x = b.x + (S.p.x - b.x) * 0.35, z = b.z + (S.p.z - b.z) * 0.35, c = FXC[b.era];
+  FX.sparks(x, 1.5, z, { n: 30, color: c.spark.concat('#ffffff'), speed: 8, up: 4, size: 0.24 });
+  FX.sparks(x, 1.5, z, { n: 3, color: '#fff6e0', speed: 0.4, up: 0, size: 1.1, life: 0.16, g: 0, drag: 0, spread: 0.1 }); // 맞닿은 자리 하얀 번쩍
+  FX.debris(x, 1.4, z, { n: 7, color: c.rock, speed: 3, up: 3, size: 0.09, dir: [b.x - S.p.x, b.z - S.p.z], cone: 1.2 });
+  FX.flash(x, 1.6, z, '#fff0c8', 6); FX.punch(0.75);
+  b.fxFlash = 1;
+  hud.boss.classList.remove('hit'); void hud.boss.offsetWidth; hud.boss.classList.add('hit');
+}
+// 성채지기가 쓰러짐: 큰 먼지 · 파편 · 금빛 알갱이가 솟고 길게 멈칫
+function deathFx(b) {
+  const c = FXC[b.era];
+  impactFx(b.x, b.z, b.era, 2.4, 2);
+  FX.debris(b.x, 1.5, b.z, { n: 26, color: c.rock, speed: 5, up: 6, size: 0.16 });
+  FX.motes(b.x, 0.5, b.z, { n: 90, color: c.glow, speed: 2.4, up: 3.5, spread: 1.2, life: 2.2, size: 0.15 });
+  FX.flash(b.x, 2, b.z, c.light, 12); FX.punch(1.2);
+  S.hitstop = 0.55; // 쓰러지는 순간을 길게
+}
+// 매 프레임: 알갱이·파편 + 성채지기 몸의 빛(예비동작이면 차오르고, 찔리면 번쩍) + 2페이즈 불씨
+let fxLit = [];
+function fxTick(dt) {
+  FX.update(dt);
+  for (const m of fxLit) m.emissiveIntensity = m.userData.e0; // 지난 프레임에 밝힌 재질을 되돌린다 (골렘 재질을 같이 쓰므로 남겨 두면 안 됨)
+  fxLit = [];
+  const b = bosses[0];
+  if (!b || !b.parts || !b.alive) return;
+  b.fxFlash = Math.max(0, (b.fxFlash || 0) - dt * 7);
+  const wind = b.wind > 0 ? 1 - b.wind / Math.max(0.01, b.windMax) : b.sweep && b.sweep.ph === 'wind' ? 1 - b.sweep.t / BOSS.sweep.windup : 0;
+  const add = wind * wind * 1.1 + b.fxFlash * 2.6;
+  if (add > 0.01) for (const o of b.parts) { const m = o.material; if (m.userData.e0 == null) m.userData.e0 = m.emissiveIntensity; m.emissiveIntensity = m.userData.e0 + add; fxLit.push(m); }
+  if (b.p2 && b.era === S.era && !b.fall && Math.random() < dt * 26) FX.motes(b.x + (Math.random() - 0.5) * 1.3, 0.5 + Math.random() * 2, b.z + (Math.random() - 0.5) * 1.3, { n: 1, color: ['#ff6a3a', '#ffb060'], speed: 0.4, up: 1.8, life: 1.1, size: 0.12 });
 }
 function noiseBuf(a, sec) { const b = a.createBuffer(1, Math.floor(a.sampleRate * sec), a.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
 const sfx = {
@@ -1008,6 +1072,7 @@ function tryShift() {
   for (const g of enemies()) if (g.alive && g.era === to && g.kind !== 'boss' && Math.hypot(g.x - S.p.x, g.z - S.p.z) < GUARD.shock) { g.stun = 0.6; if (g.anim) g.anim.once('AS_Hit_F_Seq', { speed: 1.2, dur: 0.6 }); }
   sfx.shift(to); drawEra(); syncGhostVis();
   music.setEra(to); // 떠난 시대의 노래는 그 박자에 멈추고, 이 시대의 노래가 멈췄던 자리에서 이어진다
+  FX.motes(S.p.x, 0.4, S.p.z, { n: 22, color: FXC[to].glow, speed: 2.6, up: 1.6, life: 0.9, spread: 0.4 }); // 넘어온 시대 빛 알갱이
   screenFlash(to === 'past' ? '#ffd27a' : '#7fe8ff', 0.1);
   return stand(to, cellOf(S.p.x), cellOf(S.p.z)) || onRaft() ? 'ok' : 'fall';
 }
@@ -1124,6 +1189,7 @@ function startRoll() {
   S.face = Math.atan2(S.rollDir.x, S.rollDir.z);
   if (heroAnim) { const c = CHAR.clips.AS_Roll_F_0_Seq; heroAnim.once('AS_Roll_F_0_Seq', { speed: c ? c.duration / (ROLL_T + 0.25) : 1, dur: ROLL_T + 0.05 }); }
   sfx.roll();
+  FX.dust(S.p.x, 0.1, S.p.z, { n: 7, speed: 1.6, up: 0.4, size: 0.4, alpha: 0.35, color: FXC[S.era].dust });
   return true;
 }
 function resolve() {
@@ -1262,6 +1328,7 @@ function hurt(msg) {
   if (S.invuln > 0 || S.falling > 0 || S.trans || S.down) return false;
   S.hearts--; S.hurts++; S.roomHurt++; roomFail();
   sfx.hurt(); screenFlash('#ff3b30', 0.3); S.shake = 0.25; S.hitstop = 0.12;
+  FX.sparks(S.p.x, 1.0, S.p.z, { n: 14, color: ['#ff6a6a', '#ffd0d0'], speed: 4, up: 3 }); FX.punch(0.3);
   if (msg) toast(msg);
   drawHearts();
   startDown('hurt');
@@ -1771,6 +1838,7 @@ function killGuard(g, how) {
   g.mark.visible = false; g.cone.visible = false;
   S.kills++; S.hitstop = 0.1; S.shake = 0.25;
   sfx.kill();
+  FX.sparks(g.x, 1.2, g.z, { n: 12, color: FXC[g.era].spark }); FX.dust(g.x, 0.2, g.z, { n: 8, color: FXC[g.era].dust }); FX.punch(0.25);
   toast(how === 'back' ? $t('등 뒤에서 한 방') : $t('전환 기습!'), 1.2);
   // 어제 쓰러진 자리에 오늘은 해골이 남는다
   const bones = makeMesh('bonePile', 'now'); bones.position.set(g.x, 0, g.z); bones.rotation.y = g.yaw; groups.now.add(bones);
@@ -1817,7 +1885,7 @@ function resolveStab() {
     wakeBoss(tgt);
     if (tgt.daze <= 0 && tgt.stagger <= 0 && tgt.wind <= 0 && tgt.rec <= 0 && !tgt.charge && tgt.stun <= 0) startSlam(tgt);
     S.p.x += tx / td * 1.1; S.p.z += tz / td * 1.1; resolve();
-    sfx.clang(); S.shake = 0.2;
+    sfx.clang(); S.shake = 0.2; clangFx(tgt.x, tgt.z);
     toast($t('돌이 단단해요 — 등 뒤를 노리세요'), 1.2);
     return 'blocked';
   }
@@ -1828,7 +1896,7 @@ function resolveStab() {
     // 골렘: 앞이 단단해서 튕겨 나가고, 곧바로 내려찍기로 받아친다
     alertGolem(tgt); tgt.rec = 0; tgt.wind = GOLEM.windup * 0.8; tgt.yaw = Math.atan2(tx, tz);
     S.p.x += tx / td * 1.1; S.p.z += tz / td * 1.1; resolve();
-    sfx.clang(); S.shake = 0.2;
+    sfx.clang(); S.shake = 0.2; clangFx(tgt.x, tgt.z);
     toast($t('돌이 단단해요 — 등 뒤를 노리세요'), 1.2);
     return 'blocked';
   }
@@ -1836,7 +1904,7 @@ function resolveStab() {
   tgt.anim.once('AS_Parry_L_Seq', { speed: 1.4, dur: 0.45 });
   alertGuard(tgt, 'parry'); tgt.rec = 0.45; tgt.yaw = Math.atan2(tx, tz);
   S.p.x += tx / td * 0.9; S.p.z += tz / td * 0.9; resolve();
-  sfx.clang(); S.shake = 0.15;
+  sfx.clang(); S.shake = 0.15; clangFx(tgt.x, tgt.z);
   toast($t('막혔어요 — 등 뒤를 노리세요'), 1.2);
   return 'blocked';
 }
@@ -2056,6 +2124,7 @@ function killGolem(g, how) {
   g.alive = false; g.wind = 0; g.rec = 0; g.mark.visible = false;
   S.kills++; S.hitstop = 0.12; S.shake = 0.35;
   sfx.crumble(); toast(how === 'back' ? $t('등 뒤에서 무너뜨렸어요') : $t('전환 기습!'), 1.2);
+  impactFx(g.x, g.z, g.era, 1.2, 0.8);
   if (g.anim) {
     // 등 뒤면 앞으로 엎어지고, 기습이면 뒤로 넘어간다. 마지막 자세로 오늘에만 남는다
     g.rig.rotation.z = 0; g.stun = 0;
@@ -2257,6 +2326,7 @@ function wakeBoss(b) {
   b.state = 'alert'; b.stagger = 1.0;
   b.anim.once(GCLIP.stagger, { fade: 0.1, speed: 1.8, dur: 1.0 });
   sfx.wake(); S.shake = Math.max(S.shake, 0.45);
+  impactFx(b.x, b.z, b.era, 1.4, 0.6); FX.motes(b.x, 0.5, b.z, { n: 24, color: FXC[b.era].glow, spread: 0.8 });
   toast($t('성채지기가 깨어났어요'), 2.2);
 }
 function bossBurst(b, color, r = 3.2) { b.burst = { t: 0, r }; b.burstRing.material.color.set(color); b.burstRing.position.set(b.x, 0.09, b.z); }
@@ -2286,6 +2356,12 @@ function startFissure(b, windup) {
 function stepCrack(b, dt, here) {
   const F = BOSS.fissure, c = b.crack;
   const d0 = c.d; c.d = Math.min(c.len, c.d + F.speed * dt);
+  if (c.d > d0) { // 금이 달려가는 끝에서 먼지·돌이 튄다
+    const tx = c.x + c.dx * c.d, tz = c.z + c.dz * c.d;
+    FX.dust(tx, 0.1, tz, { n: 2, speed: 1.4, up: 1.4, size: 0.45, alpha: 0.5, color: FXC[b.era].dust });
+    if (Math.random() < 0.35) FX.debris(tx, 0.1, tz, { n: 1, color: FXC[b.era].rock, speed: 1.5, up: 4, size: 0.1 });
+    if (Math.random() < 0.22) FX.crack(tx, tz, 0.7, undefined, { life: 1.6, alpha: 0.6 });
+  }
   if (c.d >= c.len) c.done = (c.done || 0) + dt;
   if (c.done > 0.35) { b.crack = null; return; }
   if (c.hit || !here) return;
@@ -2343,6 +2419,7 @@ function stepRocks(dt) {
     if (r.t <= 0) {
       r.done = 1e-3; r.rock.visible = true; r.rock.position.y = 0.35;
       S.shake = Math.max(S.shake, 0.3); sfx.thunk();
+      impactFx(r.x, r.z, 'now', 1.0, 0.45);
       if (here && Math.hypot(S.p.x - r.x, S.p.z - r.z) < Q.r) hurt($t('무너진 돌에 맞았어요'));
     }
   }
@@ -2375,6 +2452,7 @@ function stepSweep(b, dt, dist, here) {
     if (w.t <= 0) {
       w.ph = 'rec'; w.t = W.recover;
       S.shake = Math.max(S.shake, 0.3); sfx.slam(); bossBurst(b, '#ff5030', W.r);
+      FX.dustRing(b.x, b.z, W.r * 0.6, { color: FXC[b.era].dust, n: 26, speed: 6 }); FX.sparks(b.x, 1.0, b.z, { n: 12, color: FXC[b.era].spark, speed: 7, up: 2 }); FX.punch(0.35);
       if (here && dist < W.r) hurt($t('성채지기가 휘둘렀어요'));
     }
   } else {
@@ -2411,6 +2489,7 @@ function stepCharge(b, dt, here) {
   } else if (c.ph === 'dash') {
     const s = Math.min(C.speed * dt, c.len - c.went);
     b.x += c.dx * s; b.z += c.dz * s; c.went += s;
+    if (s > 0) FX.dust(b.x - c.dx * 0.8, 0.12, b.z - c.dz * 0.8, { n: 2, speed: 1.2, up: 0.5, size: 0.5, alpha: 0.4, color: FXC[b.era].dust }); // 돌진 뒤로 먼지
     if (!c.hit && here && Math.hypot(S.p.x - b.x, S.p.z - b.z) < C.hitW) { c.hit = true; hurt($t('성채지기의 돌진에 받혔어요')); }
     if (c.went >= c.len - 1e-3) {
       if (c.wall) {
@@ -2418,6 +2497,8 @@ function stepCharge(b, dt, here) {
         endCharge(b); b.chainLeft = 0; b.stagger = C.wallStun;
         b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / C.wallStun, dur: C.wallStun });
         S.shake = Math.max(S.shake, 0.4); sfx.slam(); sfx.thunk();
+        impactFx(b.x + c.dx * BOSS.r * 1.2, b.z + c.dz * BOSS.r * 1.2, b.era, 1.3, 1.3);
+        FX.debris(b.x + c.dx * BOSS.r, 1.2, b.z + c.dz * BOSS.r, { n: 10, color: FXC[b.era].rock, dir: [-c.dx, -c.dz], speed: 4, up: 3 }); // 벽에서 튀는 돌
         toast($t('벽에 박혔어요 — 지금 등 뒤로!'), 1.4);
       } else { c.ph = 'rec'; c.t = b.chainLeft > 0 ? C.chainRec : C.recover; const a = b.anim.act(GCLIP.charge); if (a) a.timeScale = 2; }
     }
@@ -2439,7 +2520,7 @@ function bossArrive(b) {
     const c = b.charge;
     if (c && c.ph === 'dash') { const r = bodyRay(E, b.x, b.z, c.dx, c.dz, Math.max(0, c.len - c.went), BOSS.r); c.len = c.went + r.d; c.wall = r.wall; } // 이 시대의 벽·구덩이로 남은 길을 다시 잰다
     bossBurst(b, E === 'past' ? '#ffd27a' : '#7fe8ff', 2.4);
-    sfx.arrive(E); S.shake = Math.max(S.shake, 0.22);
+    sfx.arrive(E); S.shake = Math.max(S.shake, 0.22); arriveFx(b, E);
     placeBoss(b); return;
   }
   // 평소: 금방 따라와 내 쪽을 보고 나타난다 (Shift만 눌러서는 아무것도 못 얻는다)
@@ -2450,7 +2531,7 @@ function bossArrive(b) {
   b.daze = b.dazeMax = ph2 ? BOSS.appear2 : BOSS.appear; b.shockArm = ph2;
   b.anim.onceLeft = 0; b.anim.loop(GCLIP.idle, 0.1);
   bossBurst(b, E === 'past' ? '#ffd27a' : '#7fe8ff');
-  sfx.arrive(E); S.shake = Math.max(S.shake, 0.22);
+  sfx.arrive(E); S.shake = Math.max(S.shake, 0.22); arriveFx(b, E);
   placeBoss(b);
 }
 function startBossFall(b) {
@@ -2459,6 +2540,7 @@ function startBossFall(b) {
   b.hp = Math.max(0, b.hp - BOSS.fallDmg); b.hurtCd = 0;
   b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.2, dur: 9 });
   S.shake = Math.max(S.shake, 0.3); S.hitstop = 0.1; sfx.bossFall();
+  FX.dust(b.x, 0.3, b.z, { n: 30, color: FXC[b.era].dust, speed: 3, up: 2.5, size: 0.7 }); FX.debris(b.x, 0.3, b.z, { n: 12, color: FXC[b.era].rock, up: 2 });
   toast(b.hp > 0 ? $t('성채지기가 구덩이에 떨어졌어요!') : $t('성채지기가 시간 속으로 떨어졌어요'), 1.8);
   placeBoss(b);
 }
@@ -2473,7 +2555,7 @@ function stepBossFall(b, dt) {
     b.fall = null; b.py = 0; b.holder.visible = true; [b.x, b.z] = f.to;
     b.daze = b.dazeMax = BOSS.rise; b.rising = true; b.shockArm = b.hp <= BOSS.phase2;
     b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / (BOSS.rise + 0.2), dur: BOSS.rise });
-    bossBurst(b, b.era === 'past' ? '#ffd27a' : '#7fe8ff'); sfx.arrive(b.era);
+    bossBurst(b, b.era === 'past' ? '#ffd27a' : '#7fe8ff'); sfx.arrive(b.era); arriveFx(b, b.era);
     placeBoss(b);
   }
 }
@@ -2525,13 +2607,16 @@ function stepBoss(b, dt) {
         b.crack = { x: b.x, z: b.z, dx: fx, dz: fz, d: 0.6, len: b.fissLen, hit: false, done: 0 };
         b.rec = BOSS.fissure.recover; b.fissCd = BOSS.fissure.cd;
         bossBurst(b, '#ff9a2a', 1.6);
+        impactFx(b.x + fx * 1.4, b.z + fz * 1.4, b.era, 1.3, 0.8);
       } else if (kind === 'quake') {
         // 천장을 내리치는 한 방은 둘레를 다 친다 (등 뒤도 위험) → 떨어져 있다가, 크게 회복하는 동안 등 뒤로
         const Q = BOSS.quake; bossBurst(b, '#ff6a3a', Q.ring * 1.1);
+        impactFx(b.x, b.z, b.era, Q.ring * 0.7, 1.5);
         if (here && dist < Q.ring) hurt($t('충격파에 맞았어요'));
         b.rec = Q.recover;
       } else {
         bossBurst(b, '#ff5030', P.slamR);
+        { const [ux, uz] = gFwd(b); impactFx(b.x + ux * 1.6, b.z + uz * 1.6, b.era, 1.7, 1.1); } // 망치가 떨어진 자리
         if (here && dist < P.slamR && inFrontOf(b, S.p.x, S.p.z, BOSS.front)) hurt($t('성채지기에게 맞았어요'));
         b.rec = b.combo > 0 ? BOSS.combo.gap : P.recover;
       }
@@ -2596,7 +2681,7 @@ function hitBoss(b, how) {
     b.x += ux / ul * r.d; b.z += uz / ul * r.d; placeBoss(b);
   }
   S.hitstop = 0.14; S.shake = Math.max(S.shake, 0.35);
-  sfx.kill(); sfx.crack();
+  sfx.kill(); sfx.crack(); hitFx(b);
   if (!b.p2 && b.hp <= BOSS.phase2) bossPhase2(b);
   else toast($t('등 뒤에서 한 방'), 1.1);
   return 'hit';
@@ -2605,6 +2690,7 @@ function killBoss(b, how) {
   b.alive = false; b.daze = 0; b.stagger = 0; b.shockArm = false;
   bossCalm(b); clearRocks();
   S.kills++; S.hitstop = 0.3; S.shake = 0.7;
+  deathFx(b);
   sfx.crumble(); sfx.door();
   screenFlash(b.era === 'past' ? '#ffd27a' : '#7fe8ff', 0.35);
   if (how !== 'fall') { b.anim.onceLeft = 0; b.anim.once(how === 'back' ? GCLIP.dieBack : GCLIP.dieFront, { fade: 0.1, hold: true }); }
@@ -2734,7 +2820,7 @@ function update(dt) {
     stepDown(dt); animatePlayer(dt); drawPlayer(dt);
     camTarget.lerp(_v.set(S.p.x, 0, S.p.z), 1 - Math.exp(-dt * 5));
     camera.position.copy(camTarget).add(camOff); camera.lookAt(camTarget.x, 0.6, camTarget.z);
-    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt);
+    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt); fxTick(dt);
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) hud.toast.style.opacity = 0; }
     if (flashA > 0) { flashA = Math.max(0, flashA - dt * 0.8); hud.flash.style.opacity = flashA; }
     return;
@@ -2755,7 +2841,7 @@ function update(dt) {
   for (const e of entities) if (e.era === 'both' || e.era === S.era) e.update(dt, e);
   updateRing(dt);
   updateLights(dt);
-  updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt);
+  updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt); fxTick(dt);
   hud.ptime.textContent = $t('어제 {0}초', S.pastTime.toFixed(1));
   // 카메라 (조금 늦게 따라옴). 깨어 있는 보스가 있으면 둘 사이 쪽으로 조금 당겨 둘 다 보이게
   _v.set(S.p.x, 0, S.p.z);
@@ -2766,6 +2852,8 @@ function update(dt) {
   const sh = S.shake * S.shake * 0.9;
   camera.position.copy(camTarget).add(camOff).add(_s.set((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh, 0));
   camera.lookAt(camTarget.x, 0.6, camTarget.z);
+  // 카메라 펀치: 큰 타격 순간 시야가 잠깐 좁아진다(확 다가오는 느낌). 끝나면 원래 화각으로
+  if (FX.kick > 0 || FX.baseFov) { if (!FX.baseFov) FX.baseFov = camera.fov; camera.fov = FX.baseFov * (1 - FX.kick * 0.07); camera.updateProjectionMatrix(); if (!FX.kick) FX.baseFov = 0; }
   ghostGroundMat.uniforms.uPlayer.value.set(S.p.x, 0, S.p.z);
   ghostGroundMat.uniforms.uTime.value = S.time;
   // HUD

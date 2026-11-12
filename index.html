@@ -82,6 +82,9 @@ function i18nDom(root) {
   body.past #boss .follow { color: var(--gold); }
   #boss.angry .name { color: #ff9a7a; }
   #boss.down { opacity: .55; }
+  /* 성채지기를 찔렀을 때 체력 막대가 번쩍 흔들림 (main.js hitFx) */
+  #boss.hit .pips { animation: bossHit .38s ease-out; }
+  @keyframes bossHit { 0% { transform: scale(1.18) translateX(3px); filter: brightness(2.4); } 30% { transform: scale(1.08) translateX(-3px); } 60% { transform: scale(1.03) translateX(2px); filter: brightness(1.4); } 100% { transform: none; filter: none; } }
   #roomTitle { position: absolute; left: 0; right: 0; top: 18%; text-align: center; font-size: 34px; font-weight: 700;
     text-shadow: 0 3px 10px #000; opacity: 0; transition: opacity .6s; }
   #roomTitle small { display: block; font-size: 15px; font-weight: 400; opacity: .8; margin-top: 6px; }
