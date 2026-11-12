@@ -293,6 +293,8 @@ const STAGES = {
   sweep() { STAGES.west(); STAGES.bait(b => b.rec > 0.5); P.circleBehind(1, 1.4, 0.9); P.waitUntil(() => B().sweep === 'wind', 2); P.wait(0.3); },
   // 평소 Shift: 0.35초 만에 내 쪽을 보고 나타남
   quick() { STAGES.west(); backOff(3.2, 0.6); P.wait(0.6); P.shift(); P.waitUntil(() => sameEra(), 2); P.wait(0.1); },
+  // 하트를 다 잃어 방이 처음부터 시작된 뒤 걸어 보기 (11/12 개발자님 제보: 쓰러진 자세로 돌아다님)
+  deadwalk() { STAGES.west(); Y().S.hearts = 1; STAGES.bait(() => !!Y().S.down); P.waitUntil(() => !Y().S.down, 3); P.wait(0.3); P.moveTo(st().x + 4, st().z - 2, { exact: true, max: 0.45 }); },
   // ── 11/12 밤 새 패턴 ──
   // 멀리(6m) 서서 기다리다 until(b)까지 (가까워지면 물러남)
   keepFar(until, d = 6, max = 10) { return P.waitUntil(() => { if (until(B())) return true; if (P.bossDist() < d - 0.5 && !B().kind && !B().charge) backOff(d, 0.15); else P.wait(1 / 30); return false; }, max); },

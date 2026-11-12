@@ -1203,10 +1203,11 @@ function stepDown(dt) {
   hud.down.style.opacity = a;
   if (!d.moved && d.t >= DOWN.move) {
     d.moved = true;
+    // 쓰러진 자세(hold)를 풀고 일어선다 — 하트를 다 잃어 방을 처음부터 할 때도 (11/12 전엔 이 길에서 안 풀려 쓰러진 채 걸어 다녔다)
+    if (heroAnim) { heroAnim.onceLeft = 0; heroAnim.loop('AS_Idle_Seq', 0.05); }
     if (S.hearts <= 0) { restartRoom(true); S.down = { t: DOWN.move, kind: 'dead', moved: true }; return; }
     S.falling = 0; S.py = 0;
     respawnSafe(); drawHearts();
-    if (heroAnim) { heroAnim.onceLeft = 0; heroAnim.loop('AS_Idle_Seq', 0.05); }
   }
   if (d.t >= DOWN.end) { S.down = null; hud.down.style.opacity = 0; }
 }
