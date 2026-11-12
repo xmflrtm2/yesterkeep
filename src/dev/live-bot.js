@@ -30,6 +30,8 @@ const L = {
     this.stop(); this.t0 = now(); this.maxSec = maxSec; this.result = null; this.log = []; this.hits = 0; this.parries = 0; this.deaths = 0;
     this.hurts0 = Y().state().hurts; this.lastHearts = Y().state().hearts; this.peak = { points: 0, rocks: 0 };
     Y().pause(false); this.set('bait');
+    // 시작·멈춤 카드(23d60df)를 끈다: 창이 포커스를 잃어도 게임이 멈추지 않게 (pause를 안 쓰는 실시간 봇이라 직접)
+    if (Y().hold) Y().hold(false);
     this.timer = setInterval(() => { try { this.tick(); } catch (e) { this.note('ERR ' + e.message); } }, 33);
     // 프레임 세기 (1초마다)
     const F = this.fps; F.frames = 0; F.last = now(); F.samples = []; F.min = 99;
