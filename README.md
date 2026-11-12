@@ -84,6 +84,13 @@ py -I tools/release_check.py build/itch/web
 `src/dev/clear-all.js` (real key input, no teleporting), and reports console errors, missing files, file-name case
 mismatches, missing translations, download sizes and unused assets. It needs Python with `websockets` and Chrome.
 
+Before building, `py -I tools/web_pack.py` shrinks the Fab GLB files for the web: WebP textures (`EXT_texture_webp`),
+`KHR_mesh_quantization` for normals, UVs, joints and weights, no tangents or unused UV sets, and animation tracks with
+redundant keys and rest-pose channels removed. It reads untouched copies kept in `build/fab-originals/` and can be re-run
+or undone (`--restore`). `py -I tools/quality_shots.py <dir>` renders the same scenes before and after, and
+`--compare <before> <after>` reports PSNR and writes diff images. On 2026-11-12 this took the first download from
+12.9 MB to 5.8 MB and the whole game from 15.0 MB to 7.9 MB (zip 10.75 MB to 5.13 MB).
+
 ## Repository layout
 
 | Path | Contents |
