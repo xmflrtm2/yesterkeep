@@ -6,7 +6,7 @@ import { GLTFLoader } from '../vendor/GLTFLoader.js';
 import { SHIFT, ERA_U, eraMaterial, eraPlain } from './eramat.js';
 import { ROOMS } from './rooms.js';
 import { LOOKS, RIG_URL, EXTRA_ANIMS_URL, DAGGER_URL, loadLook, assemble, prepClips, Animator } from './hero.js';
-import { loadGolem, buildGolem, GCLIP, GOLEM_LOOK } from './golem.js';
+import { loadGolem, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK } from './golem.js';
 
 const HERO_LOOK = 'rogueF', GUARD_LOOK = 'guardM'; // 플레이어 / 경비병 외형 (hero.js LOOKS)
 const CHAR = { rig: null, clips: null, dagger: null, hero: null, guard: null, golem: null }; // 불러 둔 캐릭터 재료 (golem은 첫 방 뒤 백그라운드)
@@ -73,7 +73,8 @@ const $ = id => document.getElementById(id);
 const hud = { hearts: $('hearts'), eraName: document.querySelector('#era .name'), eraSub: document.querySelector('#era .sub'), cd: document.querySelector('#era .cd i'),
   title: $('roomTitle'), hint: $('hint'), prompt: $('prompt'), toast: $('toast'), fade: $('fade'), flash: $('flash'), loading: $('loading'), loadBar: document.querySelector('#loading .bar i'),
   end: $('endCard'), endStats: $('endStats'),
-  shards: $('shards'), obj: $('obj'), down: $('down'), ptime: document.querySelector('#era .ptime'), gate: $('gate'), gateLbl: document.querySelector('#gate .lbl'), gateBar: document.querySelector('#gate .bar i') };
+  shards: $('shards'), obj: $('obj'), down: $('down'), ptime: document.querySelector('#era .ptime'), gate: $('gate'), gateLbl: document.querySelector('#gate .lbl'), gateBar: document.querySelector('#gate .bar i'),
+  boss: $('boss'), bossName: document.querySelector('#boss .name'), bossPips: document.querySelector('#boss .pips'), bossFollow: document.querySelector('#boss .follow') };
 let toastT = 0, titleT = 0;
 function toast(msg, sec = 1.8) { hud.toast.textContent = msg; hud.toast.style.opacity = 1; toastT = sec; }
 function drawHearts() {
@@ -134,6 +135,13 @@ const sfx = {
   rewind() { this.noise(0.6, 4000, 300, 0.12, 1.5); this.tone(880, 220, 0.6, 'sine', 0.06, 0.05); this.tone(660, 165, 0.6, 'triangle', 0.04, 0.1); },
   scrape() { this.noise(0.25, 200, 450, 0.2, 3); this.tone(70, 55, 0.2, 'sine', 0.15); },
   exit() { this.tone(523, 1046, 0.4, 'triangle', 0.07); this.tone(659, 1318, 0.5, 'sine', 0.05, 0.1); },
+  // 성채지기
+  wake() { this.tone(70, 42, 1.3, 'sawtooth', 0.09); this.noise(1.1, 260, 70, 0.3, 0.7); this.tone(55, 35, 1.4, 'sine', 0.35, 0.1); },
+  arrive(to) { if (to === 'past') { this.tone(784, 523, 0.35, 'triangle', 0.07); } else { this.tone(523, 262, 0.35, 'triangle', 0.07); } this.tone(110, 45, 0.45, 'sine', 0.4); this.noise(0.35, 500, 90, 0.25, 0.8); },
+  charge() { this.noise(0.6, 150, 900, 0.14, 1.2); this.tone(60, 120, 0.6, 'sawtooth', 0.05); },
+  dash() { this.noise(0.45, 900, 180, 0.3, 0.9); this.tone(130, 55, 0.4, 'sine', 0.3); },
+  crack() { this.tone(240, 80, 0.3, 'square', 0.06); this.noise(0.35, 3200, 500, 0.22, 1.5); },
+  bossFall() { this.tone(320, 40, 1.3, 'triangle', 0.16); this.noise(0.9, 700, 90, 0.25, 0.8); },
 };
 
 /* ───────── 조각(GLB) 불러오기 ───────── */
@@ -228,6 +236,7 @@ const S = {
   gateT: 0, pushT: 0, hurts: 0, got: new Set(), // 시간 문 남은 시간(어제의 시간), 상자 미는 중, 함정 피해 수, 모은 조각
   stabT: 0, stabHit: false, shiftStrike: 0, hitstop: 0, kills: 0, // 찌르기, 전환 기습 남은 시간, 맞춘 순간 멈칫
   pastTime: 0, alarms: 0, alarmed: false, runPast: 0, runStars: 0, // 점수: 이 방에서 어제에 머문 시간, 경보 수 / 전체 합계
+  roomHurt: 0, bossPending: false, // 이 방에서 맞거나 떨어진 횟수(보스 방 ★★) / 보스 모델을 기다리는 중
 };
 /* 확장 장치 (11/9): 발판 p → 시간 문 G, 가시 ^ (어제만 작동), 밀 수 있는 상자 c, 모래시계 조각 s */
 const GATE_HOLD = 2.6;                       // 발판을 밟으면 문이 열려 있는 시간 — 어제에 있을 때만 줄어든다
@@ -925,6 +934,9 @@ function loadRoom(idx) {
   S.pastTime = 0; S.alarms = 0; S.alarmed = false; S.stabT = 0; S.shiftStrike = 0; S.hitstop = 0;
   spawnGuards(room);
   spawnGolems(room);
+  spawnBoss(room);
+  S.roomHurt = 0;
+  if (room.boss) S.hearts = 5;
   // 시작 위치
   let si = 1, sj = 1;
   for (let j = 0; j < S.H; j++) for (let i = 0; i < S.W; i++) if (G[room.startEra][j][i] === '@') { si = i; sj = j; }
@@ -935,6 +947,10 @@ function loadRoom(idx) {
   setEraInstant(room.startEra);
   buildGhosts();
   camTarget.copy(S.p);
+  // 방마다 카메라 거리 (보스 방은 넓게 본다). 안개도 그만큼 뒤로
+  const cd = room.cam || CAM_DIST;
+  camOff.set(0, Math.sin(CAM_PITCH) * cd, Math.cos(CAM_PITCH) * cd);
+  scene.fog.near = 18 + cd - CAM_DIST; scene.fog.far = 44 + cd - CAM_DIST;
   S.roomTime = 0;
   hud.title.innerHTML = `${$t(room.name)}<small>${idx + 1} / ${ROOMS.length}</small>`;
   hud.title.style.opacity = 1; titleT = 2.6;
@@ -1119,7 +1135,7 @@ function resolve() {
   }
 }
 function startFall() {
-  S.falling = 0.8; S.fallVy = 0; S.falls++; S.roll = 0;
+  S.falling = 0.8; S.fallVy = 0; S.falls++; S.roll = 0; S.roomHurt++;
   sfx.fall(); roomFail();
 }
 // 같은 방에서 두 번 실패하면(추락·피해·막힘·경보) 더 구체적인 2단계 힌트를 연다
@@ -1229,7 +1245,7 @@ function restartRoom(dead) {
 }
 function hurt(msg) {
   if (S.invuln > 0 || S.falling > 0 || S.trans || S.down) return false;
-  S.hearts--; S.hurts++; roomFail();
+  S.hearts--; S.hurts++; S.roomHurt++; roomFail();
   sfx.hurt(); screenFlash('#ff3b30', 0.3); S.shake = 0.25; S.hitstop = 0.12;
   if (msg) toast(msg);
   drawHearts();
@@ -1752,7 +1768,7 @@ function stab() {
   if (!S.ready || S.stabT > 0 || S.falling > 0 || S.roll > 0 || S.trans || S.ended || S.down) return 'busy';
   // 가까운 경비 쪽으로 몸을 돌려 준다(탑다운에서 조준 보조)
   let best = null, bd = GUARD.lunge;
-  for (const g of enemies()) if (g.alive && g.era === S.era) { const d = Math.hypot(g.x - S.p.x, g.z - S.p.z); if (d < bd) { bd = d; best = g; } }
+  for (const g of enemies()) if (g.alive && g.era === S.era && !g.fall) { const d = Math.hypot(g.x - S.p.x, g.z - S.p.z); if (d < bd) { bd = d; best = g; } }
   if (best) S.face = Math.atan2(best.x - S.p.x, best.z - S.p.z);
   S.stabT = 0.4; S.stabHit = false;
   if (heroAnim) heroAnim.once('AS_Combo_Attack_01_01_Seq', { speed: 2.4, dur: 0.4 });
@@ -1763,7 +1779,7 @@ function resolveStab() {
   const fx = Math.sin(S.face), fz = Math.cos(S.face);
   let tgt = null, bd = GUARD.lunge;
   for (const g of enemies()) {
-    if (!g.alive || g.era !== S.era) continue;
+    if (!g.alive || g.era !== S.era || g.fall) continue;
     const dx = g.x - S.p.x, dz = g.z - S.p.z, d = Math.hypot(dx, dz);
     if (d < bd && (dx * fx + dz * fz) / Math.max(d, 0.01) > Math.cos(THREE.MathUtils.degToRad(60))) { bd = d; tgt = g; }
   }
@@ -1772,6 +1788,16 @@ function resolveStab() {
   if (bd > 1.2) { const k = (bd - 1.1) / bd; S.p.x += (tgt.x - S.p.x) * k; S.p.z += (tgt.z - S.p.z) * k; resolve(); }
   const [gx, gz] = gFwd(tgt), tx = S.p.x - tgt.x, tz = S.p.z - tgt.z, td = Math.max(Math.hypot(tx, tz), 0.01);
   const behind = (tx * gx + tz * gz) / td < Math.cos(THREE.MathUtils.degToRad(110));
+  if (tgt.kind === 'boss') {
+    // 성채지기: 등 뒤면 1칸. 앞·옆은 튕기고(휘청이는 중이 아니면) 내려찍기로 받아친다
+    if (behind) return 'boss-' + hitBoss(tgt, 'back');
+    wakeBoss(tgt);
+    if (tgt.daze <= 0 && tgt.stagger <= 0 && tgt.wind <= 0 && tgt.rec <= 0 && !tgt.charge && tgt.stun <= 0) startSlam(tgt);
+    S.p.x += tx / td * 1.1; S.p.z += tz / td * 1.1; resolve();
+    sfx.clang(); S.shake = 0.2;
+    toast($t('돌이 단단해요 — 등 뒤를 노리세요'), 1.2);
+    return 'blocked';
+  }
   const kill = tgt.kind === 'golem' ? killGolem : killGuard;
   if (behind) { kill(tgt, 'back'); return 'kill-back'; }
   if (S.shiftStrike > 0 && tgt.state !== 'alert') { kill(tgt, 'shift'); return 'kill-shift'; }
@@ -1812,14 +1838,14 @@ function updateGuardsView() {
   }
   // 경비 수 표시
   const all = enemies();
-  if (all.length) { hud.obj.style.display = 'block'; hud.obj.textContent = $t('적 {0} / {1}', all.filter(g => !g.alive).length, all.length); }
+  if (all.length && !bosses.length) { hud.obj.style.display = 'block'; hud.obj.textContent = $t('적 {0} / {1}', all.filter(g => !g.alive).length, all.length); }
   else hud.obj.style.display = 'none';
 }
 // 플레이어와 같은 시대의 살아 있는 경비병과는 부딪힌다
 function pushFromGuards() {
   for (const g of enemies()) {
-    if (!g.alive || g.era !== S.era) continue;
-    const dx = S.p.x - g.x, dz = S.p.z - g.z, d = Math.hypot(dx, dz), m = PR + (g.kind === 'golem' ? GOLEM.r : GUARD.r);
+    if (!g.alive || g.era !== S.era || g.fall) continue;
+    const dx = S.p.x - g.x, dz = S.p.z - g.z, d = Math.hypot(dx, dz), m = PR + (g.kind === 'boss' ? BOSS.r : g.kind === 'golem' ? GOLEM.r : GUARD.r);
     if (d < m && d > 1e-4) { S.p.x = g.x + dx / d * m; S.p.z = g.z + dz / d * m; }
   }
 }
@@ -1831,8 +1857,8 @@ function pushFromGuards() {
    내려찍기는 0.85초 예비동작(바닥에 붉은 원이 자람) 뒤 둘레 2.4m 전부(망치를 들고 뛰어올라 내려찍음). 어제로 가면 그 자세 그대로 멈춘다(어제에서는 붉은 윤곽). */
 // slamR 2.4: 앞에서 찔러 튕겨 나간 자리(2.2m)도 닿는다 → 가만히 있으면 맞고, 구르거나 시대를 바꾸면 피한다
 const GOLEM = { walk: 1.1, run: 2.6, turn: 3.2, r: 0.6, sense: 4.5, susNear: 1.6, susFar: 0.7, windup: 0.85, recover: 0.9, slamR: 2.4, attackAt: 1.9, lose: 6 };
-let golems = [];
-const enemies = () => guards.concat(golems);
+let golems = [], bosses = [];
+const enemies = () => guards.concat(golems, bosses);
 const golemGhostMat = new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.38, depthTest: false, depthWrite: false });
 const golemEyeMat = new THREE.MeshBasicMaterial({ color: '#7fe8ff' });
 const senseRingGeo = new THREE.RingGeometry(GOLEM.sense - 0.08, GOLEM.sense, 80);
@@ -2073,19 +2099,330 @@ function updateGolemsView() {
   }
 }
 
+/* ───────── 성채지기 — 내가 있는 시대로 1.5초 늦게 따라오는 보스 (기획서 19장) ─────────
+   모델은 골렘과 같은 StoneGolem(1.6배). 뼈대 하나가 시대를 옮겨 다닌다: 오늘 = 돌, 어제 = 금박.
+   내가 다른 시대로 가면 떠난 시대에 그 자세로 멈춰 있다가 follow초 뒤 그 자리·그 방향 그대로 내 시대에 나타난다(daze초 휘청).
+   그 자리가 이쪽 시대에서 벽이면 가장 가까운 빈 칸으로, 구덩이면 떨어진다(2칸). 등 찌르기 1칸.
+   오늘: 느린 걸음 + 내려찍기. 어제: 빠른 뜀 + 내려찍기 + 돌진(벽에 박히면 멈춤). 3칸 이하(2페이즈): 더 빨리 따라오고, 도착 휘청임 끝에 충격파 */
+const BOSS = {
+  hp: 6, phase2: 3, follow: 1.5, follow2: 1.1, daze: 0.7, hurtCd: 1.0, stagger: 0.9, knock: 0.9, r: 0.8,
+  wake: 7, fallDmg: 2, fallBack: 1.6, shock: 2.3,
+  now: { run: 1.9, turn: 2.4, windup: 0.85, recover: 0.95, slamR: 2.5, attackAt: 2.0 },
+  past: { run: 3.3, turn: 3.6, windup: 0.6, recover: 0.75, slamR: 2.3, attackAt: 1.9 },
+  charge: { min: 3.5, max: 10, tele: 0.6, speed: 12, over: 3.0, len: 12, hitW: 1.15, wallStun: 1.4, recover: 0.7, cd: 2.6 }, // 돌진: 겨눈 자리를 over m 지나칠 때까지(최대 len)
+};
+const bossFollow = b => (b.hp <= BOSS.phase2 ? BOSS.follow2 : BOSS.follow);
+// 어제의 금박 몸: 돌 텍스처 위에 금빛을 곱하고 은은히 빛나게
+const bossGoldMats = new Map();
+function bossGoldMat(src) {
+  let m = bossGoldMats.get(src);
+  if (!m) {
+    const c = src.clone();
+    c.color.set('#ffc76a').multiplyScalar(1.7);
+    c.metalness = 0.35; c.roughness = 0.42;
+    if (c.map) { c.emissiveMap = c.map; c.emissive.set('#ffae3a'); c.emissiveIntensity = 0.45; }
+    m = eraMaterial(c, 'past'); bossGoldMats.set(src, m);
+  }
+  return m;
+}
+const ringGeo1 = new THREE.RingGeometry(0.9, 1, 72);
+const discGeo1 = new THREE.CircleGeometry(1, 56);
+const laneGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).translate(0, 0, 0.5); // 앞(+z)으로 뻗는 띠
+// 등 뒤 구역: 찌르기가 '등 뒤'로 들어가는 140°(앞에서 110° 넘게) × 몸 밖~돌진 거리 3m. 바닥에 눕히면 θ=90°가 뒤(-z)
+const backGeo = new THREE.RingGeometry(1.05, GUARD.lunge, 40, 1, Math.PI / 2 - THREE.MathUtils.degToRad(70), THREE.MathUtils.degToRad(140)).rotateX(-Math.PI / 2);
+function decal(geo, color) {
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  if (geo !== laneGeo && geo !== backGeo) m.rotation.x = -Math.PI / 2;
+  m.renderOrder = 4; m.visible = false; world.add(m);
+  return m;
+}
+function placeBoss(b) { b.holder.position.set(b.x, b.py, b.z); b.holder.rotation.y = b.yaw; }
+function setBossEra(b, E) {
+  b.era = E; groups[E].add(b.holder);
+  for (const o of b.parts) o.material = o.userData.eraMats[E];
+}
+function spawnBoss(room) {
+  bosses = []; S.bossPending = false;
+  hud.boss.style.display = 'none';
+  if (!room.boss) return;
+  if (!CHAR.golem) { S.bossPending = true; return; } // 모델을 아직 받는 중 → update()에서 다시 부른다
+  const def = room.boss;
+  const b = { kind: 'boss', era: def.era || 'now', x: def.at[0] * T + 1, z: def.at[1] * T + 1, py: 0, yaw: THREE.MathUtils.degToRad(def.face || 0),
+    hp: BOSS.hp, state: 'dormant', alive: true, sus: 0, wind: 0, rec: 0, stun: 0, daze: 0, stagger: 0, hurtCd: 0, followT: 0,
+    fall: null, charge: null, chargeCd: 1.2, replan: 0, step: null, shockArm: false, burst: null, hpShown: -1 };
+  const m = buildGolem(CHAR.golem, src => src);
+  m.rig.scale.setScalar(BOSS_LOOK.scale);
+  b.rig = m.rig; b.meshes = m.meshes; b.weapons = m.weapons; b.parts = m.meshes.concat(m.weapons);
+  for (const o of b.parts) { const src = o.material; o.userData.eraMats = { now: golemMat(src), past: bossGoldMat(src) }; }
+  b.holder = new THREE.Group(); b.holder.add(m.rig);
+  b.anim = new Animator(m.rig, CHAR.golem.clips);
+  b.anim.loop(GCLIP.idle, 0);
+  setBossEra(b, b.era);
+  // 다른 시대에서 보이는 멈춘 모습 (골렘과 같은 붉은 윤곽)
+  b.ghost = new THREE.Group();
+  for (const sm of m.meshes) { const gm = new THREE.SkinnedMesh(sm.geometry, golemGhostMat); b.ghost.add(gm); gm.bind(sm.skeleton, sm.bindMatrix); gm.frustumCulled = false; gm.renderOrder = 8; }
+  b.ghostWeapons = m.weapons.map(w => { const gm = new THREE.Mesh(w.geometry, golemGhostMat); gm.matrixAutoUpdate = false; gm.frustumCulled = false; gm.renderOrder = 8; b.ghost.add(gm); return gm; });
+  b.ghost.visible = false; ghostActors.add(b.ghost);
+  b.followRing = decal(ringGeo1, '#7fe8ff');  // 도착 시계: 줄어드는 고리 (구덩이 위면 붉게)
+  b.slamRing = decal(discGeo1, '#ff3020');   // 내려찍기 범위
+  b.shockRing = decal(ringGeo1, '#ff6a3a');  // 2페이즈 도착 충격파 범위
+  b.burstRing = decal(ringGeo1, '#ffffff');  // 도착·충격파 번쩍
+  b.chargeLine = decal(laneGeo, '#ff3a20');  // 돌진 길
+  b.backArc = decal(backGeo, '#7fe8ff');     // 등 뒤 구역 (멈춰 있거나 휘청일 때)
+  hud.bossName.textContent = $t('성채지기');
+  bosses.push(b);
+  entities.push({ era: 'both', t: 0, update(dt) { stepBoss(b, dt); } });
+  placeBoss(b);
+}
+// 너비 우선으로 가장 가까운 설 수 있는 칸의 가운데 (벽 너머도 찾는다). avoid(i, j)이면 건너뜀
+function nearestStand(era, i0, j0, avoid) {
+  const seen = new Set([i0 + ',' + j0]), q = [[i0, j0]];
+  while (q.length) {
+    const [i, j] = q.shift();
+    if (stand(era, i, j) && !(avoid && avoid(i, j))) return [i * T + 1, j * T + 1];
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = i + di, nj = j + dj, k = ni + ',' + nj;
+      if (ni < 0 || nj < 0 || ni >= S.W || nj >= S.H || seen.has(k)) continue;
+      seen.add(k); q.push([ni, nj]);
+    }
+  }
+  return [S.start.x, S.start.z];
+}
+// 몸 앞 가장자리(R)가 막힌 칸(벽·기둥) 또는 바닥 없는 칸에 닿기 전까지 갈 수 있는 거리 (몸 너비 세 줄로 본다)
+function bodyRay(era, x, z, dx, dz, max, R) {
+  for (let d = 0; d <= max; d += 0.1) {
+    for (const off of [-R * 0.7, 0, R * 0.7]) {
+      const i = cellOf(x + dx * (d + R) - dz * off), j = cellOf(z + dz * (d + R) + dx * off);
+      if (solid(era, i, j) || ch(era, i, j) === '#') return { d, wall: true };
+      if (!floorAt(era, i, j)) return { d, wall: false };
+    }
+  }
+  return { d: max, wall: false };
+}
+function wakeBoss(b) {
+  if (b.state !== 'dormant') return;
+  b.state = 'alert'; b.stagger = 1.0;
+  b.anim.once(GCLIP.stagger, { fade: 0.1, speed: 1.8, dur: 1.0 });
+  sfx.wake(); S.shake = Math.max(S.shake, 0.45);
+  toast($t('성채지기가 깨어났어요'), 2.2);
+}
+function bossBurst(b, color, r = 3.2) { b.burst = { t: 0, r }; b.burstRing.material.color.set(color); b.burstRing.position.set(b.x, 0.09, b.z); }
+function startSlam(b) {
+  const P = BOSS[b.era], L = GOLEM_LOOK;
+  b.wind = P.windup;
+  b.anim.once(GCLIP.slam, { fade: 0.12, speed: L.slamSpeed, from: Math.max(0, L.slamHit - P.windup * L.slamSpeed), dur: P.windup + P.recover });
+  sfx.windup();
+}
+function startCharge(b) {
+  const C = BOSS.charge;
+  b.charge = { ph: 'tele', t: C.tele, dx: 0, dz: 0, went: 0, len: 0, want: C.len, wall: false, hit: false };
+  b.anim.once(GCLIP.charge, { fade: 0.15, speed: 0.4 / C.tele, dur: 99 }); // 웅크리는 앞 0.4초를 예비동작에 늘여 쓴다
+  sfx.charge();
+}
+function endCharge(b) { b.charge = null; b.chargeCd = BOSS.charge.cd; b.anim.onceLeft = 0; }
+function stepCharge(b, dt, here) {
+  const C = BOSS.charge, c = b.charge;
+  if (c.ph === 'tele') {
+    c.t -= dt;
+    if (c.t > C.tele * 0.35) { turnTo(b, S.p.x, S.p.z, dt, 5); c.want = Math.min(C.len, Math.hypot(S.p.x - b.x, S.p.z - b.z) + C.over); } // 겨누다가 마지막 0.2초는 방향·길이 고정 → 옆으로 비키면 피한다
+    [c.dx, c.dz] = gFwd(b);
+    const r = bodyRay(b.era, b.x, b.z, c.dx, c.dz, c.want, BOSS.r); c.len = r.d; c.wall = r.wall;
+    if (c.t <= 0) { c.ph = 'dash'; const a = b.anim.act(GCLIP.charge); if (a) a.timeScale = 3; sfx.dash(); }
+  } else if (c.ph === 'dash') {
+    const s = Math.min(C.speed * dt, c.len - c.went);
+    b.x += c.dx * s; b.z += c.dz * s; c.went += s;
+    if (!c.hit && here && Math.hypot(S.p.x - b.x, S.p.z - b.z) < C.hitW) { c.hit = true; hurt($t('성채지기의 돌진에 받혔어요')); }
+    if (c.went >= c.len - 1e-3) {
+      if (c.wall) {
+        // 벽·기둥에 박힘: 한동안 못 움직인다 (등이 열림)
+        endCharge(b); b.stagger = C.wallStun;
+        b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / C.wallStun, dur: C.wallStun });
+        S.shake = Math.max(S.shake, 0.4); sfx.slam(); sfx.thunk();
+        toast($t('벽에 박혔어요 — 지금 등 뒤로!'), 1.4);
+      } else { c.ph = 'rec'; c.t = C.recover; const a = b.anim.act(GCLIP.charge); if (a) a.timeScale = 2; }
+    }
+  } else if ((c.t -= dt) <= 0) endCharge(b);
+}
+function bossArrive(b) {
+  b.followT = 0; b.wind = 0; b.rec = 0; b.stun = 0; b.stagger = 0;
+  if (b.charge) endCharge(b);
+  const E = S.era, i = cellOf(b.x), j = cellOf(b.z);
+  setBossEra(b, E);
+  if (solid(E, i, j)) [b.x, b.z] = nearestStand(E, i, j, (a, c) => a === cellOf(S.p.x) && c === cellOf(S.p.z));
+  else if (!floorAt(E, i, j)) { startBossFall(b); return; }
+  b.daze = BOSS.daze; b.shockArm = b.hp <= BOSS.phase2;
+  b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / (BOSS.daze + 0.2), dur: BOSS.daze });
+  bossBurst(b, E === 'past' ? '#ffd27a' : '#7fe8ff');
+  sfx.arrive(E); S.shake = Math.max(S.shake, 0.22);
+  placeBoss(b);
+}
+function startBossFall(b) {
+  const i = cellOf(b.x), j = cellOf(b.z), pi = cellOf(S.p.x), pj = cellOf(S.p.z);
+  b.fall = { t: 0, vy: 0, to: nearestStand(b.era, i, j, (a, c) => Math.abs(a - pi) + Math.abs(c - pj) < 1) };
+  b.hp = Math.max(0, b.hp - BOSS.fallDmg); b.hurtCd = 0;
+  b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.2, dur: 9 });
+  S.shake = Math.max(S.shake, 0.3); S.hitstop = 0.1; sfx.bossFall();
+  toast(b.hp > 0 ? $t('성채지기가 구덩이에 떨어졌어요!') : $t('성채지기가 시간 속으로 떨어졌어요'), 1.8);
+  placeBoss(b);
+}
+function stepBossFall(b, dt) {
+  const f = b.fall;
+  f.t += dt; f.vy -= 20 * dt; b.py += f.vy * dt;
+  b.anim.update(dt); placeBoss(b);
+  b.holder.visible = b.py > -8;
+  if (b.hp <= 0 && f.t >= 0.9) { b.fall = null; b.holder.visible = false; killBoss(b, 'fall'); return; }
+  if (f.t >= BOSS.fallBack) {
+    // 가장 가까운 바닥에서 다시 올라온다 — 같은 방향, 잠깐 휘청
+    b.fall = null; b.py = 0; b.holder.visible = true; [b.x, b.z] = f.to;
+    b.daze = BOSS.daze; b.shockArm = b.hp <= BOSS.phase2;
+    b.anim.onceLeft = 0; b.anim.once(GCLIP.stagger, { fade: 0.05, speed: 1.8 / (BOSS.daze + 0.2), dur: BOSS.daze });
+    bossBurst(b, b.era === 'past' ? '#ffd27a' : '#7fe8ff'); sfx.arrive(b.era);
+    placeBoss(b);
+  }
+}
+function stepBoss(b, dt) {
+  if (b.burst) { b.burst.t += dt; if (b.burst.t > 0.45) b.burst = null; }
+  if (!b.alive) { if (b.era === S.era) b.anim.update(dt); return; }
+  if (b.fall) { stepBossFall(b, dt); return; } // 떨어지는 중엔 시대와 상관없이
+  if (b.era !== S.era) {
+    // 떠난 시대에 멈춰 있다 → 내가 있는 시대로 따라온다 (잠들어 있으면 안 옴, 내 시계로 잰다)
+    if (b.state === 'dormant' || S.trans) return;
+    b.followT += dt;
+    if (b.followT >= bossFollow(b)) bossArrive(b);
+    return;
+  }
+  b.followT = 0;
+  b.hurtCd = Math.max(0, b.hurtCd - dt); b.chargeCd = Math.max(0, b.chargeCd - dt);
+  const P = BOSS[b.era];
+  const dx = S.p.x - b.x, dz = S.p.z - b.z, dist = Math.hypot(dx, dz);
+  const here = S.falling <= 0 && !S.trans;
+  b.rig.rotation.z = 0;
+  if (b.state === 'dormant') { b.anim.update(dt); if (here && dist < BOSS.wake) wakeBoss(b); placeBoss(b); return; }
+  if (b.stun > 0) { b.stun -= dt; b.rig.rotation.z = Math.sin(S.time * 40) * 0.02; placeBoss(b); return; } // 시간 충격: 그 자세로 떤다
+  if (b.daze > 0) {
+    b.daze -= dt; b.anim.update(dt);
+    if (b.daze <= 0 && b.shockArm) {
+      b.shockArm = false; bossBurst(b, '#ff6a3a', BOSS.shock * 1.15);
+      S.shake = Math.max(S.shake, 0.35); sfx.slam();
+      if (here && dist < BOSS.shock) hurt($t('충격파에 맞았어요'));
+    }
+    placeBoss(b); return;
+  }
+  if (b.stagger > 0) { b.stagger -= dt; b.anim.update(dt); placeBoss(b); return; }
+  if (b.charge) { stepCharge(b, dt, here); b.anim.update(dt); placeBoss(b); return; }
+  if (b.wind > 0) {
+    turnTo(b, S.p.x, S.p.z, dt, b.era === 'past' ? 2.2 : 1.4);
+    b.wind -= dt; b.anim.update(dt);
+    if (b.wind <= 0) {
+      b.rec = P.recover; S.shake = Math.max(S.shake, 0.3); sfx.slam();
+      bossBurst(b, '#ff5030', P.slamR);
+      if (here && dist < P.slamR) hurt($t('성채지기에게 맞았어요'));
+    }
+    placeBoss(b); return;
+  }
+  if (b.rec > 0) { b.rec -= dt; b.anim.update(dt); placeBoss(b); return; }
+  if (here && dist < P.attackAt) startSlam(b);
+  else if (here && b.era === 'past' && b.chargeCd <= 0 && dist > BOSS.charge.min && dist < BOSS.charge.max && rayLen(b.era, b.x, b.z, dx / dist, dz / dist, dist) >= dist - 0.05) startCharge(b);
+  else {
+    b.replan -= dt;
+    if (b.replan <= 0) { b.replan = 0.3; b.step = nextStep(b, cellOf(S.p.x), cellOf(S.p.z)); }
+    const tgt = b.step && dist > 2.6 ? b.step : [S.p.x, S.p.z];
+    const stop = dist < 1.7 || !here;
+    moveEnemy(b, tgt[0], tgt[1], stop ? 0 : P.run, dt, BOSS.r, P.turn);
+    if (stop) b.anim.loop(GCLIP.idle, 0.3);
+    else if (b.era === 'past') b.anim.loop(GCLIP.run, 0.2, P.run / BOSS_LOOK.jogNat);
+    else b.anim.loop(GCLIP.walk, 0.25, P.run / BOSS_LOOK.walkNat);
+  }
+  b.anim.update(dt);
+  placeBoss(b);
+}
+// 등 찌르기: 1칸. 공격 중(내려찍기·돌진)이면 움찔하지 않고 그대로 친다 — 등 뒤에 붙어 찌르기만 반복할 수 없게
+function hitBoss(b, how) {
+  if (b.hurtCd > 0) { sfx.clang(); return 'immune'; }
+  if (b.state === 'dormant') { b.state = 'alert'; sfx.wake(); }
+  b.hp -= 1; b.hurtCd = BOSS.hurtCd;
+  if (b.hp <= 0) { killBoss(b, how); return 'kill'; }
+  const busy = b.wind > 0 || b.rec > 0 || (b.charge && b.charge.ph !== 'tele');
+  if (b.daze > 0) b.shockArm = false; // 도착하자마자 찌르면 충격파가 취소된다
+  if (!busy) {
+    if (b.charge) endCharge(b);
+    b.daze = 0; b.stagger = BOSS.stagger;
+    b.anim.onceLeft = 0; b.anim.once(GCLIP.hit, { fade: 0.06, speed: 1 / BOSS.stagger, dur: BOSS.stagger });
+    // 찌른 쪽 반대로 밀려난다 (벽·구덩이 앞에서 멈춤)
+    const ux = b.x - S.p.x, uz = b.z - S.p.z, ul = Math.hypot(ux, uz) || 1;
+    const r = bodyRay(b.era, b.x, b.z, ux / ul, uz / ul, BOSS.knock, BOSS.r);
+    b.x += ux / ul * r.d; b.z += uz / ul * r.d; placeBoss(b);
+  }
+  S.hitstop = 0.14; S.shake = Math.max(S.shake, 0.35);
+  sfx.kill(); sfx.crack();
+  if (b.hp === BOSS.phase2) { toast($t('성채지기가 화났어요 — 이제 더 빨리 따라와요'), 2.4); screenFlash('#ff5a3a', 0.2); }
+  else toast($t('등 뒤에서 한 방'), 1.1);
+  return 'hit';
+}
+function killBoss(b, how) {
+  b.alive = false; b.wind = 0; b.rec = 0; b.daze = 0; b.stagger = 0; b.shockArm = false;
+  if (b.charge) endCharge(b);
+  S.kills++; S.hitstop = 0.3; S.shake = 0.7;
+  sfx.crumble(); sfx.door();
+  screenFlash(b.era === 'past' ? '#ffd27a' : '#7fe8ff', 0.35);
+  if (how !== 'fall') { b.anim.onceLeft = 0; b.anim.once(how === 'back' ? GCLIP.dieBack : GCLIP.dieFront, { fade: 0.1, hold: true }); }
+  toast($t('성채지기를 쓰러뜨렸어요 — 출구가 열렸어요'), 3);
+}
+function updateBossView() {
+  const b = bosses[0];
+  if (!b) return;
+  const here = b.era === S.era;
+  // 전환 물결이 보스를 지나가면 바로 윤곽을 보인다 (물결 전체는 1.4초쯤 걸려 1.5초 도착 시계를 다 가려 버림)
+  const ringOk = !S.ring || S.ring.r > Math.hypot(b.x - SHIFT.origin.value.x, b.z - SHIFT.origin.value.z) + 1.5;
+  b.ghost.visible = b.alive && !here && ringOk;
+  if (b.ghost.visible) { b.holder.updateMatrixWorld(true); b.weapons.forEach((w, k) => { b.ghostWeapons[k].matrix.copy(w.matrixWorld); b.ghostWeapons[k].matrixWorldNeedsUpdate = true; }); }
+  const eraCol = S.era === 'past' ? '#ffd27a' : '#7fe8ff';
+  // 도착 시계: 다른 시대에 멈춰 있는 동안 줄어드는 고리. 그 자리가 이쪽에서 구덩이면 붉게(= 따라오면 떨어진다)
+  const fr = b.followRing, following = b.alive && b.state !== 'dormant' && !here && !b.fall && ringOk;
+  if (following || (b.alive && b.fall && here)) {
+    const k = following ? Math.min(1, b.followT / bossFollow(b)) : Math.min(1, b.fall.t / BOSS.fallBack);
+    const [x, z] = following ? [b.x, b.z] : b.fall.to, ci = cellOf(x), cj = cellOf(z);
+    const pit = following && !floorAt(S.era, ci, cj) && !solid(S.era, ci, cj);
+    fr.visible = true; fr.position.set(x, 0.08, z); fr.scale.setScalar(2.8 - 1.9 * k);
+    fr.material.color.set(pit ? '#ff4a5a' : eraCol); fr.material.opacity = 0.35 + 0.5 * k;
+  } else fr.visible = false;
+  const P = BOSS[b.era];
+  b.slamRing.visible = here && b.alive && b.wind > 0;
+  if (b.slamRing.visible) { const k = 1 - b.wind / P.windup; b.slamRing.position.set(b.x, 0.06, b.z); b.slamRing.scale.setScalar(P.slamR * (0.3 + 0.7 * k)); b.slamRing.material.opacity = 0.12 + 0.35 * k; }
+  b.shockRing.visible = here && b.alive && b.daze > 0 && b.shockArm;
+  if (b.shockRing.visible) { const k = 1 - b.daze / BOSS.daze; b.shockRing.position.set(b.x, 0.07, b.z); b.shockRing.scale.setScalar(BOSS.shock * (0.35 + 0.65 * k)); b.shockRing.material.opacity = 0.25 + 0.5 * k; }
+  const c = b.charge;
+  b.chargeLine.visible = here && b.alive && !!c && c.ph === 'tele';
+  if (b.chargeLine.visible) { const k = 1 - c.t / BOSS.charge.tele; b.chargeLine.position.set(b.x, 0.07, b.z); b.chargeLine.rotation.y = b.yaw; b.chargeLine.scale.set(BOSS.charge.hitW * 2, 1, c.len + BOSS.r); b.chargeLine.material.opacity = 0.12 + 0.4 * k; }
+  // 등 뒤 구역: 다른 시대에 멈춰 있을 때(= 도착할 때 등이 될 자리) · 휘청이거나 벽에 박혔을 때
+  const open = b.alive && !b.fall && b.state !== 'dormant' && (following || (here && (b.daze > 0 || b.stagger > 0.25 || b.stun > 0)));
+  b.backArc.visible = open;
+  if (open) { b.backArc.position.set(b.x, 0.075, b.z); b.backArc.rotation.y = b.yaw; b.backArc.material.color.set(eraCol); b.backArc.material.opacity = 0.3 + 0.1 * Math.sin(S.time * 6); }
+  b.burstRing.visible = !!b.burst && here;
+  if (b.burst) { const k = b.burst.t / 0.45; b.burstRing.scale.setScalar(0.6 + b.burst.r * k); b.burstRing.material.opacity = 0.9 * (1 - k); }
+  // 체력 막대
+  const show = b.state !== 'dormant' || !b.alive;
+  hud.boss.style.display = show ? 'block' : 'none';
+  if (!show) return;
+  if (b.hpShown !== b.hp) { b.hpShown = b.hp; let s = ''; for (let k = 0; k < BOSS.hp; k++) s += `<i class="${k < b.hp ? '' : 'off'}"></i>`; hud.bossPips.innerHTML = s; }
+  hud.boss.classList.toggle('angry', b.alive && b.hp <= BOSS.phase2);
+  hud.boss.classList.toggle('down', !b.alive);
+  hud.bossFollow.textContent = !b.alive ? $t('쓰러뜨림') : b.fall ? $t('떨어지는 중…') : following ? $t('따라오는 중 {0}초', Math.max(0, bossFollow(b) - b.followT).toFixed(1)) : '';
+}
+
 /* ───────── 방 이동 · 점수(어제에서 쓴 시간) ───────── */
 const loadBest = () => { try { return JSON.parse(localStorage.getItem('yk-best') || '{}'); } catch (e) { return {}; } };
 function roomStars() {
   const r = S.room;
   let st = 1;
-  if (!S.alarms) st++;
+  if (r.boss ? !S.roomHurt : !S.alarms) st++;
   if (r.par != null && S.pastTime <= r.par) st++;
   return st;
 }
 function updateExit() {
   if (S.trans || S.falling > 0) return;
   if (ch(S.era, cellOf(S.p.x), cellOf(S.p.z)) === '>') {
-    if (enemies().some(g => g.alive)) { if (toastT <= 0) toast($t('적이 남아 있어요')); return; }
+    if (S.bossPending || enemies().some(g => g.alive)) { if (toastT <= 0) toast($t('적이 남아 있어요')); return; }
     sfx.exit();
     // 기록: 이 방에서 어제에 머문 시간과 별
     const st = roomStars(), best = loadBest(), id = S.room.id, prev = best[id];
@@ -2137,12 +2474,13 @@ function update(dt) {
     stepDown(dt); animatePlayer(dt); drawPlayer(dt);
     camTarget.lerp(_v.set(S.p.x, 0, S.p.z), 1 - Math.exp(-dt * 5));
     camera.position.copy(camTarget).add(camOff); camera.lookAt(camTarget.x, 0.6, camTarget.z);
-    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView();
+    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView();
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) hud.toast.style.opacity = 0; }
     if (flashA > 0) { flashA = Math.max(0, flashA - dt * 0.8); hud.flash.style.opacity = flashA; }
     return;
   }
   S.time += dt; S.roomTime += dt;
+  if (S.bossPending && CHAR.golem) spawnBoss(S.room); // 보스 방에 모델보다 먼저 들어왔으면 받는 대로
   if (S.era === 'past' && !S.trans) S.pastTime += dt; // 점수: 어제에서 쓴 시간
   S.shiftCd = Math.max(0, S.shiftCd - dt); S.rollCd = Math.max(0, S.rollCd - dt); S.invuln = Math.max(0, S.invuln - dt); S.shiftStrike = Math.max(0, S.shiftStrike - dt);
   if (S.stabT > 0) { S.stabT -= dt; if (!S.stabHit && S.stabT < 0.28) { S.stabHit = true; resolveStab(); } }
@@ -2157,10 +2495,13 @@ function update(dt) {
   for (const e of entities) if (e.era === 'both' || e.era === S.era) e.update(dt, e);
   updateRing(dt);
   updateLights(dt);
-  updateGuardsView(); updateGolemsView();
+  updateGuardsView(); updateGolemsView(); updateBossView();
   hud.ptime.textContent = $t('어제 {0}초', S.pastTime.toFixed(1));
-  // 카메라 (조금 늦게 따라옴)
-  camTarget.lerp(_v.set(S.p.x, 0, S.p.z), 1 - Math.exp(-dt * 5));
+  // 카메라 (조금 늦게 따라옴). 깨어 있는 보스가 있으면 둘 사이 쪽으로 조금 당겨 둘 다 보이게
+  _v.set(S.p.x, 0, S.p.z);
+  const bb = bosses[0];
+  if (bb && bb.alive && bb.state !== 'dormant' && !bb.fall) { const ox = (bb.x - S.p.x) * 0.3, oz = (bb.z - S.p.z) * 0.3, ol = Math.hypot(ox, oz), k = ol > 4 ? 4 / ol : 1; _v.x += ox * k; _v.z += oz * k; }
+  camTarget.lerp(_v, 1 - Math.exp(-dt * 5));
   S.shake = Math.max(0, S.shake - dt);
   const sh = S.shake * S.shake * 0.9;
   camera.position.copy(camTarget).add(camOff).add(_s.set((Math.random() - 0.5) * sh, (Math.random() - 0.5) * sh, 0));
@@ -2227,6 +2568,9 @@ window.__yk = {
   stab() { const r = stab(); render(); return r; },
   golems() { return golems.map(g => ({ alive: g.alive, state: g.state, sus: +g.sus.toFixed(2), x: +g.x.toFixed(2), z: +g.z.toFixed(2), cell: [cellOf(g.x), cellOf(g.z)], yawDeg: Math.round(THREE.MathUtils.radToDeg(g.yaw)), wind: +g.wind.toFixed(2), stun: +g.stun.toFixed(2), anim: g.anim ? g.anim.curName.replace('AS_StoneGolem_', '') : 'blocks' })); },
   golemModel: () => !!CHAR.golem,
+  boss() { const b = bosses[0]; if (!b) return S.bossPending ? 'pending' : null; return { alive: b.alive, era: b.era, state: b.state, hp: b.hp, x: +b.x.toFixed(2), z: +b.z.toFixed(2), py: +b.py.toFixed(2), cell: [cellOf(b.x), cellOf(b.z)], yawDeg: Math.round(THREE.MathUtils.radToDeg(b.yaw)),
+    followT: +b.followT.toFixed(2), daze: +b.daze.toFixed(2), stagger: +b.stagger.toFixed(2), wind: +b.wind.toFixed(2), rec: +b.rec.toFixed(2), stun: +b.stun.toFixed(2), hurtCd: +b.hurtCd.toFixed(2), charge: b.charge ? b.charge.ph : null, fall: !!b.fall, shockArm: b.shockArm, anim: b.anim.curName.replace('AS_StoneGolem_', '') }; },
+  bossSet(o) { const b = bosses[0]; if (!b) return null; if (o.x != null) b.x = o.x; if (o.z != null) b.z = o.z; if (o.yawDeg != null) b.yaw = THREE.MathUtils.degToRad(o.yawDeg); if (o.hp != null) b.hp = o.hp; if (o.state) b.state = o.state; if (o.era && o.era !== b.era) setBossEra(b, o.era); placeBoss(b); render(); return this.boss(); },
   guards() { return guards.map(g => ({ alive: g.alive, state: g.state, sus: +g.sus.toFixed(2), x: +g.x.toFixed(2), z: +g.z.toFixed(2), cell: [cellOf(g.x), cellOf(g.z)], yawDeg: Math.round(THREE.MathUtils.radToDeg(g.yaw)), wind: +g.wind.toFixed(2) })); },
   guardSet(k, x, z, yawDeg) { const g = guards[k]; if (!g) return null; g.x = x; g.z = z; if (yawDeg != null) g.yaw = THREE.MathUtils.degToRad(yawDeg); placeGuard(g); updateCone(g); render(); return this.guards()[k]; },
   best() { return loadBest(); },

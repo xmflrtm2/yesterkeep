@@ -60,6 +60,17 @@ const P = {
   /** 조건이 될 때까지 기다림(최대 max초) */
   waitUntil(fn, max = 15, dt = 0.05) { let t = 0; while (t < max && !fn()) { Y().step(dt); t += dt; } return t < max ? +t.toFixed(2) : null; },
   log() { return { ...this.st(), events: this.events.slice(-12), guards: Y().guards() }; },
+  // ── 성채지기(보스) 시험용 ──
+  boss() { return Y().boss(); },
+  bossDist() { const b = Y().boss(), s = Y().state(); return Math.hypot(b.x - s.x, b.z - s.z); },
+  /** 보스(또는 멈춘 윤곽) 옆을 돌아 등 뒤 d m 자리로. side: +1 왼쪽으로 / -1 오른쪽으로 */
+  circleBehind(side = 1, d = 1.7, max = 2.5) {
+    const b = Y().boss(), y = b.yawDeg * Math.PI / 180, fx = Math.sin(y), fz = Math.cos(y), px = -fz * side, pz = fx * side;
+    this.moveTo(b.x + px * 2.3 + fx * 0.3, b.z + pz * 2.3 + fz * 0.3, { exact: true, max: max / 2, tol: 0.5 });
+    this.moveTo(b.x + px * 1.6 - fx * d, b.z + pz * 1.6 - fz * d, { exact: true, max: max / 2, tol: 0.5 });
+    this.moveTo(b.x - fx * d, b.z - fz * d, { exact: true, max: 0.8, tol: 0.35 });
+    return this.st();
+  },
 };
 window.__play = P;
 export default P;

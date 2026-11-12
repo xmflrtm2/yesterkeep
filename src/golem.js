@@ -17,9 +17,14 @@ export const GCLIP = {
   slam: 'AS_StoneGolem_attack4',   // 뛰어올라 망치를 들고 ≈1.55초에 내려찍음
   dieFront: 'AS_StoneGolem_death1', // 뒤로 쓰러짐 (정면에서 기습당했을 때)
   dieBack: 'AS_StoneGolem_death2',  // 앞으로 엎어짐 (등 뒤에서 찔렸을 때)
+  charge: 'AS_StoneGolem_attack5',  // 보스: 방패를 앞세운 돌진 (원래 0.4~2.6초에 3.9m 나아감 — 이동은 코드가 한다)
+  hit: 'AS_StoneGolem_gethit1',     // 보스: 등을 찔림 (1초)
+  stagger: 'AS_StoneGolem_gethit2', // 보스: 크게 휘청 (도착·벽에 박힘·깨어남, 1.8초)
 };
 // 모델은 키 1.84m → 1.3배(≈2.4m). 동작 본래 속도(1.3배 기준): 걷기 ≈1.5m/s, 뛰기 ≈2.7m/s
 export const GOLEM_LOOK = { scale: 1.3, walkSpeed: 0.75, runSpeed: 0.95, slamHit: 1.55, slamSpeed: 1.41, height: 2.4 };
+// 성채지기(보스): 같은 모델 1.6배(≈2.9m). 동작 본래 속도(1.6배 기준): 걷기 ≈1.85m/s, 뛰기 ≈3.3m/s → 이동 속도 ÷ 이 값 = 재생 속도 (발이 안 미끄러지게)
+export const BOSS_LOOK = { scale: 1.6, walkNat: 1.85, jogNat: 3.3, height: 2.95 };
 
 export async function loadGolem(loader) {
   const [body, hammer, shield, anims] = await Promise.all(

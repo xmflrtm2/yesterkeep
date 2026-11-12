@@ -94,5 +94,21 @@
 "E 레버 (녹슮)": "E Lever (rusted)",
 "걸린 시간 {0}분 {1}초": "Time {0} min {1} s",
 "시대 전환 {0}번": "Shifts: {0}",
-"추락 {0}번": "Falls: {0}"
+"추락 {0}번": "Falls: {0}",
+"성채의 심장": "Heart of the Keep",
+"성채지기는 내가 시대를 바꾸면 1.5초 늦게 따라와요. 그 사이 등 뒤로 가 있다가 찌르세요": "The Warden follows your shifts 1.5 s late. Get behind it in that moment, then stab",
+"붉은 고리 = 따라오면 떨어지는 자리. 어제에서 오늘의 꺼진 바닥 위로 끌어들인 뒤 오늘로 바꾸세요": "Red ring = it falls when it follows. In yesterday, lure it over today's broken floor, then shift to today",
+"성채지기": "THE WARDEN",
+"성채지기가 깨어났어요": "The Warden awakens",
+"따라오는 중 {0}초": "Following in {0}s",
+"떨어지는 중…": "Falling…",
+"쓰러뜨림": "Defeated",
+"벽에 박혔어요 — 지금 등 뒤로!": "Stuck in the wall — get behind it now!",
+"성채지기가 구덩이에 떨어졌어요!": "The Warden fell into the pit!",
+"성채지기가 시간 속으로 떨어졌어요": "The Warden fell through time",
+"성채지기가 화났어요 — 이제 더 빨리 따라와요": "The Warden is enraged — it follows faster now",
+"성채지기를 쓰러뜨렸어요 — 출구가 열렸어요": "The Warden falls — the exit is open",
+"성채지기에게 맞았어요": "Crushed by the Warden",
+"성채지기의 돌진에 받혔어요": "Rammed by the Warden",
+"충격파에 맞았어요": "Hit by the shockwave"
 };

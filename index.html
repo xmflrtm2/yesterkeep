@@ -72,6 +72,16 @@ function i18nDom(root) {
   #era .cd i { display: block; height: 100%; width: 100%; background: currentColor; }
   body.past #era .name { color: var(--gold); }
   body.now #era .name { color: var(--teal); }
+  /* 성채지기(보스) 체력: 위쪽 가운데 */
+  #boss { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); text-align: center; display: none; white-space: nowrap; }
+  #boss .name { font-size: 15px; letter-spacing: 3px; color: #ffe2b0; text-shadow: 0 2px 4px #000; }
+  #boss .pips { display: flex; gap: 4px; justify-content: center; margin-top: 5px; }
+  #boss .pips i { width: 30px; height: 9px; border-radius: 2px; background: #ff6a50; box-shadow: 0 0 6px #ff6a5088; transition: background .25s, box-shadow .25s; }
+  #boss .pips i.off { background: #ffffff1c; box-shadow: none; }
+  #boss .follow { margin-top: 5px; font-size: 13px; color: var(--teal); text-shadow: 0 1px 3px #000; min-height: 16px; }
+  body.past #boss .follow { color: var(--gold); }
+  #boss.angry .name { color: #ff9a7a; }
+  #boss.down { opacity: .55; }
   #roomTitle { position: absolute; left: 0; right: 0; top: 18%; text-align: center; font-size: 34px; font-weight: 700;
     text-shadow: 0 3px 10px #000; opacity: 0; transition: opacity .6s; }
   #roomTitle small { display: block; font-size: 15px; font-weight: 400; opacity: .8; margin-top: 6px; }
@@ -107,6 +117,7 @@ function i18nDom(root) {
   <div id="obj"></div>
   <div id="era"><div class="name"></div><div class="sub"></div><div class="cd"><i></i></div><div class="ptime"></div>
     <div id="gate"><div class="lbl"></div><div class="bar"><i></i></div></div></div>
+  <div id="boss"><div class="name"></div><div class="pips"></div><div class="follow"></div></div>
   <div id="roomTitle"></div>
   <div id="hint"></div>
   <div id="prompt"></div>

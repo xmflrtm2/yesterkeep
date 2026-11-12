@@ -18,7 +18,8 @@ OUT = GAME / 'assets' / 'fab' / 'StoneGolem'
 ANIM_OUT = GAME / 'assets' / 'fab' / 'anims' / 'SKEL_StoneGolem.anims.glb'
 GLB_TOOLS = Path(r'C:\Users\PC\Desktop\CMG\fab-assets\tools\glb_tools.py')
 CLIPS = ['AS_StoneGolem_idle2', 'AS_StoneGolem_walkF', 'AS_StoneGolem_jogF', 'AS_StoneGolem_attack4',  # attack4 = 뛰어올라 망치 내려찍기
-         'AS_StoneGolem_death1', 'AS_StoneGolem_death2']  # death1 = 뒤로 쓰러짐(정면·기습), death2 = 앞으로 엎어짐(등 뒤)
+         'AS_StoneGolem_death1', 'AS_StoneGolem_death2',  # death1 = 뒤로 쓰러짐(정면·기습), death2 = 앞으로 엎어짐(등 뒤)
+         'AS_StoneGolem_attack5', 'AS_StoneGolem_gethit1', 'AS_StoneGolem_gethit2']  # 보스(11/12): attack5 = 방패 앞세운 돌진, gethit1 = 등 찔림, gethit2 = 크게 휘청(도착·벽에 박힘)
 # 줄일 크기: 위에서 내려다보는 카메라(골렘 키가 화면에서 150px 안팎)라 몸 바탕색만 512, 나머지·무기는 256
 SIZES = {'base': 512, 'normal': 256, 'mr': 256, 'occlusion': 256}
 SMALL = {'base': 256, 'normal': 256, 'mr': 256, 'occlusion': 256}

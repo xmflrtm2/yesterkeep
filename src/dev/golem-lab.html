@@ -24,7 +24,9 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshStan
 floor.rotation.x = -Math.PI / 2; scene.add(floor);
 const loader = new GLTFLoader();
 const base = '../../assets/fab/';
-const [body, hammer, shield, anims] = await Promise.all(['StoneGolem/StoneGolem.glb', 'StoneGolem/Hammer.glb', 'StoneGolem/Shield.glb', 'anims/SKEL_StoneGolem.anims.glb'].map(u => loader.loadAsync(base + u)));
+// ?anims=SKEL_StoneGolem.all.glb 처럼 다른 동작 파일을 볼 수 있다 (동작 고르는 중 — golem_pack.py 주석 참고)
+const animFile = new URLSearchParams(location.search).get('anims') || 'SKEL_StoneGolem.anims.glb';
+const [body, hammer, shield, anims] = await Promise.all(['StoneGolem/StoneGolem.glb', 'StoneGolem/Hammer.glb', 'StoneGolem/Shield.glb', 'anims/' + animFile].map(u => loader.loadAsync(base + u)));
 const rig = body.scene; scene.add(rig);
 const bones = {}; rig.traverse(o => { if (o.isBone) bones[o.name] = o; });
 const hm = hammer.scene, sh = shield.scene;
