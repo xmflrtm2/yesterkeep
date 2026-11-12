@@ -234,6 +234,30 @@ These Four Walls와 첫인상이 겹쳐서 개발자님 결정으로 **잠입 �
 
 시험 도구: `tools/boss_sim.py` = 화면 없는 크롬으로 `src/dev/boss-bots.js` 봇(spam·circle·idle·parry)을 돌리고 `shot:<장면>=<jpg>`로 장면 스크린샷. 브라우저 창이 가려져 있으면 창 안 시험은 렌더링이 멈춰 쓸 수 없었다. `src/dev/clear-all.js`(출시 점검 세션 파일)의 `heart` 풀이도 parry 봇으로 바꿈 → 출시 점검 13/13 통과. 스크린샷 `docs/boss/09~12`.
 
+### 성채지기 패턴 정리 (11/12 밤) — 기획서 19장 "패턴 표", 스크린샷 `docs/boss/13~20`
+
+개발자님: "좀 괜찮네, 패턴이 단조롭긴 하다". 의도한 풀이 봇의 판을 세어 보니 공격이 내려찍기·휘두르기 둘만 나왔다. 같은 봇을 고치기 전 판에서 다시 재 보니 **Shift 없이 구르기만 하는 봇(roll)이 19~20초에 이기고**, 연타 봇도 6판 중 1판을 17.9초에 이겼다(오후의 "연타 못 이김"은 1판만 잰 숫자였다).
+
+| 바꾼 것 (`src/main.js` 성채지기 절) | 내용 |
+|---|---|
+| 망치 공격 셋 | `startSlam(b, kind, windup)`: 'slam' 부채꼴 · 'quake' 무너지는 천장 · 'fissure' 땅 가르기. 셋 다 `b.wind` = 예비동작이라 `bossLocked`가 그대로 묶는다. 같은 attack4를 예비동작 길이에 맞춰 늘여 쓴다(`speed = min(slamSpeed, slamHit / w)`) |
+| 박자 | `BOSS.beat` — 앞 가까이에서 고르는 순서를 시대·페이즈마다 돌림(오늘 내려찍기·내려찍기·땅 가르기 / 어제 내려찍기·돌진 / 2페이즈 오늘 2연타·땅 가르기 / 어제 2연타·돌진). `b.beat[era]` |
+| 2연타 | 2페이즈 내려찍기는 `b.combo = 1` → 회복 0.35초 뒤 `startComboSlam`(0.3초 동안 8 rad/s로 돌아서며 0.6/0.45초 예비). 그때 등·옆이면 휘두르기 |
+| 땅 가르기 | 오늘 4.5~11m(깨어난 뒤 첫 번은 4초), 휘두르기 뒤 3.5m+. 주황 줄(`fissLine`)이 겨누다 마지막 0.3초 고정 → 금(`b.crack`, `stepCrack`)이 초속 14m. 줄 길이 `fissureLen`은 구덩이를 건너고 벽·기둥에서 멈춤(처음엔 `bodyRay`를 써서 구덩이 끝에서 멈춰 줄이 1m로 짧았다 → 스크린샷으로 발견) |
+| 무너지는 천장 | 2페이즈 오늘, 들어서자마자 + 9초마다. 둘레 고리 2.8m + 붉은 원 7개(`bossRocks`, 오늘 무리에 넣어 오늘에서만 보임). `stepRocks`는 `S.era === 'now'`일 때만 시간이 흘러 **어제로 가 있으면 돌이 공중에 멈추고**, 돌아오면 최소 0.6초 남기고 이어진다(`rocksAway`). 돌·원판은 `eraPlain('now')` + 가산 원판 |
+| 돌진 3연속 | 2페이즈 `b.chainLeft = 2`. 멈추자마자 0.42초 겨눔(12 rad/s로 돌아섬 — 처음 5 rad/s로는 두 번째 줄이 엉뚱한 쪽을 봤다), 사이 0.3초, 벽에 박히면 끝 |
+| 휘두르기 연계 | 휘두른 뒤 3.5m+ 떨어져 있으면 어제 = 돌진(0.5초), 오늘 = 땅 가르기(0.7초) |
+| 빙빙 돌기 막기 | ① 휘두르기 예비동작 중엔 돌아서며 찌르기가 안 통함(`hitBoss` → 'immune', "휘두르는 중엔 안 통해요 — 고리 밖으로!") ② 내려찍기·천장·땅 가르기 회복이 끝날 때 등·옆 2.5m면 0.3초 안 기다리고 바로 휘두르기. 둘 다 circle 봇이 4판 중 3판을 이겨서 넣었다(처음엔 천장의 1.1초 예비동작 동안 등 뒤에서 거저 찔렀다 → 천장의 한 방을 앞 부채꼴에서 둘레 충격파로 바꿈) |
+| 2페이즈 들어설 때 | `bossPhase2(b)` — 찌르기든 구덩이(4→2칸처럼 3을 건너뛰어도)든 `b.p2`로 한 번만. 천장 바로 쓸 수 있게, 붉게 번쩍, "성채지기가 화났어요 — 이제 두 번씩 쳐요" |
+| 정리 | `bossCalm(b)` = 공격 내려놓기(평소 도착·구덩이·쓰러짐). 쓰러지면 `clearRocks`. 음악(`musicTick`)이 읽는 `bosses[0].state/alive/hp`, `BOSS.phase2`는 이름 그대로 |
+| 시험 훅 | `__yk.boss()`에 `kind`(망치 공격 종류), `combo`, `pivot`, `fissLen`, `crack`, `chainLeft`, `p2`, `rocks`, `used`(공격별 횟수 `slam:now` 식) 추가 |
+
+봇(`src/dev/boss-bots.js`): parry가 새 패턴에 맞게(천장은 Shift → 고리 밖 → 회복 중 등, 땅 가르기는 6.5m 안이면 Shift 뒤 등·멀면 옆으로, 돌아온 오늘의 돌 원은 걸어 나감) + **구덩이를 돌아가는 길찾기**(`safeTo`/`goBehind`/`backOff`) — 전엔 어제의 우물로 걸어 들어가 판마다 한 번 쓰러졌다. 새 꼼수 봇 roll·wall·far. 결과 JSON에 `used`(공격별 횟수), `hl`(맞을 때 화면 알림). 장면 스크린샷 fissure·crack·quake·rockfall·frozen·resume·combo·chain.
+
+숫자(기획서 19장 표): parry 6/6 승 31~70초 하트 2~9 · roll 0/3(90초) · circle 0/4(60초) · spam 0/6(90초) · wall 0/2 · far 60초에 하트 5. 출시 점검 13/13(두 번), heart 29.2초·35초.
+
+동작 파일은 그대로 10개. 손으로 해 볼 곳: 미리보기 `yesterkeep` → `http://localhost:8133/?room=heart`. 2페이즈만 보려면 `__yk.bossSet({ hp: 3 })`.
+
 ## 배경 음악 (11/12 밤) — `src/music.js`
 
 WebAudio 합성, 소리 파일 없음. main.js 연결은 몇 줄: `ac()`에서 `music.attach(AC)`(첫 입력 뒤 시작), `loadRoom` → `setSong(room.boss ? 'boss' : 'keep')`, `tryShift`·`setEraInstant` → `setEra`, `update()`의 `musicTick(dt)`(쫓김 · 보스 페이즈 0/1/2/-1 · 되감기), M 키 `toggle()`(localStorage `yk-music`).
