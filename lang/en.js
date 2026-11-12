@@ -1,7 +1,12 @@
 // English. Keys are the Korean text passed to $t() / N() / shown in the HTML; a missing key falls back to Korean.
 (window.I18N = window.I18N || {})['en'] = {
 "어제의 성채": "Yesterkeep",
-"WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악": "WASD Move · J/Click Stab · Space Roll · Shift Time shift · E Interact · R Restart room · M Music",
+"WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift/L 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악": "WASD Move · J/Click Stab · Space Roll · Shift/L Time shift · E Interact · R Restart room · M Music",
+"클릭해서 시작": "Click to start",
+"일시정지": "Paused",
+"클릭하거나 아무 키나 누르면 계속": "Click or press any key to continue",
+"이 게임은 키보드가 필요해요": "This game needs a keyboard",
+"Shift를 연달아 눌러 윈도우 고정키 창이 뜨면 '아니요'를 누르세요. Shift 대신 L로도 시대를 바꿀 수 있어요.": "If Windows asks about Sticky Keys after a few Shift presses, choose No. You can also shift time with L.",
 "멈춘 문": "The Held Gate",
 "발판을 밟으면 창살이 잠깐 내려가요. 내가 없는 동안 어제의 시간은 멈춰요": "The plate lowers the gate for a moment. While you're away, yesterday stands still",
 "가시 회랑": "The Spike Hall",

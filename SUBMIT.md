@@ -62,6 +62,14 @@
 - 게임 안에 언어 바꾸기 버튼은 없다(브라우저 언어로만 정함). 잼에는 문제없음.
 - 소리는 첫 키 입력 뒤에 켜진다(브라우저 자동재생 규칙). itch 임베드에서도 같음 — 정상.
 
+11/12 밤 "제출 전에 더 볼 것" 점검 뒤 고친 것 (개발자님 "지금 해 줘"):
+- **시작 카드**: itch 임베드는 한 번 눌러야 키가 들어오므로 첫 화면에 "Click to start"(뒤로 첫 방이 보임). 카드를 닫는 첫 입력은 행동으로 안 쓴다.
+- **일시정지**: 창 밖을 누르거나 다른 탭으로 가면(윈도우 고정키 창 포함) 세상과 소리가 멈추고 "Paused · Click or press any key to continue".
+- **고정키 안내**: 조작 안내를 "Shift/L"로, 카드에 "고정키 창이 뜨면 아니요, L로도 된다" 한 줄.
+- **휴대폰**: 터치만 있는 기기에서는 카드에 "This game needs a keyboard".
+- **모래시계 조각 5개 모두** 봇으로 수집 확인(뗏목 방 조각 포함).
+- 스크린샷 `devlog/shots/2026-11-12-hold-card/`. 아직 못 한 것: 파이어폭스·사파리 시험(이 PC에 없음), 저사양 PC 속도.
+
 스크린샷 `devlog/shots/2026-11-12-release-check/`: `first-room-en.jpg`(영어 첫 방), `after-run-en.jpg`(13방 뒤 끝 화면 "End of the prototype"),
 `storehouse-1-fail-center-start.jpg`(칸 가운데서 출발 → 12열 가시에 찔림), `storehouse-2-ok-edge-roll.jpg`(끝에 붙어 출발 + 구르기 → 피해 0).
 
@@ -108,7 +116,8 @@ SCORE = SECONDS SPENT IN YESTERDAY
 Every room counts your time in the past and your alarms. Fewer seconds, fewer alarms, more stars.
 Hourglass shards are hidden for players who read both maps.
 
-13 rooms and a boss, about 15 minutes. Plays in the browser (WebGL). Keyboard and mouse.
+13 rooms and a boss, about 15 minutes. Plays in the browser (WebGL). Keyboard required.
+Click the game once to start; it pauses when you click outside it.
 
 Made for GitHub Game Off 2026 (theme: SHIFT). Source: https://github.com/xmflrtm2/yesterkeep
 
@@ -123,7 +132,7 @@ the developer. The art, 3D models and animations are purchased Fab assets made b
 | WASD / Arrow keys | Move |
 | J / F / Left click | Stab |
 | Space / K | Roll |
-| Shift / L | Shift era (yesterday ↔ today) |
+| Shift / L | Shift era (yesterday ↔ today). If Windows asks about Sticky Keys after a few Shift presses, choose No, or use L |
 | E | Interact (levers) |
 | R | Restart room |
 

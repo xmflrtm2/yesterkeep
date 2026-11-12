@@ -120,6 +120,16 @@ function i18nDom(root) {
   #endStats .small { font-size: 14px; opacity: .75; }
   #endCard button { margin-top: 6px; font: inherit; padding: 8px 22px; border-radius: 8px; border: 1px solid #ffffff55; background: #ffffff14; color: inherit; cursor: pointer; }
   #endCard .credits { margin-top: 6px; font-size: 12px; line-height: 1.5; opacity: .6; }
+  /* 시작·멈춤 카드 (main.js setHold): itch 임베드는 한 번 클릭해야 키가 들어온다 / 창 밖을 누르면 멈춤 */
+  #holdCard { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
+    background: #000b; text-align: center; cursor: pointer; pointer-events: auto; text-wrap: balance; }
+  #holdCard.on { display: flex; }
+  #holdCard .t { font-size: 34px; font-weight: 700; color: var(--gold); text-shadow: 0 3px 10px #000; }
+  #holdCard .s { margin-top: 10px; font-size: 16px; opacity: .85; }
+  #holdCard .tip { margin-top: 22px; font-size: 13px; opacity: .65; max-width: 620px; }
+  #holdCard .start, #holdCard .paused, #holdCard .kb { display: none; }
+  #holdCard.start .start, #holdCard.paused .paused { display: block; }
+  body.touchOnly #holdCard .kb { display: block; color: #ffb3a8; }
 </style>
 </head>
 <body class="now">
@@ -134,12 +144,19 @@ function i18nDom(root) {
   <div id="hint"></div>
   <div id="prompt"></div>
   <div id="toast"></div>
-  <div id="help"><span data-t>WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악</span></div>
+  <div id="help"><span data-t>WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift/L 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악</span></div>
 </div>
 <div id="flash"></div>
 <div id="down"><div class="glyph">⟲</div><div class="txt"><span data-t>시간을 되감는 중…</span></div></div>
 <div id="fade"></div>
 <div id="loading"><div><span data-t>불러오는 중…</span></div><div class="bar"><i></i></div></div>
+<div id="holdCard"><div>
+  <div class="t start"><span data-t>클릭해서 시작</span></div>
+  <div class="t paused"><span data-t>일시정지</span></div>
+  <div class="s paused"><span data-t>클릭하거나 아무 키나 누르면 계속</span></div>
+  <div class="s kb"><span data-t>이 게임은 키보드가 필요해요</span></div>
+  <div class="tip"><span data-t>Shift를 연달아 눌러 윈도우 고정키 창이 뜨면 '아니요'를 누르세요. Shift 대신 L로도 시대를 바꿀 수 있어요.</span></div>
+</div></div>
 <div id="endCard"><div class="inner">
   <h2><span data-t>성채를 빠져나왔어요</span></h2>
   <div class="story"><span data-t>성채지기가 쓰러지자, 성채의 어제는 마침내 멈췄어요.</span><br><span data-t>오늘의 폐허에는 이제 바람 소리뿐이에요.</span></div>

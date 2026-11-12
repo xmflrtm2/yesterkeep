@@ -202,16 +202,19 @@ const SOLVE = {
   raft() {
     go(6, 7); P.moveCell(6, 7, { exact: true, tol: 0.15 });
     const raft = () => Y().actors().rafts[0];
-    P.waitUntil(() => Math.abs(raft()[0] - 13) < 0.25, 20, 1 / 60);
+    // 서쪽으로 가는 뗏목에 올라타 서쪽 끝의 모래시계 조각(2,4)을 지나간 뒤 동쪽 착지대로
+    P.waitUntil(() => Math.abs(raft()[0] - 13) < 0.25 && raft()[2] < 0, 20, 1 / 60);
     shiftTo('now'); go(6, 4); P.moveTo(13, 9, { exact: true, tol: 0.15 });
     shiftTo('past');
-    const boarded = Math.abs(st().x - raft()[0]) < 1 && !st().falling;
+    const boarded = Math.abs(st().x - raft()[0]) < 1 && !st().falling, shards0 = st().shards;
+    P.waitUntil(() => raft()[0] < 5.3, 10, 1 / 30);
+    const shard = st().shards > shards0;
     P.waitUntil(() => raft()[0] > 20.6, 15, 1 / 30);
     P.moveTo(21, 7, { exact: true, tol: 0.2, max: 2 });
     shiftTo('now'); shiftTo('past'); P.stab(); P.wait(0.6);
     if (Y().guards()[0].alive) kill('guard', 0);
     exitAt(11, 1);
-    return boarded ? '' : 'did not board raft';
+    return (boarded ? '' : 'did not board raft; ') + (shard ? 'shard on the raft' : 'raft shard missed');
   },
   blades() {
     go(2, 12); P.moveCell(2, 12, { exact: true, tol: 0.2 });

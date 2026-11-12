@@ -1169,6 +1169,23 @@ addEventListener('keydown', e => {
 addEventListener('pointerdown', e => { if (e.button === 0 && e.target === renderer.domElement) { ac(); stab(); } });
 addEventListener('keyup', e => keys.delete(codeOf(e)));
 addEventListener('blur', () => keys.clear());
+/* ───────── 시작·멈춤 카드 (index.html #holdCard) ─────────
+   itch 임베드에서는 게임 화면을 한 번 눌러야 키가 게임으로 들어온다(소리도 그때 켜짐) → 처음엔 "클릭해서 시작".
+   창 밖을 누르거나 다른 창·탭으로 가면(Shift 다섯 번에 뜨는 윈도우 고정키 창 포함) 세상을 멈추고 "일시정지".
+   카드를 닫는 첫 입력은 행동으로 쓰지 않는다. 시작 카드 뒤에서는 첫 방(적 없음)이 그대로 밝아지고, 일시정지만 세상을 멈춘다.
+   ?room= 으로 시작하거나 시험 도구가 __yk.pause()를 쓰면 카드를 끈다. */
+function setHold(mode) { // 'start' | 'paused' | null
+  if (mode && (S.noHold || S.ended || !S.ready)) return;
+  S.hold = mode || null; S.held = mode === 'paused'; // S.held: 세상 멈춤(frame)
+  $('holdCard').className = mode ? 'on ' + mode : '';
+  if (mode) { keys.clear(); if (AC && AC.state === 'running') AC.suspend(); }
+}
+const leaveHold = e => { if (!S.hold) return; setHold(null); ac(); e.preventDefault(); e.stopImmediatePropagation(); };
+addEventListener('keydown', leaveHold, true);
+addEventListener('pointerdown', leaveHold, true);
+addEventListener('blur', () => { if (!S.hold) setHold('paused'); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !S.hold) setHold('paused'); });
+if (matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches) document.body.classList.add('touchOnly'); // 휴대폰: "키보드가 필요해요"
 function inputDir() {
   if (virt.on) return [virt.x, virt.z];
   let x = 0, z = 0;
@@ -2874,7 +2891,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (!S.ready) return;
-  if (!S.paused) update(dt);
+  if (!S.paused && !S.held) update(dt);
   render();
 }
 
@@ -2926,7 +2943,8 @@ window.__yk = {
   best() { return loadBest(); },
   heroYaw(r) { if (hero) hero.rig.rotation.y = r; render(); return r; },
   get hero() { return hero; },
-  pause(on = true) { S.paused = !!on; return S.paused; }, // 켜 두면 실시간 진행을 멈추고 step()으로만 움직인다 (스크린샷용)
+  hold(on = true) { S.noHold = !on; if (!on) setHold(null); return !S.noHold; }, // 시작·멈춤 카드 켜고 끄기
+  pause(on = true) { S.paused = !!on; if (S.paused) { S.noHold = true; setHold(null); } return S.paused; }, // 켜 두면 실시간 진행을 멈추고 step()으로만 움직인다 (스크린샷용)
   cam(dist = CAM_DIST, pitchDeg = 55, fov = camera.fov) { const p = THREE.MathUtils.degToRad(pitchDeg); camOff.set(0, Math.sin(p) * dist, Math.cos(p) * dist); camera.fov = fov; camera.updateProjectionMatrix(); stepSim(0.02); return true; },
   cell(i, j, era = S.era) { return { ch: ch(era, i, j), solid: solid(era, i, j), floor: floorAt(era, i, j), ghost: cellKind(era, i, j) }; },
   grid(era = S.era) { return G[era].map(r => r.join('')); },
@@ -2968,6 +2986,7 @@ window.__yk = {
   S.ready = true;
   render();
   requestAnimationFrame(frame);
+  if (!want) setHold('start');
   // 골렘 모델(약 1.9MB)은 첫 방(골렘 없음)이 뜬 뒤에 받는다. 골렘 방까지 못 받았으면 코드 몸으로 대신
   loadGolem(loader).then(gm => { CHAR.golem = gm; }).catch(e => console.warn('golem model load failed, using stone blocks', e));
 })();

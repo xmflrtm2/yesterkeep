@@ -40,7 +40,7 @@ Built with plain JavaScript and [three.js](https://threejs.org/). No build step,
 | WASD | Move |
 | J / Click | Stab |
 | Space | Roll |
-| Shift | Shift era (yesterday ↔ today) |
+| Shift / L | Shift era (yesterday ↔ today) |
 | E | Interact |
 | R | Restart room |
 
