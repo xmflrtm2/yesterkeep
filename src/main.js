@@ -3086,6 +3086,7 @@ window.__yk = {
     guardGhostMat, ghostRedMat, makeCone, MARK, assemble, Animator, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK, LOOKS,
     freeze(on) { S.held = !!on; if (!on && S.hold === 'paused') setHold(null); }, // 고르기 창 등을 띄우는 동안 세상 멈춤
     get ac() { return AC; },
+    get arrows() { return arrows; }, killFoe: (g, how = 'back') => (!g || !g.alive ? null : g.ext ? (extKilled(g, how), 'kill') : g.kind === 'boss' ? hitBoss(g, how) : ((g.kind === 'golem' ? killGolem : killGuard)(g, how), 'kill')), // T4 유물: 날아가는 화살 줍기, 찌르기 밖에서 쓰러뜨리기(던진 단검 등)
   });
   // ?room=heart 처럼 방 이름(또는 1부터 센 번호)을 주면 그 방에서 시작 (손으로 시험할 때)
   const want = new URLSearchParams(location.search).get('room');
