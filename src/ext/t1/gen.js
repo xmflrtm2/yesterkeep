@@ -196,8 +196,11 @@ export function toRoom(c, extra = {}) {
 }
 
 /** 대강의 풀림 검사: (칸, 시대) 그래프에서 시작 → 출구, 그리고 모든 적의 첫 자리에 닿는지. 함정·시야는 안 본다(그건 직접 플레이로) */
-export function reachCheck(room) {
+export function reachCheck(room, extChars = null) {
   const H = room.past.length, W = room.past[0].length;
+  // 다른 트랙 장치 글자(EXT.chars)가 있으면 구덩이가 다리가 되는 등 이 검사가 모르는 규칙이 있다 → 그 트랙의 solve 확인을 믿는다
+  // (11/13 네 트랙 겹친 시험: T3 "돌다리 위의 열쇠"·"멈춘 회전 다리"가 여기서만 '출구 못 감'으로 나왔다)
+  if (extChars) { const all = room.past.join('') + room.now.join(''); for (const c of Object.keys(extChars)) if (all.includes(c)) return { ok: true, trusted: true }; }
   const ok = (E, i, j) => {
     if (i < 0 || j < 0 || i >= W || j >= H) return false;
     const c = room[E][j][i];

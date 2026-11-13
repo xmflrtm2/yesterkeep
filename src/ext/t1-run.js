@@ -154,7 +154,7 @@ function buildNodeRoom(node, resume = false) {
     let built = rec && fromRecipe(rec, vr());
     if (built) {
       const r = toRoom(built.c, { id, name: built.name, label });
-      const chk = reachCheck(r);
+      const chk = reachCheck(r, EXT.chars);
       if (!chk.ok) { // 이어 붙인 게 안 풀리면 첫 조각만
         console.warn('[T1] generated room failed reach check, using first chunk', rec, chk.why);
         rec = { ...rec, b: null }; built = fromRecipe(rec, vr());
@@ -564,7 +564,7 @@ EXT.run = {
             if (node.type === 'guard' && !st.recipe.b) out.guardSingle = (out.guardSingle || 0) + 1;
             out.rooms++; out.types[node.type] = (out.types[node.type] || 0) + 1;
             if (st.recipe && node.type !== 'boss') { out.chunks[st.recipe.a] = (out.chunks[st.recipe.a] || 0) + 1; if (st.recipe.b) { out.joined++; out.chunks[st.recipe.b] = (out.chunks[st.recipe.b] || 0) + 1; } }
-            const chk = reachCheck(room);
+            const chk = reachCheck(room, EXT.chars);
             out.sizes.push(room.past[0].length + 'x' + room.past.length);
             if (!chk.ok) out.fail.push([room.id, room.name, chk.why]);
             // 오늘에서 시작하는 방: 골렘 순찰이 시작 칸 5m 안에 들어오면 "서서 생각만 해도 맞는" 방
