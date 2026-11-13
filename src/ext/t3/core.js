@@ -58,12 +58,13 @@ export function gmat(color, op = 0.4) {
   if (!MAT[k]) { const THREE = EXT.K.THREE; MAT[k] = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending }); }
   return MAT[k];
 }
-// 빛 (가산, 깊이 씀 없음 — 그 시대 안에서만 보임)
-export function lmat(color, op = 0.8) {
-  const k = 'l:' + color + ':' + op;
-  if (!MAT[k]) { const THREE = EXT.K.THREE; MAT[k] = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending }); }
-  return MAT[k];
+// 빛 (가산, 깊이 씀 없음). 시대 재질이라 전환 고리가 퍼지는 동안에도 떠나는 시대 쪽에서는 사라진다
+// (11/13 직접 플레이: MeshBasic으로 했더니 전환하는 0.5초 동안 오늘의 금 간 바닥 빛·달빛이 어제 화면에 그대로 떴다)
+export function emat(era, color, op = 0.8, extra = {}) {
+  const THREE = EXT.K.THREE;
+  return EXT.K.eraPlain(era, Object.assign({ color: '#000000', emissive: color, emissiveIntensity: 1.6, roughness: 1, metalness: 0, transparent: true, opacity: op, depthWrite: false, blending: THREE.AdditiveBlending }, extra));
 }
+export function lmat(color, op = 0.8, era = 'now') { const k = 'l:' + era + ':' + color + ':' + op; return MAT[k] || (MAT[k] = emat(era, color, op)); }
 let GLOW3 = null;
 export function glowTex() {
   if (GLOW3) return GLOW3;
@@ -133,9 +134,9 @@ addEventListener('keydown', e => { if (e.code === 'KeyE' || (!e.code && (e.key =
 addEventListener('keyup', e => { if (e.code === 'KeyE' || (!e.code && (e.key === 'e' || e.key === 'E'))) C.eHeld = false; });
 addEventListener('blur', () => { C.eHeld = false; });
 
-// ── E 대상 고르기: 내 장치 중 가장 가까운 것. 장치 칸은 대개 막혀 있으니 옆 칸 가운데(2m)에서도 닿게 2.15m.
+// ── E 대상 고르기: 내 장치 중 가장 가까운 것. 장치 칸은 대개 막혀 있으니 옆 칸 어디에 서 있어도 닿게.
 //    없으면 undefined → 기본 레버 처리 ──
-export const REACH = 2.15;
+export const REACH = 2.45; // 11/13 직접 플레이: 2.15m는 멈추며 미끄러지는 사이 E가 안 닿는 일이 잦았다
 export function nearestTarget() {
   if (!live() || busy()) return null;
   let best = null, bd = 1e9;
@@ -183,11 +184,9 @@ EXT.on('update', (dt, k) => {
   wasFalling = f;
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
   // 막다른 길 알아채기 (보이는 상태에서 출구까지 갈 길이 하나도 없으면 R 안내)
-  C.stuckT -= dt;
-  if (C.stuckT <= 0 && solverMod && !busy()) {
-    C.stuckT = 0.4; // 풀이기는 세상이 바뀔 때만 다시 계산한다(solver.js signature) — 자주 물어도 싸다
-    const v = solverMod.stuckCheck();
-    if (v === true && !C.stuck) { C.stuck = true; k.toast($t('길이 막혔어요 — R을 눌러 이 방을 다시 시작하세요'), 3.2); addFail(); }
+  if (solverMod && !busy()) {
+    const v = solverMod.stuckTick(3); // 세상이 바뀌었을 때만 다시 풀고, 한 프레임에 3ms씩만
+    if (v === true && !C.stuck) { C.stuck = true; k.toast($t('길이 막혔어요 — R로 다시 시작'), 3.2); addFail(); }
     else if (v === false) C.stuck = false;
   }
 });

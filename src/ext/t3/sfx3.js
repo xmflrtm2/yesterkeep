@@ -1,7 +1,10 @@
 // T3 장치 소리 — audio.js는 고치지 않고 K.sfx의 재료(tone·noise·fm·voiceish·thud)와 at(pos)(거리·좌우)로 만든다.
 // 세기는 기존 소리와 비슷하게 (발판 0.26, 레버 0.2 언저리). 자주 나는 것(톱니 딸깍, 째깍)은 작게.
 import { EXT } from '../../ext.js';
-const X = () => EXT.K.sfx;
+let alt = null;
+const X = () => alt || EXT.K.sfx;
+/** 시험용: 다른 소리 재료(OfflineAudioContext로 만든 makeSfx)로 바꿔 끼우기 (tools/t3_sfx.py) */
+export function useSfx(s) { alt = s; }
 const c = (f, ct = 60) => f * Math.pow(2, ((Math.random() * 2 - 1) * ct) / 1200);
 const o = (pos, extra) => { const s = X(); return pos ? s.at(pos, extra) : Object.assign({}, extra); };
 export const S3 = {
@@ -26,8 +29,8 @@ export const S3 = {
   crack(pos) { const s = X(), p = o(pos); if (!p) return; for (let k = 0; k < 4; k++) s.noise(0.03, c(3200, 300), 1600, 0.16, 1, 'bandpass', Object.assign({ t: k * 0.07 }, p)); s.thud(c(260), 0.05, 0.08, p); },
   // 태엽: 딸깍 (자주 나므로 작게) / 째깍
   ratchet(pos) { const s = X(), p = o(pos); if (!p) return; s.noise(0.025, c(4200), 2600, 0.1, 2, 'highpass', p); s.thud(c(420), 0.03, 0.05, p); },
-  tick(pos) { const s = X(), p = o(pos); if (!p) return; s.tone(1900, 1900, 0.025, 'square', 0.008, p); },
+  tick(pos) { const s = X(), p = o(pos); if (!p) return; s.tone(1900, 1900, 0.04, 'square', 0.05, p); s.noise(0.025, 4200, 3000, 0.1, 2, 'highpass', p); s.thud(600, 0.03, 0.04, p); },
   // 회전 다리: 톱니 덜컹 / 예고 딸깍
   gear(pos) { const s = X(), p = o(pos, { rev: 0.3 }); if (!p) return; s.fm(c(180), 2.76, 1.4, 0.3, 0.05, p); s.thud(c(80), 0.25, 0.18, p); s.noise(0.5, 300, 700, 0.06, 2, 'bandpass', Object.assign({ t: 0.05 }, p)); },
-  warn(pos) { const s = X(), p = o(pos); if (!p) return; s.tone(1400, 1400, 0.04, 'triangle', 0.025, p); },
+  warn(pos) { const s = X(), p = o(pos); if (!p) return; s.tone(1400, 1400, 0.07, 'triangle', 0.1, p); s.tone(2100, 2100, 0.06, 'sine', 0.05, Object.assign({ t: 0.08 }, p)); s.fm(700, 2.76, 0.6, 0.12, 0.03, p); },
 };

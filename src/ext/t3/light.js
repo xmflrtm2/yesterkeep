@@ -5,13 +5,13 @@
 //  X      봉인 문 (오늘 그리드). 가장 가까운 수정이 켜져 있으면 열림
 // 달빛은 벽·막힌 칸(나무 줄기, 바닥 위 썩은 상자, 잠긴 문)에 막히고, 창살 | 과 시간 문 G 사이로는 지나간다.
 // 어제에서는 '오늘 이렇게 빛이 지나갈 것'을 옅은 윤곽으로 미리 보여 준다.
-import { at, mech, put, both, mat, gmat, lmat, mesh, group, glow, ghostObj, cpos, nearest, markDirty, toastOnce } from './core.js';
+import { at, mech, put, both, mat, gmat, lmat, emat, mesh, group, glow, ghostObj, cpos, nearest, markDirty, toastOnce } from './core.js';
 import { S3 } from './sfx3.js';
 
 const T = 2;
 /** 달빛 따라가기. oriOf(mirror) → 0('/') | 1('\'), blocks(i, j) → 막히면 true. 결과: 켜진 수정 Set, 그릴 선분 [[x0,z0,x1,z1]] */
 export function trace(d, oriOf, blocks) {
-  const lit = new Set(), segs = [], mi = new Map(d.mirrors.map(m => [m.i + ',' + m.j, m])), si = new Map(d.seals.map(s => [s.i + ',' + s.j, s]));
+  const lit = new Set(), segs = [], stops = [], mi = new Map(d.mirrors.map(m => [m.i + ',' + m.j, m])), si = new Map(d.seals.map(s => [s.i + ',' + s.j, s]));
   for (const w of d.windows) {
     if (!w.dx && !w.dz) continue;
     let i = w.i, j = w.j, dx = w.dx, dz = w.dz, sx = i * T + 1 + dx, sz = j * T + 1 + dz;
@@ -23,10 +23,10 @@ export function trace(d, oriOf, blocks) {
       if (m) { const cx = i * T + 1, cz = j * T + 1; segs.push([sx, sz, cx, cz]); sx = cx; sz = cz; [dx, dz] = oriOf(m) === 0 ? [-dz, -dx] : [dz, dx]; continue; }
       const s = si.get(i + ',' + j);
       if (s) { segs.push([sx, sz, i * T + 1 - dx * 0.35, j * T + 1 - dz * 0.35]); lit.add(s); break; }
-      if (blocks(i, j)) { segs.push([sx, sz, i * T + 1 - dx, j * T + 1 - dz]); break; }
+      if (blocks(i, j)) { segs.push([sx, sz, i * T + 1 - dx, j * T + 1 - dz]); stops.push([i, j]); break; }
     }
   }
-  return { lit, segs };
+  return { lit, segs, stops };
 }
 
 export default mech({
@@ -60,7 +60,11 @@ export default mech({
     for (const o of d.doors) o.a = o.seal && o.seal.lit && o.era === 'now' ? 1 : 0;
     d.ready = true;
   },
-  update(d, dt, k) { relight(d, k, false); },
+  update(d, dt, k) {
+    relight(d, k, false);
+    // 달빛이 오늘의 나무에 막혀 있으면, 오늘 거울 근처에 왔을 때 한 번 알려 준다 (11/13 직접 플레이: 거울은 맞췄는데 왜 안 켜지는지 안 보였다)
+    if (d.treeBlock && k.S.era === 'now' && d.mirrors.some(m => { const p = cpos(m.i, m.j); return Math.hypot(p.x - k.S.p.x, p.z - k.S.p.z) < 6; })) toastOnce('tree-block', $t('오늘은 나무가 달빛을 가리고 있어요'), 2.6);
+  },
   frame(d, dt, k) {
     const t = k.S.time;
     for (const m of d.mirrors) { const want = m.o === 0 ? Math.PI / 4 : -Math.PI / 4; m.yaw += (want - m.yaw) * Math.min(1, dt * 10); for (const h of m.heads || []) h.rotation.y = m.yaw; }
@@ -83,7 +87,7 @@ export default mech({
     for (const m of d.mirrors) {
       const p = cpos(m.i, m.j);
       if (k.S.era === 'past') out.push({ x: p.x, z: p.z, label: () => $t('E 거울 돌리기'), act: () => turn(m, d, k) });
-      else out.push({ x: p.x, z: p.z, label: () => $t('E 거울 (녹슮)'), act: () => { S3.locked(p); k.toast($t('녹슬어 돌아가지 않아요 — 어제 돌려 두면 오늘도 그 방향이에요'), 2.6); return 'rusted'; } });
+      else out.push({ x: p.x, z: p.z, label: () => $t('E 거울 (녹슮)'), act: () => { S3.locked(p); k.toast($t('녹슨 거울 — 어제 돌려 둔 방향 그대로예요'), 2.6); return 'rusted'; } });
     }
     return out;
   },
@@ -101,7 +105,7 @@ function turn(m, d, k) {
   k.FX.sparks(p.x, 1.3, p.z, { n: 6, color: ['#fff6d8', '#ffd27a'], speed: 2, up: 1.5, size: 0.1 });
   k.FX.dust(p.x, 0.1, p.z, { n: 6, color: k.FXC.past.dust, speed: 1, up: 0.4, size: 0.4, alpha: 0.4 });
   relight(d, k, false);
-  toastOnce('mirror', $t('거울이 돌아갔어요 — 옅은 빛줄기가 오늘의 달빛이 지나갈 길이에요'), 3.0);
+  toastOnce('mirror', $t('옅은 빛줄기 = 오늘 달빛이 지나갈 길'), 3.0);
   return 'turned';
 }
 // 달빛 다시 따라가기 → 수정 켜짐·문 열림이 바뀌면 소리·윤곽, 선분이 바뀌면 다시 그림
@@ -110,6 +114,9 @@ function relight(d, k, first) {
   // 달빛은 창살·시간 문 사이로 지나가고, 낮은 화단은 넘어간다(심어서 나무가 서 있으면 막힘)
   const blocks = (i, j) => { const c = k.ch('now', i, j); if (c === '|' || c === 'G') return false; if (c === '#') return true; const x = at('now', i, j); if (x && x.k === 'bed') return x.b.planted; return k.solid('now', i, j); };
   const r = trace(d, m => m.o, blocks);
+  // 나무만 없었으면 켜졌을 수정이 있나 (거울은 맞췄는데 나무가 가로막은 경우만 알린다)
+  d.treeBlock = r.stops.some(([i, j]) => { const x = at('now', i, j); return x && x.k === 'bed' && x.b.planted; })
+    && [...trace(d, m => m.o, (i, j) => { const x = at('now', i, j); return x && x.k === 'bed' ? false : blocks(i, j); }).lit].some(s => !r.lit.has(s));
   let changed = false;
   for (const s of d.seals) {
     const on = r.lit.has(s);
@@ -134,8 +141,8 @@ function drawBeam(d, segs, k) {
     const len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.01) continue;
     const yaw = Math.atan2(x1 - x0, z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     const c = mesh(new THREE.BoxGeometry(0.1, 0.1, len), core, cx, 1.2, cz); c.rotation.y = yaw;
-    const h = mesh(new THREE.BoxGeometry(0.42, 0.42, len), new THREE.MeshBasicMaterial({ color: '#8fc8ff', transparent: true, opacity: 0.18, depthWrite: false, blending: THREE.AdditiveBlending }), cx, 1.2, cz); h.rotation.y = yaw; h.userData.halo = true;
-    const fl = mesh(new THREE.PlaneGeometry(0.9, len).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#7fb8ff', transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending }), cx, 0.04, cz); fl.rotation.y = yaw; // 바닥에 비친 빛
+    const h = mesh(new THREE.BoxGeometry(0.42, 0.42, len), emat('now', '#8fc8ff', 0.18), cx, 1.2, cz); h.rotation.y = yaw; h.userData.halo = true;
+    const fl = mesh(new THREE.PlaneGeometry(0.9, len).rotateX(-Math.PI / 2), emat('now', '#7fb8ff', 0.12), cx, 0.04, cz); fl.rotation.y = yaw; // 바닥에 비친 빛
     d.beamNow.add(c, h, fl);
     const g = mesh(new THREE.BoxGeometry(0.07, 0.07, len), gm, cx, 1.2, cz); g.rotation.y = yaw;
     d.beamGhost.add(g);

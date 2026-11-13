@@ -28,7 +28,7 @@ const D = {
     const s = st(), ts = T3().targets();
     let best = null, bd = 1e9;
     for (const t of ts) { const d = Math.hypot(t.x - s.x, t.z - s.z); if (d < bd) { bd = d; best = t; } }
-    if (!best || bd < 2.0 || bd > 3.2) return;
+    if (!best || bd < 2.3 || bd > 3.4) return;
     const k = 1.75 / bd;
     P.moveTo(best.x + (s.x - best.x) * k, best.z + (s.z - best.z) * k, { tol: 0.12, max: 1.5, exact: true });
     Y().step(0.15); // 멈춰 서기 (미끄러짐)

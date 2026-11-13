@@ -26,7 +26,7 @@ export default mech({
       ky.got = true; C.inv.key++;
       const p = cpos(ky.i, ky.j); S3.pick(p, 1.25);
       k.FX.motes(p.x, 0.7, p.z, { n: 22, color: ['#ffe9a8', '#ffffff', '#ffc65a'], speed: 2, up: 2, life: 1.0, size: 0.12 }); k.FX.flash(p.x, 1.0, p.z, '#ffe2a0', 3);
-      k.toast($t('열쇠를 주웠어요 — 들고 다른 시대로 갈 수 있어요'), 2.6);
+      k.toast($t('열쇠 — 들고 시대를 건널 수 있어요'), 2.6);
     }
   },
   frame(d, dt, k) {
@@ -46,7 +46,7 @@ export default mech({
       if (l.open) continue;
       const p = cpos(l.i, l.j);
       if (k.S.era === 'past') out.push({ x: p.x, z: p.z, label: () => C.inv.key > 0 ? $t('E 자물쇠 열기') : $t('잠긴 문 — 열쇠가 필요해요'), act: () => unlock(l, k) });
-      else out.push({ x: p.x, z: p.z, label: () => $t('E 잠긴 문 (녹슮)'), act: () => { S3.locked(p); k.toast(C.inv.key > 0 ? $t('오늘의 자물쇠는 녹슬어 열쇠가 안 들어가요 — 어제의 자물쇠에 꽂아 보세요') : $t('오늘의 자물쇠는 녹슬었어요'), 2.8); return 'rusted'; } });
+      else out.push({ x: p.x, z: p.z, label: () => $t('E 잠긴 문 (녹슮)'), act: () => { S3.locked(p); k.toast(C.inv.key > 0 ? $t('녹슨 자물쇠 — 어제의 자물쇠에 꽂아 보세요') : $t('오늘의 자물쇠는 녹슬었어요'), 2.8); return 'rusted'; } });
     }
     return out;
   },

@@ -3,7 +3,7 @@
 //     → 금이 가는 중에 어제로 넘어가면 그 순간에 멈춘다(어제에서는 주황 윤곽으로 보임). 어제 그리드의 x는 그냥 멀쩡한 바닥
 // 어제 그 칸에 상자를 밀어 두면, 오늘은 그 무게에 바닥이 오래전에 꺼져 상자가 구멍을 메우고 있다(밟고 지나감).
 // 무너진 바닥 때문에 출구로 갈 길이 하나도 없으면 공통 막힘 검사가 "R로 다시 시작"을 띄운다.
-import { mech, put, gmat, mesh, group, ghostObj, cpos, onCell, busy, crateAt, markDirty, toastOnce } from './core.js';
+import { mech, put, gmat, emat, mesh, group, ghostObj, cpos, onCell, busy, crateAt, markDirty, toastOnce } from './core.js';
 import { S3 } from './sfx3.js';
 
 export const CRACK_T = 0.7;
@@ -23,7 +23,7 @@ export default mech({
       if (crateAt(t.i, t.j)) continue;
       if (t.st === 'ok' && !busy() && onCell(t.i, t.j)) {
         t.st = 'crack'; t.t = 0; S3.crack(cpos(t.i, t.j));
-        toastOnce('crumble', $t('바닥이 무너져요! 멈추지 말고, 어제로 가면 그 순간에 멈춰요'), 2.6);
+        toastOnce('crumble', $t('바닥이 무너져요! 어제로 가면 멈춰요'), 2.6);
       } else if (t.st === 'crack') {
         t.t += dt;
         if (t.t >= CRACK_T) collapse(t, d, k);
@@ -75,12 +75,12 @@ function cracks(k) {
 function buildTile(t, k) {
   const THREE = k.THREE, x0 = t.i * 2, z0 = t.j * 2, p = cpos(t.i, t.j);
   const tile = group(k.makeMesh('floor', 'now'));
-  const dark = mesh(new THREE.PlaneGeometry(1.9, 1.9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: cracks(k), color: '#000', transparent: true, opacity: 0.75, depthWrite: false }), 1, 0.012, 1);
+  const dark = mesh(new THREE.PlaneGeometry(1.9, 1.9).rotateX(-Math.PI / 2), k.eraPlain('now', { map: cracks(k), color: '#000000', roughness: 1, transparent: true, opacity: 0.75, depthWrite: false }), 1, 0.012, 1);
   dark.rotation.y = (t.i * 7 + t.j * 3) % 4 * Math.PI / 2;
   tile.add(dark);
   tile.position.set(x0, 0, z0); t.x0 = x0; t.z0 = z0;
   k.groups.now.add(tile); t.tile = tile;
-  const glow = mesh(new THREE.PlaneGeometry(1.9, 1.9).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: cracks(k), color: '#ff7a2a', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), p.x, 0.02, p.z);
+  const glow = mesh(new THREE.PlaneGeometry(1.9, 1.9).rotateX(-Math.PI / 2), emat('now', '#ff7a2a', 0, { map: cracks(k), emissiveMap: cracks(k), emissiveIntensity: 2.2 }), p.x, 0.02, p.z);
   glow.rotation.y = dark.rotation.y; glow.visible = false;
   k.groups.now.add(glow); t.glow = glow;
   // 어제에서 보이는 '오늘 금이 가다 멈춘 바닥' (주황)

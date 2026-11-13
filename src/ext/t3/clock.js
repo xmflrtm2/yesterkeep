@@ -68,8 +68,8 @@ export default mech({
     const out = [];
     for (const c of d.cranks) {
       const p = cpos(c.i, c.j);
-      if (k.S.era === 'past') out.push({ crank: c, x: p.x, z: p.z, label: () => $t('E 길게 눌러 태엽 감기') + (c.spring > 0 ? ' · ' + $t('{0}초', c.spring.toFixed(1)) : ''), act: () => { toastOnce('wind', $t('누르고 있는 만큼 감겨요 — 오늘의 태엽 문이 그만큼 열려요'), 2.6); return 'wind'; } });
-      else out.push({ crank: c, x: p.x, z: p.z, label: () => $t('E 태엽 (녹슮)'), act: () => { S3.locked(p); k.toast($t('녹슬어 안 돌아가요 — 어제 감아 둔 만큼 오늘 문이 열려요'), 2.6); return 'rusted'; } });
+      if (k.S.era === 'past') out.push({ crank: c, x: p.x, z: p.z, label: () => $t('E 길게 눌러 태엽 감기') + (c.spring > 0 ? ' · ' + $t('{0}초', c.spring.toFixed(1)) : ''), act: () => { toastOnce('wind', $t('누른 만큼 감겨요 = 오늘 문이 열리는 시간'), 2.6); return 'wind'; } });
+      else out.push({ crank: c, x: p.x, z: p.z, label: () => $t('E 태엽 (녹슮)'), act: () => { S3.locked(p); k.toast($t('녹슨 태엽 — 어제 감은 만큼 오늘 열려요'), 2.6); return 'rusted'; } });
     }
     return out;
   },

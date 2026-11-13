@@ -42,7 +42,7 @@ export default mech({
       p.got = true; C.inv.seed++;
       const q = cpos(p.i, p.j); S3.pick(q, 0.8);
       k.FX.motes(q.x, 0.6, q.z, { n: 18, color: ['#d8f5a0', '#ffffff', '#9be070'], speed: 1.8, up: 1.8, life: 0.9, size: 0.12, spread: 0.2 });
-      k.toast($t('마른 씨앗을 주웠어요 — 어제의 흙에 심으면 오늘 자라 있어요'), 2.8);
+      k.toast($t('마른 씨앗 — 어제의 화단에 심어 보세요'), 2.8);
     }
   },
   frame(d, dt, k) {
@@ -62,7 +62,7 @@ export default mech({
     for (const b of d.beds) {
       const p = cpos(b.i, b.j);
       if (S.era === 'past') out.push({ x: p.x, z: p.z, label: () => b.planted ? $t('E 씨앗 캐내기') : C.inv.seed > 0 ? $t('E 씨앗 심기 — 오늘 여기 나무가 자라요') : $t('빈 흙 — 씨앗이 없어요'), act: () => actBed(b, k) });
-      else if (!b.planted) out.push({ x: p.x, z: p.z, label: () => $t('E 메마른 흙'), act: () => { k.toast($t('오늘의 흙은 메말랐어요 — 씨앗은 어제 심어야 자라요'), 2.4); return 'dry'; } });
+      else if (!b.planted) out.push({ x: p.x, z: p.z, label: () => $t('E 메마른 흙'), act: () => { k.toast($t('메마른 화단 — 씨앗은 어제 심어야 자라요'), 2.4); return 'dry'; } });
     }
     return out;
   },
@@ -76,12 +76,12 @@ function actBed(b, k) {
     k.toast($t('씨앗을 캐냈어요 — 오늘의 나무도 사라져요'), 2.2);
     return 'dug';
   }
-  if (C.inv.seed <= 0) { S3.locked(p); k.toast($t('씨앗이 없어요 — 오늘의 폐허 어딘가에 마른 씨앗이 있어요'), 2.6); return 'noseed'; }
+  if (C.inv.seed <= 0) { S3.locked(p); k.toast($t('씨앗이 없어요 — 오늘의 폐허를 찾아보세요'), 2.6); return 'noseed'; }
   b.planted = true; C.inv.seed--; markDirty();
   S3.plant(p);
   k.FX.dust(p.x, 0.15, p.z, { n: 10, color: ['#6b4a2e', '#8a6a44'], speed: 1.2, up: 1, size: 0.45 });
   k.FX.motes(p.x, 0.4, p.z, { n: 16, color: ['#b8ff9a', '#ffffff'], speed: 1.2, up: 2.2, life: 1.1, size: 0.1 });
-  toastOnce('planted', $t('심었어요 — 오늘로 가 보면 큰 나무가 자라 있어요'), 2.6);
+  toastOnce('planted', $t('심었어요 — 오늘엔 큰 나무가 서 있어요'), 2.6);
   return 'planted';
 }
 

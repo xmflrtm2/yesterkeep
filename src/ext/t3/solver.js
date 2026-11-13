@@ -81,7 +81,7 @@ function cell(M, st, cs, era, i, j, noLit) {
 const stand = (M, st, cs, era, i, j) => { const r = cell(M, st, cs, era, i, j, false); return r.floor && !r.solid; };
 
 /** 풀기. opt: 'D'·'G'를 열린 것으로 볼지(막힘 검사). from: { era, i, j } (없으면 지금 플레이어 자리). 결과 { ok, actions, plan, nodes, capped } */
-export function solve({ opt = false, from = null, cap = 300000 } = {}) {
+function* solveGen({ opt = false, from = null, cap = 300000 } = {}) {
   const k = EXT.K, S = k.S;
   const M = model(opt); if (!M) return null;
   const E2 = ['past', 'now'];
@@ -130,6 +130,7 @@ export function solve({ opt = false, from = null, cap = 300000 } = {}) {
     const key2 = nk(st, cs, e, i, j);
     if (dist.get(key2) !== dd) continue;
     if (++nodes > cap) return { ok: false, capped: true, nodes };
+    if ((nodes & 511) === 0) yield nodes; // 막힘 검사는 여러 프레임에 나눠 계산 (한 번에 다 하면 상자 방에서 0.35초 끊김)
     const era = E2[e];
     if (isExit(era, i, j)) { const plan = []; for (let q = key2; q; q = prev.get(q)[0]) { const w = prev.get(q)[1]; if (w) plan.unshift(w); } return { ok: true, actions: dd, plan, nodes }; }
     for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -148,6 +149,8 @@ export function solve({ opt = false, from = null, cap = 300000 } = {}) {
   }
   return { ok: false, nodes };
 }
+/** 한 번에 끝까지 (시험 도구용) */
+export function solve(opts) { const g = solveGen(opts); let r; do r = g.next(); while (!r.done); return r.value; }
 
 // 세상 상태 요약 (바뀌었을 때만 막힘을 다시 계산)
 function signature() {
@@ -156,19 +159,23 @@ function signature() {
     d.key.keys.map(o => +o.got).join(''), d.key.locks.map(o => +o.open).join(''), d.clock.cranks.map(c => +(c.spring > 0)).join(''), d.crumble.tiles.map(t => t.st[0]).join(''),
     k.crates.map(c => c.i + ',' + c.j + (c.sunk ? '!' : '')).join(';'), C.inv.seed, C.inv.key, k.S.room && k.S.room.id].join('|');
 }
-let lastSig = null, lastRes;
-/** 막힘 검사: true = 길이 하나도 없음, false = 길 있음, undefined = 판정 못 함(뗏목 방·보스, 너무 큼) */
-export function stuckCheck() {
+let lastSig = null, lastRes, job = null, jobSig = null;
+/** 막힘 검사 한 걸음 (core.js가 매 프레임): 세상이 바뀌면 새로 풀기 시작해 budget ms씩 이어 간다.
+ *  true = 길이 하나도 없음, false = 길 있음, undefined = 아직 계산 중이거나 판정 못 함(뗏목 방·보스, 너무 큼) */
+export function stuckTick(budget = 3) {
   const k = EXT.K;
   const r = k.S.room; if (!r) return undefined;
   if (['past', 'now'].some(E => r[E].some(row => /[Mm]/.test(row)))) return undefined;
   if (k.enemies().some(f => f.alive && f.kind === 'boss')) return undefined;
   const sig = signature();
-  if (sig === lastSig) return lastRes;
-  lastSig = sig;
-  const res = solve({ opt: true, cap: 150000 });
-  lastRes = !res || res.capped ? undefined : !res.ok;
-  return lastRes;
+  if (sig !== lastSig && sig !== jobSig) { job = solveGen({ opt: true, cap: 150000 }); jobSig = sig; }
+  if (job) {
+    const t0 = performance.now(); let step;
+    do step = job.next(); while (!step.done && performance.now() - t0 < budget);
+    if (step.done) { const res = step.value; lastSig = jobSig; lastRes = !res || res.capped ? undefined : !res.ok; job = null; jobSig = null; }
+  }
+  return sig === lastSig ? lastRes : undefined;
 }
-export function resetStuck() { lastSig = null; }
-useSolver({ stuckCheck, solve, resetStuck });
+export function stuckCheck() { let v; for (let n = 0; n < 2000; n++) { v = stuckTick(50); if (!job) break; } return v; }
+export function resetStuck() { lastSig = null; job = null; jobSig = null; }
+useSolver({ stuckCheck, stuckTick, solve, resetStuck });
