@@ -38,7 +38,7 @@ const D = {
     this.load(id);
     const c = CHUNKS.find(c => c.id === id);
     const sv = T3().solver(), r = sv ? sv.solve({ opt: false }) : null;
-    return { id, tier: c && c.tier, mode: c && c.solver, ...(r || { ok: null }) };
+    return { id, tier: c && c.tier, mode: c && c.solver, timing: !!(c && c.timing), ...(r || { ok: null }) };
   },
   /** 봇 풀이 */
   bot(id, steps) {

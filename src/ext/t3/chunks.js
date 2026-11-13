@@ -110,7 +110,8 @@ export const CHUNKS = [
     solve: [['go', 2, 2], ['go', 7, 3], ['shift'], ['E'], ['go', 11, 3]],
   },
   {
-    id: 't3-crumble1', track: 't3', tier: 1, tags: ['puzzle', 'crumble'], mech: 'crumble', name: N('금 간 다리'),
+    id: 't3-crumble1', track: 't3', timing: true, // 장치를 쓰지 않고 박자·멈추기로 푸는 방 (풀이기 최소 행동 0이 정상)
+    tier: 1, tags: ['puzzle', 'crumble'], mech: 'crumble', name: N('금 간 다리'),
     hint: N('오늘의 금 간 바닥은 밟으면 곧 무너져요. 멈추지 말고 건너세요'),
     tip: N('무너졌다면 어제의 다리로 걸어가, 아직 멀쩡한 칸 위에서 오늘로 바꾸세요'),
     startEra: 'now', start: [2, 3], exit: [12, 3],
@@ -160,7 +161,8 @@ export const CHUNKS = [
     solve: [['go', 3, 2], ['shift'], ['holdE', 3.2], ['go', 5, 2], ['shift'], ['go', 12, 3]],
   },
   {
-    id: 't3-turn1', track: 't3', tier: 1, tags: ['puzzle', 'turn'], mech: 'turn', name: N('멈춘 회전 다리'),
+    id: 't3-turn1', track: 't3', timing: true, // 장치를 쓰지 않고 박자·멈추기로 푸는 방 (풀이기 최소 행동 0이 정상)
+    tier: 1, tags: ['puzzle', 'turn'], mech: 'turn', name: N('멈춘 회전 다리'),
     hint: N('어제의 다리는 돌고, 오늘의 다리는 어제 떠난 순간 그대로 녹슬어 있어요'),
     tip: N('어제 다리가 동서로 놓였을 때 Shift — 오늘의 녹슨 다리도 동서로 멈춰 있어요'),
     startEra: 'past', start: [2, 3], exit: [11, 3],
@@ -274,7 +276,8 @@ export const CHUNKS = [
     solver: 'crate',
   },
   {
-    id: 't3-crumble2', track: 't3', tier: 2, tags: ['puzzle', 'crumble'], mech: 'crumble', name: N('멈춘 균열'),
+    id: 't3-crumble2', track: 't3', timing: true, // 장치를 쓰지 않고 박자·멈추기로 푸는 방 (풀이기 최소 행동 0이 정상)
+    tier: 2, tags: ['puzzle', 'crumble'], mech: 'crumble', name: N('멈춘 균열'),
     hint: N('어제는 가운데에만 바닥이 있어요. 오늘의 금 간 바닥은 어제에 있는 동안 멈춰요'),
     tip: N('금 간 바닥 셋째 칸에서 바로 Shift → 어제로 벽을 돌아가 → 다음 금 간 칸 위에서 오늘로'),
     startEra: 'now', start: [2, 3], exit: [11, 3],
