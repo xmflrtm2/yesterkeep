@@ -14,7 +14,7 @@ const R = {};
 R['t4-treasure'] = {
   id: 't4-treasure', name: N('보물 방'), label: 'T4', startEra: 'now',
   hint: N('제단 앞에서 E — 유물 셋 중 하나를 고르세요'),
-  t4: { type: 'treasure', altars: [{ type: 'treasure', at: [5, 3] }] },
+  t4: { type: 'treasure', altars: [{ type: 'treasure', at: [5, 2] }] },
   past: ['###########', '#.........#', '#..*...*..#', '#@.......>#', '#..*...*..#', '#.........#', '###########'],
   now: ['###########', '#...,.....#', '#..*...*..#', '#@.......>#', '#..*.,.*..#', '#.,.......#', '###########'],
 };
@@ -28,7 +28,7 @@ R['t4-shop'] = {
 R['t4-rest'] = {
   id: 't4-rest', name: N('모닥불 쉼터'), label: 'T4', startEra: 'now',
   hint: N('모닥불 앞에서 E — 쉬거나 유물을 강화해요 (하나만)'),
-  t4: { type: 'rest', altars: [{ type: 'rest', at: [5, 3] }] },
+  t4: { type: 'rest', altars: [{ type: 'rest', at: [5, 2] }] },
   past: ['###########', '#.........#', '#.........#', '#@.......>#', '#.........#', '#.........#', '###########'],
   now: ['###########', '#..,......#', '#.........#', '#@.......>#', '#......,..#', '#.........#', '###########'],
 };
@@ -143,8 +143,6 @@ EXT.on('roomLoad', (room, K) => {
   // 시험 런 시작 (T1 없이 시험 방으로 들어오면)
   if (!T1on() && !T4.run.active && room.id.startsWith('t4-') && room.id !== 't4-meta') startMini(room);
   if (T4.run.mini && !T1on()) {
-    const k = MINI.indexOf(room.id);
-    if (k >= 0 && k !== T4.miniI && fresh) T4.miniI = k;
     K.hud.title.innerHTML = `${$t(room.name)}<small>${$t('시험 런 {0} / {1}', (T4.miniI || 0) + 1, MINI.length)}</small>`;
   }
   T4.altars = [];
@@ -192,7 +190,7 @@ EXT.on('init', () => { const q = new URLSearchParams(location.search); if (q.get
 // ───────── E: 제단 쓰기 ─────────
 const nearAltar = () => {
   const K = T4.K; if (!K || !T4.altars || !T4.altars.length) return null;
-  let best = null, bd = 1.75;
+  let best = null, bd = 2.0;
   for (const a of T4.altars) { const d = Math.hypot(a.x - K.S.p.x, a.z - K.S.p.z); if (d < bd) { bd = d; best = a; } }
   return best;
 };

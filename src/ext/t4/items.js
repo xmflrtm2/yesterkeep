@@ -95,8 +95,8 @@ export const ITEMS = [
     desc: [N('하트를 다 잃는 순간 한 번, 하트 2개로 그 자리에서 버텨요 (런에 한 번)'), N('하트 3개로 버티고, 강화할 때 다시 채워져요')],
     stat(st, lv) { st.phoenix = Math.max(st.phoenix, lv > 1 ? 3 : 2); } },
   { id: 't4-afterimage', kind: 'relic', rar: 'legend', icon: '👤', name: N('잔상 미끼'), lock: 12,
-    desc: [N('시대를 떠난 자리에 잔상이 남아요. 그 시대로 돌아오면 2.5초 동안 둘레 7m의 경비·골렘이 잔상을 쳐다봐요 (8초에 한 번)'), N('4초 동안 쳐다보고, 5초에 한 번')],
-    stat(st, lv) { st.decoy = Math.max(st.decoy, lv > 1 ? 4 : 2.5); st.decoyCd = lv > 1 ? 5 : 8; } },
+    desc: [N('어제를 떠난 자리에 잔상이 남아요. 어제로 돌아오면 2.5초 동안 둘레 7m의 경비가 잔상을 쳐다봐요 (8초에 한 번)'), N('오늘을 떠날 때도 남아 골렘도 쳐다봐요. 4초 동안, 5초에 한 번')],
+    stat(st, lv) { st.decoy = Math.max(st.decoy, lv > 1 ? 4 : 2.5); st.decoyCd = lv > 1 ? 5 : 8; if (lv > 1) st.decoyBoth = 1; } },
 ];
 
 // 시너지: 둘을 함께 가지면 켜진다 (고르기 창에 '시너지!' 표시, HUD 풍선에 이름)

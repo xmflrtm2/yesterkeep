@@ -89,8 +89,8 @@ Object.assign(window.I18N.en = window.I18N.en || {}, {
   '하트를 다 잃는 순간 한 번, 하트 2개로 그 자리에서 버텨요 (런에 한 번)': 'Once per run, when your last heart breaks you hold on with 2 hearts',
   '하트 3개로 버티고, 강화할 때 다시 채워져요': 'Hold on with 3 hearts; upgrading refills it',
   '잔상 미끼': 'Lingering Afterimage',
-  '시대를 떠난 자리에 잔상이 남아요. 그 시대로 돌아오면 2.5초 동안 둘레 7m의 경비·골렘이 잔상을 쳐다봐요 (8초에 한 번)': 'Leaving an era leaves an afterimage there. When you return, guards and golems within 7m stare at it for 2.5s (every 8s)',
-  '4초 동안 쳐다보고, 5초에 한 번': 'They stare for 4s; every 5s',
+  '어제를 떠난 자리에 잔상이 남아요. 어제로 돌아오면 2.5초 동안 둘레 7m의 경비가 잔상을 쳐다봐요 (8초에 한 번)': 'Leaving Yesterday leaves an afterimage where you stood. When you return, guards within 7m stare at it for 2.5s (every 8s)',
+  '오늘을 떠날 때도 남아 골렘도 쳐다봐요. 4초 동안, 5초에 한 번': 'Also left when leaving Today, so golems stare too. 4s, every 5s',
   // 시너지
   '연쇄 암살': 'Chain Assassin',
   '다시 켜지는 전환 기습이 1초로': 'Re-armed shift strike lasts 1s',
@@ -114,6 +114,7 @@ Object.assign(window.I18N.en = window.I18N.en || {}, {
   '←→ 고르기 · Enter 가져가기': '←→ choose · Enter take',
   'R 다시 뽑기 ({0})': 'R reroll ({0})',
   'Esc 건너뛰기 (금화 +{0})': 'Esc skip (+{0} coins)',
+  'Esc 건너뛰기': 'Esc skip',
   '{0} 얻음': 'Got {0}',
   '시작 유물': 'Starting relic',
   '런 사이 해금: 흔한 유물 하나를 들고 시작해요': 'Unlock: start the run with one common relic',

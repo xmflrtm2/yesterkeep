@@ -10,6 +10,7 @@ import { snd } from './sfx.js';
 const CSS = `
 #t4-bar { position: fixed; right: 12px; top: 128px; display: none; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: auto; z-index: 2; }
 #t4-bar.on { display: flex; }
+body:has(#endCard[style*="flex"]) #t4-bar, body:has(#holdCard.on) #t4-bar { visibility: hidden; } /* 끝 화면·멈춤 카드 뒤로 비치지 않게 */
 #t4-bar .chip { font-size: 14px; padding: 2px 9px; border-radius: 10px; background: #0009; border: 1px solid #ffffff22; text-shadow: 0 1px 2px #000; white-space: nowrap; }
 #t4-bar .coin { color: var(--gold); }
 #t4-bar .ammo { color: #dfefff; } #t4-bar .ammo b { color: var(--gold); font-weight: 600; }
@@ -113,7 +114,7 @@ export function showHud() {
   h += '<div class="icons">';
   for (const e of T4.inv) {
     const it = byId(e.id); if (!it) continue;
-    const used = (e.id === 't4-hourglass-heart' && T4.run.phoenixUsed) || (e.id === 't4-cracked-shield' && T4.room.shield <= 0) || (e.id === 't4-rewind-spring' && T4.room.spring <= 0);
+    const used = (e.id === 't4-hourglass-heart' && T4.run.phoenixUsed) || (e.id === 't4-cracked-shield' && T4.room.shield <= 0) || (e.id === 't4-rewind-spring' && T4.room.spring <= 0) || (e.id === 't4-afterimage' && T4.decoyCd > 0);
     h += `<div class="ic r-${it.rar} ${it.kind}${synFor(e.id).length ? ' syn' : ''}${used ? ' used' : ''}" data-id="${e.id}">${it.icon}${e.lv > 1 ? '<span class="lv">II</span>' : ''}</div>`;
   }
   h += '</div>';
@@ -216,7 +217,7 @@ export function openPick({ ids = null, count = 3, tier = 1, title = null, sub = 
         P.close(); give(id); (it.rar === 'legend' ? snd.legend : snd.take).call(snd); resolve(id);
       } };
     });
-    const footFn = () => `${$t('←→ 고르기 · Enter 가져가기')}${T4.rerolls > 0 ? ' · ' + $t('R 다시 뽑기 ({0})', T4.rerolls) : ''} · ${$t('Esc 건너뛰기 (금화 +{0})', skipCoins)}`;
+    const footFn = () => `${$t('←→ 고르기 · Enter 가져가기')}${T4.rerolls > 0 ? ' · ' + $t('R 다시 뽑기 ({0})', T4.rerolls) : ''} · ${skipCoins ? $t('Esc 건너뛰기 (금화 +{0})', skipCoins) : $t('Esc 건너뛰기')}`;
     const P = panel({
       title: title || $t('유물을 하나 고르세요'), sub: sub || '', cards: mk(), foot: footFn(),
       onCancel: P2 => { P2.close(); addCoinsUI(skipCoins); resolve(null); },

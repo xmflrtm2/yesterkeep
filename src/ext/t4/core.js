@@ -33,7 +33,7 @@ function freshStats() {
     add: { maxHearts: 0 },
     strike: 0.6, shockStun: 0.6, backDeg: 110, shield: 0, shieldStun: 0, boots: 0, spring: 0, catch: 0, ammoMax: 3, knives: 0,
     killCoins: 0, price: 1, gate: 0, chain: 0, ripple: 0, breath: 0, double: 0, phoenix: 0, decoy: 0, decoyCd: 8, harvest: -1,
-    lastGrain: 0, shadow: 0, glass: 0, sandKill: 0, moon: 1, pierce: 0,
+    lastGrain: 0, shadow: 0, glass: 0, sandKill: 0, moon: 1, pierce: 0, decoyBoth: 0,
   };
 }
 export const has = id => T4.inv.some(e => e.id === id);
@@ -338,7 +338,7 @@ function dropDecoy(era) {
   const d = { era, x: S.p.x, z: S.p.z, active: 0, hold: new Map() };
   d.mesh = makeDecoyMesh(era, false); d.mesh.position.set(d.x, 0, d.z); K.groups[era].add(d.mesh);
   d.ghost = makeDecoyMesh(era, true); d.ghost.position.set(d.x, 0, d.z); K.groups[K.other(era)].add(d.ghost);
-  T4.decoy = d; T4.decoyCd = T4.st.decoyCd;
+  T4.decoy = d;
 }
 function clearDecoy() { const d = T4.decoy; if (!d) return; for (const m of [d.mesh, d.ghost]) if (m && m.parent) m.parent.remove(m); T4.decoy = null; }
 function stepDecoy(dt) {
@@ -357,7 +357,7 @@ function stepDecoy(dt) {
     let dd = want - f.yaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); f.yaw += dd * Math.min(1, dt * 10);
     if (f.holder) { f.holder.position.set(f.x, f.holder.position.y, f.z); f.holder.rotation.y = f.yaw; }
   }
-  if (d.active <= 0) clearDecoy();
+  if (d.active <= 0) { clearDecoy(); changed('decoy'); }
 }
 
 // ───────── 그림자 걸음 ─────────
@@ -421,9 +421,11 @@ EXT.on('shift', (from, to, K) => {
   if (st.shockStun > 0.6) for (const f of K.enemies()) if (f.alive && f.era === to && f.kind !== 'boss' && Math.hypot(f.x - S.p.x, f.z - S.p.z) < K.GUARD.shock) f.stun = Math.max(f.stun || 0, st.shockStun);
   if (st.breath) { T4.breathT = st.breath; T4.breathSus = new Map(K.enemies().filter(f => f.alive && f.era === to).map(f => [f, f.sus || 0])); }
   if (st.shadow && (to === 'past' || st.shadow > 1)) shadowSlide(to);
+  // 잔상 미끼: 떠난 시대에 남기고(쿨다운이 끝났을 때), 그 시대로 돌아오면 켜진다. 쿨다운은 켜질 때부터
   if (st.decoy) {
-    if (T4.decoy && T4.decoy.era === to) { T4.decoy.active = st.decoy; T4.decoy.hold = new Map(); snd.decoy(); }
-    else if (T4.decoyCd <= 0) dropDecoy(from);
+    const d = T4.decoy;
+    if (d && d.era === to && !d.used) { d.active = st.decoy; d.used = true; d.hold = new Map(); T4.decoyCd = st.decoyCd; snd.decoy(); changed('decoy'); }
+    else if (T4.decoyCd <= 0 && (!d || d.used) && (from === 'past' || st.decoyBoth)) dropDecoy(from);
   }
   dynStats();
 });
@@ -487,7 +489,7 @@ EXT.on('kill', (foe, how, K) => {
 EXT.on('cleared', (room, K) => {
   if (!live()) return;
   const st = T4.st;
-  if (st.harvest >= 0 && K.S.alarms <= st.harvest && K.S.hearts < K.STAT.maxHearts) { K.S.hearts++; T4.lastHearts = K.S.hearts; K.drawHearts(); K.toast('🌾 ' + $t('고요한 수확: 하트 +1'), 1.8); snd.heal(); }
+  if (st.harvest >= 0 && K.S.alarms <= st.harvest && K.S.hearts < K.STAT.maxHearts) { K.S.hearts++; T4.lastHearts = K.S.hearts; K.drawHearts(); snd.heal(); setTimeout(() => K.toast('🌾 ' + $t('고요한 수확: 하트 +1'), 1.8), 2000); } // 바로 뒤에 main.js가 '출구가 열렸어요'를 띄우므로 그 뒤에
 });
 
 EXT.on('exit', (room, K) => {
@@ -519,7 +521,8 @@ EXT.on('stab', (tgt, info) => {
 EXT.on('update', (dt, K) => {
   if (!live()) return;
   const S = K.S;
-  T4.bootsT = Math.max(0, T4.bootsT - dt); T4.decoyCd = Math.max(0, T4.decoyCd - dt);
+  T4.bootsT = Math.max(0, T4.bootsT - dt);
+  if (T4.decoyCd > 0) { T4.decoyCd = Math.max(0, T4.decoyCd - dt); if (T4.decoyCd <= 0) changed('decoy'); }
   heartWatch();
   dynStats();
   // 멈춘 숨: 넘어온 뒤 잠깐은 의심이 차지 않는다
