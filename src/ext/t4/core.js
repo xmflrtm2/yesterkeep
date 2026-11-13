@@ -85,10 +85,13 @@ export function apply() {
 }
 // 매 프레임 바뀌는 능력치: 달빛 걸음(오늘에서만), 마지막 모래알(하트가 적을 때)
 const graining = () => T4.st && T4.st.lastGrain && T4.K && T4.K.S.hearts <= T4.st.lastGrain;
+// 성채지기가 깨어 있으면 걸음이 빨라지는 유물은 꺼진다 — 달빛 걸음 II(+35%)면 보스가 도는 속도(오늘 3.0 rad/s)보다 빨리 돌아
+// Shift 없이 빙빙 도는 봇이 13초 만에 이겼다 (11/13 tools/t4_balance.py boss circle). 구르기 대기(마지막 모래알)는 그대로
+const bossAwake = () => { const K = T4.K; return !!(K && K.bosses && K.bosses.some(b => b.alive && b.state !== 'dormant')); };
 function dynStats() {
   const K = T4.K, st = T4.st; if (!K || !st) return;
-  const moon = K.S.era === 'now' ? st.moon : 1, g = graining();
-  put(K.STAT, 'speed', 'STAT', st.mul.speed * moon * (g ? 1.15 : 1));
+  const calm = !bossAwake(), moon = calm && K.S.era === 'now' ? st.moon : 1, g = graining();
+  put(K.STAT, 'speed', 'STAT', st.mul.speed * moon * (g && calm ? 1.15 : 1));
   put(K.STAT, 'rollCd', 'STAT', st.mul.rollCd * (g ? 0.5 : 1));
 }
 // 창살 쐐기: 방 데이터의 gateHold를 잠깐 늘렸다가, 방을 떠나거나 유물이 없어지면 되돌린다
@@ -505,10 +508,11 @@ EXT.on('stab', (tgt, info) => {
   if (info.behind) return undefined;
   const fx = Math.sin(tgt.yaw || 0), fz = Math.cos(tgt.yaw || 0);
   const cosA = (info.tx * fx + info.tz * fz) / info.td;
-  if (st.backDeg < 110 && cosA < Math.cos(st.backDeg * DEG)) {
+  // 암살자의 눈은 성채지기엔 안 통한다 — 등 220°면 빙빙 돌며 옆구리만 찌르는 봇이 14초 만에 이겼다 (11/13)
+  if (st.backDeg < 110 && tgt.kind !== 'boss' && cosA < Math.cos(st.backDeg * DEG)) {
     if (tgt.ext) return tgt.onStab ? tgt.onStab({ ...info, behind: true }) : undefined;
     const r = K.killFoe(tgt, 'back');
-    return tgt.kind === 'boss' ? 'boss-' + r : 'kill-back';
+    return 'kill-back';
   }
   if (st.glass && tgt.kind !== 'boss' && tgt.state !== 'alert' && !tgt.ext) {
     K.killFoe(tgt, 'shift');
