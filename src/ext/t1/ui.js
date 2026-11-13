@@ -55,7 +55,12 @@ body:has(#ext .t1-ov) #hud #hint, body:has(#ext .t1-ov) #hud #prompt, body:has(#
   #ext .t1-node { width: 44px; height: 44px; line-height: 40px; font-size: 20px; }
   #ext .t1-sand { top: 44px; left: 14px; } #ext .t1-sand .bar { width: 96px; }
 }
-@media (max-height: 520px) { #ext .t1-mapwrap { height: 50vh; min-height: 200px; } #ext .t1-h { font-size: 22px; } #ext .t1-box { gap: 6px; } }
+/* 낮은 창(960×420 등): 칸이 겹치지 않게 작게 (11/13 창 크기 시험) */
+@media (max-height: 520px) {
+  #ext .t1-mapwrap { height: 60vh; min-height: 240px; } #ext .t1-h { font-size: 20px; } #ext .t1-box { gap: 4px; }
+  #ext .t1-node { width: 38px; height: 38px; line-height: 34px; font-size: 18px; } #ext .t1-info { min-height: 36px; font-size: 13px; } #ext .t1-info b { font-size: 15px; }
+  #ext .t1-btn { padding: 6px 14px; font-size: 15px; } #ext .t1-sub { font-size: 13px; }
+}
 `;
 
 export const UI = {

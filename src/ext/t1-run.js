@@ -42,8 +42,16 @@ const ls = {
   del(k) { try { localStorage.removeItem(k); } catch (e) { /* */ } },
 };
 const tutDone = () => ls.get(KEY.tut, 0) === 1;
-const meta = () => Object.assign({ mem: 0, runs: 0, wins: 0, bestFloor: 0, total: 0 }, ls.get(KEY.meta, {}));
-function save() { if (st && !st.pending) { st.saved = Date.now(); ls.set(KEY.run, st); } }
+// 런 사이 저장 'yk-meta'는 T4(meta.js)와 같은 열쇠·같은 필드 이름(memory·runs·wins·best·total·unlocked)을 쓴다.
+// T4가 있으면 기억 계산·저장은 T4 몫(EXT.t4.endRun), T1은 안 쓴다. 없으면 T1이 같은 필드로 쓰되 모르는 필드(unlocked 등)는 그대로 둔다
+const T4 = () => EXT.t4 || null;
+const meta = () => { const m = ls.get(KEY.meta, {}) || {}; return Object.assign(m, { memory: m.memory | 0, runs: m.runs | 0, wins: m.wins | 0, best: m.best | 0, total: m.total | 0, bestFloor: m.bestFloor | 0 }); };
+function save() {
+  if (!st || st.pending) return;
+  st.saved = Date.now();
+  if (T4() && T4().snapshot) { try { st.t4 = T4().snapshot(); } catch (e) { console.error('[T1] t4 snapshot', e); } }
+  ls.set(KEY.run, st);
+}
 function loadSaved() { const s = ls.get(KEY.run, null); return s && s.v === 1 && s.seed && s.floor >= 1 && s.floor <= 3 ? s : null; }
 // 런 방의 별 기록(yk-best)은 남기지 않는다 — main.js가 출구에서 저장한 것을 바로 지움 (튜토리얼 기록만 남게)
 function cleanBest(id) { if (!id || !/^run-/.test(id)) return; const b = ls.get('yk-best', {}); if (b[id]) { delete b[id]; ls.set('yk-best', b); } }
@@ -53,18 +61,25 @@ function freshState(seed) {
   return { v: 1, seed: String(seed), floor: 1, pos: { row: -1, col: 0 }, visited: [], phase: 'landing', hearts: K ? K.STAT.maxHearts : 5, sand: SAND.start,
     recipe: null, used: [], mem: 0, stats: { rooms: 0, kills: 0, time: 0, hurts: 0, sandUsed: 0, shifts: 0, deepest: 1 }, t4: {}, started: Date.now() };
 }
-const sandMax = () => Math.max(1, EXT.stats.sandMax || SAND.max);
+const sandMax = () => Math.max(1, (EXT.stats.sandMax || SAND.max) * (EXT.stats.sandMul ?? 1)); // T4 유물(모래주머니)이 sandMul을 바꾼다
 function withMeta(room, m) { room.t1 = m; return room; }
 function landing(floor, opts) { return withMeta(landingRoom(floor, opts), { kind: 'landing', floor }); }
 function enterRun(seed, pending = false) {
   st = freshState(seed); st.pending = pending;
   R.mode = 'run'; R.rows = genFloor(st.seed, 1, EXTRA_TYPES); R.cur = null; R.next = null; R.warned = {};
   if (K) { for (const id of [...K.S.got]) if (id.startsWith('run-')) K.S.got.delete(id); }
-  if (!pending) { save(); EXT.emit('runStart', st); }
+  if (!pending) beginRun();
   return landing(1);
+}
+// 런이 정말 시작될 때(메뉴에서 고른 뒤 포함): 저장 + T4 런 시작(유물·금화 초기화, 해금 적용)
+function beginRun() {
+  st.pending = false;
+  if (T4() && T4().startRun) { try { T4().startRun(); } catch (e) { console.error('[T1] t4 startRun', e); } }
+  save(); EXT.emit('runStart', st);
 }
 function enterResume(s) {
   st = s; st.pending = false;
+  if (T4() && T4().restore && s.t4) { try { T4().restore(s.t4); } catch (e) { console.error('[T1] t4 restore', e); } }
   R.mode = 'run'; R.rows = genFloor(st.seed, st.floor, EXTRA_TYPES); R.cur = null; R.next = null; R.warned = {};
   R.resumeHearts = st.hearts;
   EXT.emit('runResume', st);
@@ -126,7 +141,8 @@ function buildNodeRoom(node, resume = false) {
     const heart = K.ROOMS.find(r => r.id === 'heart');
     room = { ...heart, id: 'run-heart', label };
   } else if (ROOMTYPES[node.type] || TEMP[node.type]) {
-    try { room = (ROOMTYPES[node.type] || TEMP[node.type])(ctx); } catch (e) { console.error('[T1] room type', node.type, e); }
+    const rt = ROOMTYPES[node.type];
+    try { room = rt ? (typeof rt === 'function' ? rt(ctx) : rt.make({ tier: f, label, floor: f, rng: ctx.rng, seed: st.seed })) : TEMP[node.type](ctx); } catch (e) { console.error('[T1] room type', node.type, e); }
     if (!room && TEMP[node.type]) room = TEMP[node.type](ctx);
     if (room && !room.past && room.room) room = room.room;
     if (room && room.start && room.exit && !room.past.some(r => r.includes('@'))) room = toRoom({ ...room, w: room.past[0].length, h: room.past.length, parts: [], shards: room.shards || [] }, {});
@@ -197,7 +213,7 @@ function drawSand(dt) {
 function setRunUI(on) { document.body.classList.toggle('t1run', !!on); }
 
 /* ───────── 화면: 시작 메뉴 · 지도 · 요약 ───────── */
-function metaLine() { const M = meta(); return M.runs ? $t('기억 {0} · 런 {1}번 · 가장 깊이 {2}층 · 성공 {3}번', M.mem, M.runs, M.bestFloor, M.wins) : $t('기억 {0}', M.mem); }
+function metaLine() { const M = meta(); return M.runs ? $t('기억 {0} · 런 {1}번 · 가장 깊이 {2}층 · 성공 {3}번', M.memory, M.runs, M.bestFloor, M.wins) : $t('기억 {0}', M.memory); }
 function showMenu() {
   const saved = st && !st.pending;
   const where = saved ? (st.phase === 'room' && st.pos.row >= 0 ? $t('{0}층 · {1}번째 방', st.floor, st.pos.row + 1) : $t('{0}층 입구', st.floor)) : '';
@@ -247,7 +263,7 @@ function openMap() {
   EXT.emit('mapOpen', can, st);
   const here = st.pos.row >= 0 ? st.pos : null;
   const html = `<div class="t1-h">${$t(FLOOR_NAME[st.floor])}</div>
-    <div class="t1-bar"><span class="h">♥ ${K.S.hearts} / ${K.STAT.maxHearts}</span><span class="s">⌛ ${$t('{0}초', st.sand.toFixed(1))} / ${sandMax()}</span><span class="m">✧ ${$t('기억')} ${st.mem}</span></div>
+    <div class="t1-bar"><span class="h">♥ ${K.S.hearts} / ${K.STAT.maxHearts}</span><span class="s">⌛ ${$t('{0}초', st.sand.toFixed(1))} / ${sandMax()}</span>${T4() ? '' : `<span class="m">✧ ${$t('기억')} ${st.mem}</span>`}</div>
     ${mapHtml(R.rows, st.visited, can, here, typeMeta)}
     <div class="t1-info"></div>
     <div class="t1-small">${$t('←/→ 고르기 · Enter 들어가기 · 아래에서 위로, 맨 위가 이 층의 끝')}</div>`;
@@ -270,17 +286,20 @@ function pickNode(k) {
   UI.close();
 }
 function endRun(result) {
-  const S = K.S;
   if (!st) return;
-  const M = meta();
-  if (result === 'win') st.mem += 10;
-  M.mem += st.mem; M.total += st.mem; M.runs++; if (result === 'win') M.wins++;
-  M.bestFloor = Math.max(M.bestFloor, st.floor);
-  ls.set(KEY.meta, M);
+  const won = result === 'win';
+  if (won) st.mem += 10;
   ls.del(KEY.run);
-  const old = st, seed = st.seed;
+  const old = st, seed = st.seed, t4 = T4();
+  // 기억(런 사이 재화): T4가 있으면 T4의 계산(지난 방 + 층×3 + 이기면 10 + 금화÷4)과 저장을 쓴다
+  let gain = null;
+  if (t4 && t4.endRun) { try { gain = t4.endRun({ won, floors: won ? 3 : old.floor - 1, rooms: old.stats.rooms }); } catch (e) { console.error('[T1] t4 endRun', e); gain = null; } }
+  const M = meta();
+  if (gain == null) { gain = old.mem; M.memory += gain; M.total += gain; M.runs++; if (won) M.wins++; }
+  M.bestFloor = Math.max(M.bestFloor, old.floor);
+  ls.set(KEY.meta, M);
   EXT.emit('runEnd', result, old);
-  (result === 'win' ? SND.win : SND.dead)(K);
+  (won ? SND.win : SND.dead)(K);
   const t = Math.floor(old.stats.time), mm = Math.floor(t / 60), ss = t % 60;
   const row = (a, b) => `<b>${a}</b><span>${b}</span>`;
   const html = `<div class="t1-h">${result === 'win' ? $t('성채지기를 쓰러뜨렸어요!') : $t('성채에 쓰러졌어요')}</div>
@@ -289,21 +308,27 @@ function endRun(result) {
       ${row($t('내려간 층'), $t('{0}층', old.floor))}${row($t('지난 방'), old.stats.rooms)}${row($t('쓰러뜨린 적'), old.stats.kills)}
       ${row($t('맞은 횟수'), old.stats.hurts)}${row($t('어제에서 쓴 모래'), $t('{0}초', old.stats.sandUsed.toFixed(1)))}${row($t('걸린 시간'), $t('{0}분 {1}초', mm, ss))}
     </div>
-    <div class="t1-meta">✧ ${$t('기억 +{0}', old.mem)} → ${$t('모두 {0}', M.mem)}</div>
+    <div class="t1-meta">✧ ${$t('기억 +{0}', gain)} → ${$t('모두 {0}', M.memory)}</div>
     <div class="t1-small">${$t('기억은 런이 끝나도 남아요.')} · ${$t('시드 {0}', seed)}</div>
     <div class="t1-slot"></div>
     <div class="t1-btns">
       <button class="t1-btn main" data-k="new">${$t('새 런')}</button>
       <button class="t1-btn" data-k="same">${$t('같은 시드로 다시')}<small>${$t('시드 {0}', seed)}</small></button>
+      ${t4 && t4.openMeta ? `<button class="t1-btn" data-k="meta">${$t('기억의 서고')}<small>${$t('기억으로 새 유물·해금')}</small></button>` : ''}
       <button class="t1-btn" data-k="tut">${$t('튜토리얼 다시 하기')}</button>
     </div>`;
   st = null;
   setRunUI(false);
   const ov = UI.show(html, k => {
     if (k === 'tut') return startTutorial();
+    if (k === 'meta') { // T4 해금 창 → 닫으면 새 런
+      UI.close(true);
+      Promise.resolve(t4.openMeta({ gain: 0, cont: $t('새 런') })).catch(e => console.error(e)).then(() => startRoomNow(enterRun(newSeed())));
+      return;
+    }
     startRoomNow(enterRun(k === 'same' ? seed : newSeed()));
   }, { cls: 'summary' });
-  try { EXT.emit('runSummary', ov.querySelector('.t1-slot'), { result, state: old, meta: M }); } catch (e) { console.error(e); }
+  try { EXT.emit('runSummary', ov.querySelector('.t1-slot'), { result, state: old, meta: M, gain }); } catch (e) { console.error(e); }
 }
 
 /* ───────── 제단 (임시 상점·쉼터) ───────── */
@@ -373,7 +398,7 @@ EXT.on('roomLoad', room => {
   EXT.emit('roomEnter', room, m, st);
 });
 EXT.on('update', dt => {
-  if (UI.open) { K.freeze(true); const tr = K.S.trans; if (tr && !tr.loaded) tr.t = Math.min(tr.t, 0.3); return; }
+  if (UI.open || R.waiting) { K.freeze(true); const tr = K.S.trans; if (tr && !tr.loaded) tr.t = Math.min(tr.t, 0.3); return; }
   if (R.mode !== 'run' || !R.cur || !st) return;
   const S = K.S, m = R.cur.t1;
   st.stats.time += dt;
@@ -436,11 +461,21 @@ EXT.on('exit', room => {
       R.next = landing(st.floor);
       save();
       EXT.emit('floorStart', st.floor, st);
+      reward(m, null);
       return;
     }
+    if (m.type === 'elite') { reward(m, openMap); return; }
   }
   openMap();
 });
+// 정예·문지기 보상: T4가 있으면 유물·축복 셋 중 하나 고르기 창(EXT.t4.openPick → Promise). 그동안 세상은 멈춘다(R.waiting)
+function reward(m, then) {
+  const t4 = T4();
+  if (!t4 || !t4.openPick) { if (then) then(); return; }
+  R.waiting = true; K.freeze(true);
+  const done = () => { R.waiting = false; save(); if (then) then(); else K.freeze(false); };
+  try { Promise.resolve(t4.openPick({ count: 3, tier: st.floor, title: m.type === 'guard' ? $t('문지기를 넘었어요 — 하나를 고르세요') : $t('정예를 쓰러뜨렸어요 — 하나를 고르세요') })).catch(e => console.error('[T1] t4 openPick', e)).then(done); } catch (e) { console.error(e); done(); }
+}
 EXT.on('nextRoom', () => {
   if (R.mode !== 'run' || !st) return undefined;
   const r = R.next; R.next = null;
@@ -486,17 +521,19 @@ EXT.run = {
   sandMax,
   addSand: (n, why = 'item') => addSand(n, why),
   setSand(v) { if (st) st.sand = Math.max(0, Math.min(sandMax(), v)); },
-  floor: () => (st ? st.floor : 0),
+  get floor() { return st ? st.floor : 0; }, // 숫자 (T4 rooms.js가 EXT.run.floor를 값으로 씀)
   seed: () => (st ? st.seed : null),
   node: () => (R.cur && R.cur.t1) || null,
   map: () => R.rows,
   rng: (...tags) => makeRng(st ? st.seed : 'none', 't4', ...tags),
   heal(n = 1) { const S = K.S; const h0 = S.hearts; S.hearts = Math.min(K.STAT.maxHearts, S.hearts + n); K.drawHearts(); return S.hearts - h0; },
+  // fn = (ctx) => 방 데이터, 또는 T4 꼴 { track, make(opts) → 방 데이터, decorate(room, opts) }
   registerRoomType(type, fn, m) {
     ROOMTYPES[type] = fn;
+    if (fn && typeof fn === 'object' && !m && fn.meta) m = fn.meta;
     if (m) { TYPES[type] = { ...(TYPES[type] || { icon: '?', name: type, desc: '', color: '#ccc' }), ...m }; if (m.rows && !['treasure', 'shop', 'rest', 'combat', 'puzzle', 'elite', 'guard', 'boss'].includes(type)) EXTRA_TYPES[type] = { rows: m.rows, weight: m.weight ?? 1 }; }
   },
-  meta: { get: meta, add(n) { const M = meta(); M.mem += n; ls.set(KEY.meta, M); return M.mem; }, spend(n) { const M = meta(); if (M.mem < n) return false; M.mem -= n; ls.set(KEY.meta, M); return true; } },
+  meta: { get: meta, add(n) { const M = meta(); M.memory += n; ls.set(KEY.meta, M); return M.memory; }, spend(n) { const M = meta(); if (M.memory < n) return false; M.memory -= n; ls.set(KEY.meta, M); return true; } },
   save,
   start(seed) { startRoomNow(enterRun(seed || newSeed())); },
   types: TYPES, FLOORS, SAND, ROWS,
