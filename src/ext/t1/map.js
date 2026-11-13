@@ -47,9 +47,11 @@ export function genFloor(seed, floor, extra = {}) {
     for (let a = 0; a < n; a++) { let best = 0; for (let b = 1; b < m; b++) if (Math.abs(ratio(b, m) - ratio(a, n)) < Math.abs(ratio(best, m) - ratio(a, n))) best = b; link(a, best); }
     for (let b = 0; b < m; b++) if (!A.some(x => x.next.includes(b))) { let best = 0; for (let a = 1; a < n; a++) if (Math.abs(ratio(a, n) - ratio(b, m)) < Math.abs(ratio(best, n) - ratio(b, m))) best = a; link(best, b); }
     const crosses = (a, b) => A.some((x, a2) => x.next.some(b2 => (a2 < a && b2 > b) || (a2 > a && b2 < b)));
-    for (let tries = 0; tries < 2; tries++) {
-      const a = rng.int(0, n - 1), b = A[a].next[0] + (rng.chance(0.5) ? 1 : -1);
-      if (b >= 0 && b < m && !A[a].next.includes(b) && !crosses(a, b)) link(a, b);
+    // 11/13 직접 플레이(시드 623843): 외길이 잦아 "고르는" 맛이 없었다 → 다음 줄에 칸이 둘 이상이면 칸마다 되도록 두 갈래(엇갈리지 않게)
+    if (m > 1) for (const a of rng.shuffle([...A.keys()])) {
+      if (A[a].next.length > 1) continue;
+      const b0 = A[a].next[0];
+      for (const b of rng.shuffle([b0 - 1, b0 + 1])) if (b >= 0 && b < m && !A[a].next.includes(b) && !crosses(a, b)) { link(a, b); break; }
     }
     for (const x of A) x.next.sort((p, q) => p - q);
   }

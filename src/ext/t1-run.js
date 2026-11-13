@@ -14,12 +14,14 @@ import { landingRoom, TEMP, FLOOR_NAME, buildAltar } from './t1/temp-rooms.js';
 const KEY = { run: 'yk-run', tut: 'yk-tut', meta: 'yk-meta' };
 // 층마다: 뽑을 조각 단계(tier)와 비율, 두 조각을 이어 붙일 확률, 방을 깰 때 받는 모래
 export const FLOORS = [null,
-  { tiers: [[1, 0.6], [2, 0.4]], join: 0.3, clear: 3 },
+  { tiers: [[1, 0.6], [2, 0.4]], join: 0.3, clear: 2.5 },
   { tiers: [[2, 0.6], [3, 0.4]], join: 0.55, clear: 2 },
   { tiers: [[3, 0.6], [4, 0.4]], join: 0.75, clear: 1.5 },
 ];
 // 모래(초). 어제에 있으면 1초에 1(×EXT.stats.sandDrain)씩 준다. 오늘에서는 reserve까지만 천천히 차올라 갇히지 않게
-export const SAND = { max: 20, start: 20, shard: 4, kill: 1.5, elite: 4, floorBonus: 6, reserve: 3, trickle: 0.3, enterMin: 0.35, low: 4,
+// 11/13 직접 플레이(시드 123, 14방): 최대 20·처치 1.5·조각 4로는 방을 나올 때마다 거의 가득 → 모래가 고민거리가 안 됐다(상점에서 쓴 뒤에만 빠듯)
+// → 최대 16, 처치 1, 조각 3, 층 보너스 5, 상점 5. 어제에서 기다리기만 하는 풀이(경비가 돌아서길 어제에서 기다림)는 바닥나게
+export const SAND = { max: 16, start: 16, shard: 3, kill: 1.0, elite: 3, floorBonus: 5, reserve: 3, trickle: 0.3, enterMin: 0.35, low: 4,
   // 성채지기 방: 싸움 자체가 시대 전환이라 모래가 바닥나면 이길 길이 없었다(11/13 봇: 모래 0 → 150초 동안 4번만 맞힘, 런 끝)
   // → 이 방에서는 0.6배로 줄고, 성채지기를 맞힐 때마다 모래가 쏟아진다(+4)
   bossDrain: 0.6, bossHit: 4 };
@@ -98,10 +100,11 @@ function genRecipe(type, rng, floor) {
     const order = [];
     const left = cands.slice();
     while (left.length && order.length < 14) { const c = rng.weighted(left, pb.w); order.push(c); left.splice(left.indexOf(c), 1); }
-    const a = fa ? flip(A) : A;
-    outer: for (const B of order) for (const fb of rng.shuffle(B.flip !== false ? [false, true] : [false])) for (const dir of rng.shuffle(['E', 'N'])) {
-      if (canJoin(a, fb ? flip(B) : B, dir)) { rec.b = B.id; rec.fb = fb; rec.dir = dir; break outer; }
-    }
+    // 뒤집은 A가 이어 붙일 수 없으면 안 뒤집은 쪽으로도 (11/13: 1층 문지기가 뒤집힌 "좁은 회랑" 하나뿐이라 너무 작았다)
+    const fas = A.flip !== false ? [fa, !fa] : [false];
+    outer: for (const fa2 of fas) { const a = fa2 ? flip(A) : A; for (const B of order) for (const fb of rng.shuffle(B.flip !== false ? [false, true] : [false])) for (const dir of rng.shuffle(['E', 'N'])) {
+      if (canJoin(a, fb ? flip(B) : B, dir)) { rec.fa = fa2; rec.b = B.id; rec.fb = fb; rec.dir = dir; break outer; }
+    } }
   }
   return rec;
 }
@@ -306,7 +309,7 @@ function endRun(result) {
 /* ───────── 제단 (임시 상점·쉼터) ───────── */
 let altar = null;
 const nearAltar = () => altar && altar.left > 0 && Math.hypot(K.S.p.x - altar.x, K.S.p.z - altar.z) < 2.1 && !K.S.trans;
-const SHOP_COST = 6;
+const SHOP_COST = 5;
 function useAltar() {
   const S = K.S;
   if (altar.kind === 'shop') {
@@ -518,13 +521,18 @@ EXT.run = {
         for (let f = 1; f <= 3; f++) {
           st.floor = f;
           const rows = genFloor(st.seed, f, EXTRA_TYPES);
+          for (let r = 0; r < rows.length - 1; r++) for (const n of rows[r]) { if (rows[r + 1].length > 1) { out.decisions = (out.decisions || 0) + 1; out.choiceSum = (out.choiceSum || 0) + n.next.length; if (n.next.length < 2) out.oneWay = (out.oneWay || 0) + 1; } }
           for (const row of rows) for (const node of row) {
             const room = buildNodeRoom(node);
+            if (node.type === 'guard' && !st.recipe.b) out.guardSingle = (out.guardSingle || 0) + 1;
             out.rooms++; out.types[node.type] = (out.types[node.type] || 0) + 1;
             if (st.recipe && node.type !== 'boss') { out.chunks[st.recipe.a] = (out.chunks[st.recipe.a] || 0) + 1; if (st.recipe.b) { out.joined++; out.chunks[st.recipe.b] = (out.chunks[st.recipe.b] || 0) + 1; } }
             const chk = reachCheck(room);
             out.sizes.push(room.past[0].length + 'x' + room.past.length);
             if (!chk.ok) out.fail.push([room.id, room.name, chk.why]);
+            // 오늘에서 시작하는 방: 골렘 순찰이 시작 칸 5m 안에 들어오면 "서서 생각만 해도 맞는" 방
+            const s0 = room.now.findIndex(r => r.includes('@')), sx = s0 >= 0 ? room.now[s0].indexOf('@') : -1;
+            if ((room.startEra || 'now') === 'now' && sx >= 0) for (const g of room.golems || []) for (const [i, j] of g.path || []) if (Math.hypot(i - sx, j - s0) * 2 < 5) { (out.nearStart = out.nearStart || []).push([room.name, [i, j]]); break; }
             if (load) { try { K.loadRoom(room); } catch (e) { out.fail.push([room.id, 'load', String(e)]); } }
           }
         }

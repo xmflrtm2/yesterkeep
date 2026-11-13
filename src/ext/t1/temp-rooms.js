@@ -1,5 +1,5 @@
 // T1 — 층 입구(계단참)와 임시 보물·상점·쉼터 방. T4가 EXT.run.registerRoomType('treasure'|'shop'|'rest', fn)로 바꾸면 그쪽을 쓴다.
-// 제단(t1altar)은 E로 쓴다: 상점 = 모래 6 → 하트 1(두 번까지), 쉼터 = 하트 +2 · 모래 가득(한 번).
+// 제단(t1altar)은 E로 쓴다: 상점 = 모래 5 → 하트 1(두 번까지), 쉼터 = 하트 +2 · 모래 가득(한 번).
 export const FLOOR_NAME = [null, N('1층 · 무너진 바깥 회랑'), N('2층 · 가라앉은 창고'), N('3층 · 심장으로 가는 길')];
 
 export function landingRoom(floor, opts = {}) {
