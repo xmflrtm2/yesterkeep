@@ -1,9 +1,11 @@
 // 씨앗 → 나무 (t3-seed)
-//  o  씨앗 흙 (두 시대 같은 칸). 어제 씨앗을 심으면 오늘 그 자리에 큰 나무 — 줄기는 막힘(지나갈 수도, 달빛이 지나갈 수도 없음)
-//  v  뿌리 자리 (오늘 그리드, 기본은 구덩이). 4방향으로 이어진 v 무리가 닿은 흙에 나무가 자라면 뿌리 다리가 된다
+//  o  돌 화단 (두 시대 같은 칸, 늘 막힘 — 옆 칸에서 심는다). 어제 씨앗을 심으면 오늘 그 자리에 큰 나무가 서서 달빛을 가린다.
+//     심지 않은 화단은 낮아서 달빛이 넘어간다
+//     (11/13 직접 플레이: 처음엔 흙 칸을 밟을 수 있고 나무만 막혔더니, 흙에 붙어 서서 심고 오늘로 가면 줄기 칸에 걸려 막혔다 → 화단 자체를 막힘으로)
+//  v  뿌리 자리 (오늘 그리드, 기본은 구덩이). 4방향으로 이어진 v 무리가 닿은 화단에 나무가 자라면 뿌리 다리가 된다
 //  e  마른 씨앗 주머니 (밟으면 줍기). 보통 오늘의 폐허에 둔다 → 오늘 주워 어제 심는다
 // 심은 씨앗은 어제 다시 캘 수 있다(씨앗이 손으로 돌아옴) → 되돌릴 수 없는 상태가 생기지 않는다.
-import { C, mech, put, both, mat, gmat, mesh, group, glow, ghostObj, cpos, onCell, busy, toastOnce, markDirty, K } from './core.js';
+import { C, mech, put, both, mat, gmat, mesh, group, glow, ghostObj, cpos, onCell, busy, toastOnce, markDirty } from './core.js';
 import { S3 } from './sfx3.js';
 
 const planted = v => v.beds.some(b => b.planted);
@@ -17,7 +19,7 @@ export default mech({
     v(d, E, i, j) { if (E === 'now') { const v = { i, j, beds: [] }; d.vines.push(v); put('now', i, j, { m: 'seed', k: 'vine', v }); } return '_'; },
     e(d, E, i, j) { d.pouches.push({ era: E, i, j, got: false }); return '.'; },
   },
-  solid(x, era) { if (x.k === 'bed' && era === 'now' && x.b.planted) return true; return undefined; },
+  solid(x) { if (x.k === 'bed') return true; return undefined; },
   floor(x, era) { if (x.k === 'vine' && era === 'now' && planted(x.v)) return true; return undefined; },
   load(d, k) {
     // 뿌리 무리: 4방향으로 이어진 v 칸들 → 무리에 닿은 흙
@@ -86,42 +88,46 @@ function actBed(b, k) {
 // ── 모습 ──
 function buildBed(b, k) {
   const THREE = k.THREE, p = cpos(b.i, b.j);
-  // 어제: 돌로 두른 흙 + (심으면) 새싹
-  const soilP = mat('past', 'soil', { color: '#4a3322', roughness: 1 });
-  const rimP = mat('past', 'rim', { color: '#8d8478', roughness: 0.9 });
+  // 칸을 꽉 채우는 돌 화단(높이 0.5m, 두 시대 모두 막힘). 어제: 깨끗한 돌 + 검은 흙 + (심으면) 새싹 / 오늘: 이끼 낀 깨진 돌 + 메마른 흙 또는 큰 나무
+  const planter = (E, worn) => {
+    const stone = mat(E, 'planter', { color: worn ? '#5d5a55' : '#9a9083', roughness: 0.95 });
+    const soil = mat(E, 'soil', { color: worn ? '#3a2a20' : '#4a3322', roughness: 1 });
+    const g = group(mesh(new THREE.BoxGeometry(1.7, 0.42, 1.7), soil, 0, 0.21, 0));
+    for (const [x, z, w, d] of [[0, -0.86, 1.92, 0.2], [0, 0.86, 1.92, 0.2], [-0.86, 0, 0.2, 1.52], [0.86, 0, 0.2, 1.52]]) {
+      const s = mesh(new THREE.BoxGeometry(w, 0.5, d), stone, x, 0.25, z);
+      if (worn && x > 0) { s.scale.y = 0.7; s.position.y = 0.18; s.rotation.z = -0.06; } // 오늘: 한쪽 벽이 무너져 낮음
+      g.add(s);
+    }
+    return g;
+  };
   const leafP = mat('past', 'leaf', { color: '#58b04a', roughness: 0.7 });
   const stemP = mat('past', 'stem', { color: '#6f8a3a', roughness: 0.8 });
-  const gp = group(
-    mesh(new THREE.CylinderGeometry(0.78, 0.82, 0.08, 18), soilP, 0, 0.04, 0),
-    mesh(new THREE.TorusGeometry(0.82, 0.09, 6, 18).rotateX(Math.PI / 2), rimP, 0, 0.07, 0),
-  );
+  const gp = planter('past', false);
   const sap = group(mesh(new THREE.CylinderGeometry(0.025, 0.04, 0.55, 6), stemP, 0, 0.3, 0));
   for (let n = 0; n < 3; n++) { const lf = mesh(new THREE.SphereGeometry(0.13, 8, 6), leafP, Math.cos(n * 2.1) * 0.12, 0.4 + n * 0.08, Math.sin(n * 2.1) * 0.12); lf.scale.set(1, 0.45, 0.7); lf.rotation.y = n * 2.1; sap.add(lf); }
-  sap.position.y = 0.06; sap.visible = false;
+  sap.position.y = 0.42; sap.visible = false;
   gp.add(sap); gp.position.set(p.x, 0, p.z);
   k.groups.past.add(gp);
   b.sapling = sap;
   // 오늘: 메마른 흙 (심지 않았으면) / 큰 나무 (심었으면)
   const soilN = mat('now', 'soil', { color: '#3a2a20', roughness: 1 });
-  const rimN = mat('now', 'rim', { color: '#5d5a55', roughness: 1 });
   const barkN = mat('now', 'bark', { color: '#5a3d28', roughness: 0.95 });
   const leafN = mat('now', 'leaf', { color: '#3f6e34', roughness: 0.85 });
-  const dead = group(mesh(new THREE.CylinderGeometry(0.78, 0.82, 0.06, 18), soilN, 0, 0.03, 0), mesh(new THREE.TorusGeometry(0.82, 0.08, 5, 14).rotateX(Math.PI / 2), rimN, 0, 0.05, 0));
-  const twig = mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.45, 5), barkN, 0.1, 0.22, -0.05); twig.rotation.z = 0.6; dead.add(twig);
+  const box = planter('now', true);
+  const dead = group();
+  const twig = mesh(new THREE.CylinderGeometry(0.015, 0.03, 0.45, 5), barkN, 0.1, 0.62, -0.05); twig.rotation.z = 0.6; dead.add(twig);
   const tree = group();
-  // 줄기는 칸 전체를 막으므로(충돌은 2m 칸 단위) 밑동과 뿌리가 칸을 꽉 채우게 — 칸 가장자리에 붙어 있다가 막혀도 억울해 보이지 않게
   tree.add(mesh(new THREE.CylinderGeometry(0.45, 0.62, 3.3, 10), barkN, 0, 1.65, 0));
-  tree.add(mesh(new THREE.CylinderGeometry(0.6, 0.98, 0.8, 12), barkN, 0, 0.4, 0));
-  const mound = mesh(new THREE.SphereGeometry(1.0, 14, 8), soilN, 0, 0, 0); mound.scale.set(1, 0.22, 1); tree.add(mound);
-  for (let n = 0; n < 8; n++) { // 칸 가장자리까지 퍼지는 뿌리
-    const a = n * Math.PI / 4 + 0.2, reach = n % 2 ? 1.05 : 0.9, r = mesh(new THREE.CylinderGeometry(0.08, 0.2, 1.1, 6), barkN, Math.cos(a) * reach * 0.62, 0.16, Math.sin(a) * reach * 0.62);
-    r.rotation.set(Math.sin(a) * 1.3, 0, -Math.cos(a) * 1.3); tree.add(r);
+  tree.add(mesh(new THREE.CylinderGeometry(0.6, 0.85, 0.9, 12), barkN, 0, 0.6, 0));
+  for (let n = 0; n < 8; n++) { // 화단 벽을 넘어 흘러내리는 뿌리
+    const a = n * Math.PI / 4 + 0.2, r = mesh(new THREE.CylinderGeometry(0.07, 0.17, 1.0, 6), barkN, Math.cos(a) * 0.62, 0.45, Math.sin(a) * 0.62);
+    r.rotation.set(Math.sin(a) * 1.0, 0, -Math.cos(a) * 1.0); tree.add(r);
   }
   for (const [bx, by, bz, ra] of [[0.6, 2.4, 0.1, -0.7], [-0.55, 2.7, -0.2, 0.8]]) { const br = mesh(new THREE.CylinderGeometry(0.08, 0.16, 1.4, 6), barkN, bx, by, bz); br.rotation.z = ra; tree.add(br); }
   const canopy = group();
   for (const [cx, cy, cz, r] of [[0, 3.7, 0, 1.35], [0.85, 3.3, 0.3, 0.95], [-0.8, 3.45, -0.25, 1.0], [0.2, 3.25, -0.85, 0.9], [-0.2, 3.2, 0.85, 0.85]]) canopy.add(mesh(new THREE.IcosahedronGeometry(r, 1), leafN, cx, cy, cz));
   tree.add(canopy);
-  const holder = group(dead, tree); holder.position.set(p.x, 0, p.z);
+  const holder = group(box, dead, tree); holder.position.set(p.x, 0, p.z);
   k.groups.now.add(holder);
   b.dead = dead; b.tree = tree; b.canopy = canopy; tree.visible = false;
   // 어제에서 보이는 '오늘의 나무' 윤곽 (심었을 때)

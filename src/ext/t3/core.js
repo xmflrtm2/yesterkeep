@@ -168,6 +168,7 @@ EXT.on('roomLoad', (room, k) => {
   for (const m of MECHS) { if (m.load) m.load(C.d[m.id], k, room); if (m.count && m.count(C.d[m.id])) C.has = true; }
   if (C.cells.size) C.has = true;
   HUDX.spring = null; wasFalling = false;
+  if (solverMod && solverMod.resetStuck) solverMod.resetStuck();
   if (C.has && (C.fails[room.id] || 0) >= 2) showTip();
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
   drawUi();
@@ -181,10 +182,10 @@ EXT.on('update', (dt, k) => {
   if (f && !wasFalling) addFail();
   wasFalling = f;
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
-  // 막다른 길 알아채기: 1초마다 (보이는 상태에서 출구까지 갈 길이 하나도 없으면 R 안내)
+  // 막다른 길 알아채기 (보이는 상태에서 출구까지 갈 길이 하나도 없으면 R 안내)
   C.stuckT -= dt;
   if (C.stuckT <= 0 && solverMod && !busy()) {
-    C.stuckT = 1.0;
+    C.stuckT = 0.4; // 풀이기는 세상이 바뀔 때만 다시 계산한다(solver.js signature) — 자주 물어도 싸다
     const v = solverMod.stuckCheck();
     if (v === true && !C.stuck) { C.stuck = true; k.toast($t('길이 막혔어요 — R을 눌러 이 방을 다시 시작하세요'), 3.2); addFail(); }
     else if (v === false) C.stuck = false;

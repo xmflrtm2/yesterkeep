@@ -5,7 +5,7 @@
 //  X      봉인 문 (오늘 그리드). 가장 가까운 수정이 켜져 있으면 열림
 // 달빛은 벽·막힌 칸(나무 줄기, 바닥 위 썩은 상자, 잠긴 문)에 막히고, 창살 | 과 시간 문 G 사이로는 지나간다.
 // 어제에서는 '오늘 이렇게 빛이 지나갈 것'을 옅은 윤곽으로 미리 보여 준다.
-import { mech, put, both, mat, gmat, lmat, mesh, group, glow, ghostObj, cpos, nearest, markDirty, toastOnce } from './core.js';
+import { at, mech, put, both, mat, gmat, lmat, mesh, group, glow, ghostObj, cpos, nearest, markDirty, toastOnce } from './core.js';
 import { S3 } from './sfx3.js';
 
 const T = 2;
@@ -107,7 +107,8 @@ function turn(m, d, k) {
 // 달빛 다시 따라가기 → 수정 켜짐·문 열림이 바뀌면 소리·윤곽, 선분이 바뀌면 다시 그림
 function relight(d, k, first) {
   if (!d.windows.length) { for (const s of d.seals) s.lit = false; return; }
-  const blocks = (i, j) => { const c = k.ch('now', i, j); if (c === '|' || c === 'G') return false; if (c === '#') return true; return k.solid('now', i, j); };
+  // 달빛은 창살·시간 문 사이로 지나가고, 낮은 화단은 넘어간다(심어서 나무가 서 있으면 막힘)
+  const blocks = (i, j) => { const c = k.ch('now', i, j); if (c === '|' || c === 'G') return false; if (c === '#') return true; const x = at('now', i, j); if (x && x.k === 'bed') return x.b.planted; return k.solid('now', i, j); };
   const r = trace(d, m => m.o, blocks);
   let changed = false;
   for (const s of d.seals) {
