@@ -1,7 +1,7 @@
 // English. Keys are the Korean text passed to $t() / N() / shown in the HTML; a missing key falls back to Korean.
 (window.I18N = window.I18N || {})['en'] = {
 "어제의 성채": "Yesterkeep",
-"WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift/L 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악": "WASD Move · J/Click Stab · Space Roll · Shift/L Time shift · E Interact · R Restart room · M Music",
+"WASD 이동 · J/클릭 찌르기 · Space 구르기 · Shift/L 시대 전환 · E 상호작용 · R 방 다시 시작 · M 음악 · Esc 멈춤": "WASD Move · J/Click Stab · Space Roll · Shift/L Time shift · E Interact · R Restart room · M Music · Esc Pause",
 "클릭해서 시작": "Click to start",
 "일시정지": "Paused",
 "클릭하거나 아무 키나 누르면 계속": "Click or press any key to continue",
@@ -104,6 +104,7 @@
 "어딘가에서 문이 열렸어요": "Somewhere, a door swings open",
 "문이 닫혔어요": "The door closed",
 "E 레버 당기기": "E Pull the lever",
+"E 레버 되돌리기 (문이 닫혀요)": "E Push the lever back (closes the door)",
 "E 레버 (녹슮)": "E Lever (rusted)",
 "걸린 시간 {0}분 {1}초": "Time {0} min {1} s",
 "시대 전환 {0}번": "Shifts: {0}",

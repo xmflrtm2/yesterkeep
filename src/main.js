@@ -9,6 +9,7 @@ import { LOOKS, RIG_URL, EXTRA_ANIMS_URL, DAGGER_URL, loadLook, assemble, prepCl
 import { loadGolem, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK } from './golem.js';
 import { music } from './music.js';
 import { fx as FX } from './fx.js'; // 타격감 이펙트 (지역 변수 fx와 겹치지 않게 FX)
+import { makeSfx } from './audio.js'; // 효과음 (11/13)
 
 const HERO_LOOK = 'rogueF', GUARD_LOOK = 'guardM'; // 플레이어 / 경비병 외형 (hero.js LOOKS)
 const CHAR = { rig: null, clips: null, dagger: null, hero: null, guard: null, golem: null }; // 불러 둔 캐릭터 재료 (golem은 첫 방 뒤 백그라운드)
@@ -159,8 +160,47 @@ function deathFx(b) {
 }
 // 매 프레임: 알갱이·파편 + 성채지기 몸의 빛(예비동작이면 차오르고, 찔리면 번쩍) + 2페이즈 불씨
 let fxLit = [];
+const cellPos = (i, j) => ({ x: i * T + 1, z: j * T + 1 }); // 칸 가운데 (효과음 위치)
+// 발소리: 걸은 거리로 센다. 오늘은 자갈 먼지가 살짝 인다
+function stepTick(dist) {
+  S.stepAcc = (S.stepAcc || 0) + dist;
+  if (S.stepAcc < 1.25) return;
+  S.stepAcc = 0;
+  sfx.step(S.era);
+  if (S.era === 'now') FX.dust(S.p.x, 0.05, S.p.z, { n: 2, speed: 0.6, up: 0.3, size: 0.32, alpha: 0.28, color: FXC.now.dust, life: 0.6 });
+}
+// 분위기: 횃불 불씨·타닥 소리, 공기 중에 떠다니는 먼지(어제 = 금빛 티끌, 오늘 = 천천히 떨어지는 재), 열린 출구의 빛, 조각 반짝임,
+//         골렘·성채지기가 걸을 때 쿵 소리와 먼지
+const heavyWalk = new Map();
+function ambientTick(dt) {
+  if (S.trans || !lightSpecs) return;
+  let near = null, nd = 25;
+  for (const L of lightSpecs[S.era] || []) {
+    if (!L.flick) continue;
+    const d = (L.x - S.p.x) ** 2 + (L.z - S.p.z) ** 2;
+    if (d > 110) continue;
+    if (Math.random() < dt * 2.6) FX.motes(L.x + (Math.random() - 0.5) * 0.2, L.y + 0.1, L.z + (Math.random() - 0.5) * 0.2, { n: 1, color: ['#ffb347', '#ff7a2a', '#ffd27a'], speed: 0.25, up: 0.9, life: 1.5, size: 0.08, spread: 0.06 });
+    if (d < nd) { nd = d; near = L; }
+  }
+  if (near && Math.random() < dt * 2.2) sfx.crackle({ x: near.x, z: near.z });
+  if (Math.random() < dt * 5) {
+    const x = S.p.x + (Math.random() - 0.5) * 18, z = S.p.z + (Math.random() - 0.5) * 12 - 1;
+    if (S.era === 'past') FX.motes(x, 0.6 + Math.random() * 2.2, z, { n: 1, color: ['#ffe2a0', '#fff4d0'], speed: 0.12, up: 0.08, life: 5, size: 0.06, alpha: 0.55, g: -0.02, drag: 0.4 });
+    else FX.motes(x, 1.5 + Math.random() * 2.5, z, { n: 1, color: ['#c8d4e4', '#9fb0c8'], speed: 0.1, up: -0.15, life: 6, size: 0.06, alpha: 0.5, g: 0.02, drag: 0.4 });
+  }
+  if (!enemies().some(g => g.alive) && !S.bossPending) for (const e of dyn.exits || []) if (Math.random() < dt * 4) FX.motes(e.position.x, 0.3, e.position.z, { n: 1, color: FXC[S.era].glow, speed: 0.3, up: 1.6, life: 1.4, size: 0.1, spread: 0.5 });
+  for (const s of shards) if (!s.got && s.era === S.era && Math.random() < dt * 1.5) FX.motes(s.i * T + 1, 1.0, s.j * T + 1, { n: 1, color: ['#ffe9a8', '#ffffff'], speed: 0.4, up: 0.6, life: 0.8, size: 0.08, spread: 0.25 });
+  for (const g of enemies()) {
+    if (g.kind === 'guard' || !g.alive || g.era !== S.era || g.fall) { heavyWalk.delete(g); continue; }
+    const w = heavyWalk.get(g) || { x: g.x, z: g.z, acc: 0 };
+    w.acc += Math.hypot(g.x - w.x, g.z - w.z); w.x = g.x; w.z = g.z;
+    const stride = g.kind === 'boss' ? 1.7 : 1.3;
+    if (w.acc > stride) { w.acc = 0; const big = g.kind === 'boss' ? 1.2 : 0.7; sfx.heavyStep({ x: g.x, z: g.z }, big); FX.dust(g.x, 0.1, g.z, { n: 4, speed: 1, up: 0.4, size: 0.5, alpha: 0.4, color: FXC[g.era].dust }); if (g.kind === 'boss') S.shake = Math.max(S.shake, 0.06); }
+    heavyWalk.set(g, w);
+  }
+}
 function fxTick(dt) {
-  FX.update(dt);
+  FX.update(dt); ambientTick(dt);
   for (const m of fxLit) m.emissiveIntensity = m.userData.e0; // 지난 프레임에 밝힌 재질을 되돌린다 (골렘 재질을 같이 쓰므로 남겨 두면 안 됨)
   fxLit = [];
   const b = bosses[0];
@@ -171,51 +211,10 @@ function fxTick(dt) {
   if (add > 0.01) for (const o of b.parts) { const m = o.material; if (m.userData.e0 == null) m.userData.e0 = m.emissiveIntensity; m.emissiveIntensity = m.userData.e0 + add; fxLit.push(m); }
   if (b.p2 && b.era === S.era && !b.fall && Math.random() < dt * 26) FX.motes(b.x + (Math.random() - 0.5) * 1.3, 0.5 + Math.random() * 2, b.z + (Math.random() - 0.5) * 1.3, { n: 1, color: ['#ff6a3a', '#ffb060'], speed: 0.4, up: 1.8, life: 1.1, size: 0.12 });
 }
-function noiseBuf(a, sec) { const b = a.createBuffer(1, Math.floor(a.sampleRate * sec), a.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
-const sfx = {
-  tone(f0, f1, sec, type = 'sine', vol = 0.2, delay = 0) {
-    const a = ac(); if (!a) return;
-    const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
-    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + sec);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
-    o.connect(g).connect(a.destination); o.start(t); o.stop(t + sec + 0.05);
-  },
-  noise(sec, f0, f1, vol = 0.2, q = 1.2) {
-    const a = ac(); if (!a) return;
-    const t = a.currentTime, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
-    s.buffer = noiseBuf(a, sec); f.type = 'bandpass'; f.Q.value = q;
-    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + sec);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
-    s.connect(f).connect(g).connect(a.destination); s.start(t);
-  },
-  shift(to) {
-    if (to === 'past') { this.noise(0.5, 600, 4000, 0.18); this.tone(523, 784, 0.5, 'triangle', 0.08); this.tone(784, 1046, 0.6, 'sine', 0.05, 0.08); }
-    else { this.noise(0.5, 3000, 400, 0.18); this.tone(392, 262, 0.55, 'triangle', 0.08); this.tone(196, 131, 0.6, 'sine', 0.06, 0.06); }
-  },
-  thunk() { this.tone(140, 50, 0.22, 'sine', 0.35); this.noise(0.12, 300, 120, 0.25, 0.8); },
-  lever() { this.tone(900, 500, 0.06, 'square', 0.05); this.tone(320, 180, 0.12, 'triangle', 0.12, 0.05); },
-  door() { this.noise(0.9, 250, 600, 0.12, 4); this.tone(110, 90, 0.8, 'sawtooth', 0.025); },
-  fall() { this.tone(500, 80, 0.7, 'triangle', 0.12); },
-  roll() { this.noise(0.22, 900, 300, 0.08); },
-  hurt() { this.tone(330, 110, 0.25, 'square', 0.08); this.noise(0.15, 2000, 500, 0.15); },
-  swish() { this.noise(0.14, 1800, 5000, 0.12, 2); },
-  kill() { this.noise(0.18, 600, 200, 0.25, 1.5); this.tone(180, 60, 0.3, 'sine', 0.3); this.tone(880, 1320, 0.25, 'triangle', 0.05, 0.08); },
-  clang() { this.tone(1400, 900, 0.18, 'square', 0.06); this.tone(2100, 1500, 0.22, 'triangle', 0.05); },
-  alarm() { this.tone(660, 660, 0.12, 'square', 0.07); this.tone(880, 880, 0.14, 'square', 0.07, 0.14); this.tone(660, 660, 0.12, 'square', 0.07, 0.3); },
-  windup() { this.noise(0.35, 300, 1200, 0.07, 1); },
-  slam() { this.tone(90, 40, 0.4, 'sine', 0.4); this.noise(0.3, 400, 80, 0.3, 0.7); },
-  crumble() { this.noise(0.7, 900, 120, 0.3, 0.8); this.tone(120, 50, 0.5, 'sine', 0.25); },
-  rewind() { this.noise(0.6, 4000, 300, 0.12, 1.5); this.tone(880, 220, 0.6, 'sine', 0.06, 0.05); this.tone(660, 165, 0.6, 'triangle', 0.04, 0.1); },
-  scrape() { this.noise(0.25, 200, 450, 0.2, 3); this.tone(70, 55, 0.2, 'sine', 0.15); },
-  exit() { this.tone(523, 1046, 0.4, 'triangle', 0.07); this.tone(659, 1318, 0.5, 'sine', 0.05, 0.1); },
-  // 성채지기
-  wake() { this.tone(70, 42, 1.3, 'sawtooth', 0.09); this.noise(1.1, 260, 70, 0.3, 0.7); this.tone(55, 35, 1.4, 'sine', 0.35, 0.1); },
-  arrive(to) { if (to === 'past') { this.tone(784, 523, 0.35, 'triangle', 0.07); } else { this.tone(523, 262, 0.35, 'triangle', 0.07); } this.tone(110, 45, 0.45, 'sine', 0.4); this.noise(0.35, 500, 90, 0.25, 0.8); },
-  charge() { this.noise(0.6, 150, 900, 0.14, 1.2); this.tone(60, 120, 0.6, 'sawtooth', 0.05); },
-  dash() { this.noise(0.45, 900, 180, 0.3, 0.9); this.tone(130, 55, 0.4, 'sine', 0.3); },
-  crack() { this.tone(240, 80, 0.3, 'square', 0.06); this.noise(0.35, 3200, 500, 0.22, 1.5); },
-  bossFall() { this.tone(320, 40, 1.3, 'triangle', 0.16); this.noise(0.9, 700, 90, 0.25, 0.8); },
-};
+// 효과음은 src/audio.js (여러 겹 · 칠 때마다 조금씩 다름 · 소리 난 자리의 좌우·거리). 이름은 예전과 같고 pos({x,z})를 주면 거리 반영
+// 소리 길은 첫 입력(키·클릭)이 ac()로 연 뒤에만 쓴다 — 그 전에 만들면 브라우저가 "자동 재생 막음" 경고를 쏟아냄 (발소리·횃불이 매초 부름)
+const sfx = makeSfx(() => AC, () => ({ x: S.p.x, z: S.p.z }));
+window.__sfx = sfx; window.__makeSfx = makeSfx; // 시험용 (tools/sfx_check.py가 소리마다 세기를 잰다)
 
 /* ───────── 조각(GLB) 불러오기 ───────── */
 const BASE = 'assets/fab/Fantastic_Dungeon_Pack/meshes/';
@@ -1012,6 +1011,7 @@ function loadRoom(idx) {
   S.roomHurt = 0;
   if (room.boss) S.hearts = 5;
   music.setSong(room.boss ? 'boss' : 'keep');
+  if (S.lastRoomId !== room.id) { S.lastRoomId = room.id; if (AC) sfx.room(); } // 새 방에 들어설 때 낮은 울림 (다시 시작할 땐 안 울림)
   // 시작 위치
   let si = 1, sj = 1;
   for (let j = 0; j < S.H; j++) for (let i = 0; i < S.W; i++) if (G[room.startEra][j][i] === '@') { si = i; sj = j; }
@@ -1165,6 +1165,7 @@ addEventListener('keydown', e => {
   if (code === 'KeyJ' || code === 'KeyF') stab();
   if (code === 'KeyR' && S.ready && !S.trans && !S.ended) { restartRoom(false); toast($t('방을 처음부터')); }
   if (code === 'KeyM') toast(music.toggle() ? $t('음악 켬') : $t('음악 끔'), 1.2);
+  if ((code === 'Escape' || code === 'KeyP') && !S.hold) setHold('paused'); // 일시정지 (11/13 직접 플레이: 창 밖을 누르는 것 말고는 멈출 길이 없었다)
 });
 addEventListener('pointerdown', e => { if (e.button === 0 && e.target === renderer.domElement) { ac(); stab(); } });
 addEventListener('keyup', e => keys.delete(codeOf(e)));
@@ -1270,6 +1271,8 @@ function respawnSafe() {
   if (pick.era !== S.era) { if (S.ring) finishRing(); setEraInstant(pick.era); }
   S.safeHist = S.safeHist.filter(h => h.t <= pick.t); // 돌아간 뒤의 기록은 버린다
   S.invuln = 1.2;
+  // 돌아갈 곳이 깨어 있는 적 곁뿐이면(가만히 서 있다 들킨 경우) 그 적이 잠깐 멈칫한다 — 되감자마자 또 찔려 하트가 4초 만에 다 빠지던 일 (11/13 직접 플레이)
+  for (const g of enemies()) if (g.alive && g.era === S.era && g.kind !== 'boss' && Math.hypot(g.x - S.p.x, g.z - S.p.z) < 3.0) { g.stun = Math.max(g.stun || 0, 1.2); g.wind = 0; } // 경비는 stun이 처음엔 없다(undefined → NaN 주의)
 }
 /* 쓰러짐 → 되감기 → 직전 자리에서 다시. 그동안 세상은 멈춘다(적·함정·시계 모두). 하트가 다 떨어지면 방 처음부터 */
 const DOWN = { fadeIn: 0.35, move: 0.6, end: 1.15 };
@@ -1324,6 +1327,7 @@ function updatePlayer(dt) {
     }
   }
   S.p.x += vx * dt; S.p.z += vz * dt;
+  if (S.roll <= 0 && !S.trans) stepTick(Math.hypot(vx, vz) * dt); // 발소리
   resolve();
   if (S.era === 'past' && S.roll <= 0 && crates.length) tryPushCrate(ix, iz, dt);
   else {
@@ -1385,9 +1389,14 @@ function tryPushCrate(ix, iz, dt) {
   const tc = ch('past', ti, tj);
   const blocked = tc === '#' || solid('past', ti, tj) || 'GDpL>'.includes(tc) || shards.some(s => !s.got && s.era === 'past' && s.i === ti && s.j === tj);
   if (blocked) { sfx.thunk(); if (toastT <= 0) toast($t('그쪽으로는 안 밀려요')); S.pushT = -0.5; return; }
+  const from = cellPos(cr.i, cr.j);
   cr.i = ti; cr.j = tj; cr.moving = 0.2;
-  if (tc === '_' || (tc === '=' && false)) { cr.sunk = true; toast($t('상자가 구덩이를 메웠어요')); }
-  sfx.scrape();
+  if (tc === '_' || (tc === '=' && false)) {
+    cr.sunk = true; toast($t('상자가 구덩이를 메웠어요'));
+    const p = cellPos(ti, tj); sfx.crateSink(p); FX.dust(p.x, 0.2, p.z, { n: 22, color: FXC.past.dust, speed: 2.5, up: 2, size: 0.7 }); FX.debris(p.x, 0.3, p.z, { n: 8, color: ['#8a6a44', '#6e5234'], up: 3 }); FX.punch(0.25);
+  }
+  sfx.scrape(from);
+  FX.dust(from.x, 0.1, from.z, { n: 6, color: FXC.past.dust, speed: 1.2, up: 0.4, size: 0.5, alpha: 0.45, dir: [-ax[0], -ax[1]] }); // 끌린 자리 먼지
   buildGhosts();
 }
 function placeCrate(cr, instant) {
@@ -1435,14 +1444,23 @@ function stepArrows(E, dt, warm) {
   for (const l of launchers) {
     if (l.era !== E) continue;
     l.t += dt;
-    while (l.t >= ARROW.interval) { l.t -= ARROW.interval; spawnArrow(l, l.t * ARROW.speed); }
+    while (l.t >= ARROW.interval) {
+      l.t -= ARROW.interval; spawnArrow(l, l.t * ARROW.speed);
+      if (!warm && E === S.era) { const x = l.i * T + 1 + l.dx * 1.1, z = l.j * T + 1 + l.dz * 1.1; sfx.arrowFire({ x, z }); FX.dust(x, 1.1, z, { n: 3, speed: 0.8, up: 0.2, size: 0.35, alpha: 0.35, color: FXC[E].dust, dir: [l.dx, l.dz] }); }
+    }
   }
   for (let k = arrows.length - 1; k >= 0; k--) {
     const a = arrows[k];
     if (a.era !== E) continue;
     a.x += a.dx * ARROW.speed * dt; a.z += a.dz * ARROW.speed * dt;
     let gone = solid(E, cellOf(a.x + a.dx * 0.3), cellOf(a.z + a.dz * 0.3));
+    const wall = gone;
     if (!gone && !warm && S.era === E && S.falling <= 0 && Math.abs(a.x - S.p.x) < PR + 0.12 && Math.abs(a.z - S.p.z) < PR + 0.12 && hurt($t('화살에 맞았어요'))) gone = true;
+    if (gone && wall && !warm && E === S.era) { // 벽에 박힘: 불꽃 · 나무 부스러기
+      sfx.arrowHit({ x: a.x, z: a.z });
+      FX.sparks(a.x, 1.1, a.z, { n: 6, color: FXC[E].spark, speed: 3, up: 2, size: 0.14, dir: [-a.dx, -a.dz], cone: 1.2 });
+      FX.debris(a.x, 1.1, a.z, { n: 2, color: ['#8a6a44', '#6e5234'], speed: 1.5, up: 2, size: 0.06 });
+    }
     if (gone) { a.mesh.parent && a.mesh.parent.remove(a.mesh); if (a.ghost) a.ghost.parent && a.ghost.parent.remove(a.ghost); arrows.splice(k, 1); continue; }
     a.mesh.position.set(a.x, 1.1, a.z);
   }
@@ -1453,7 +1471,9 @@ function stepRaft(r, dt) {
   if (r.wait > 0) r.wait -= dt;
   else {
     r.pos += r.dir * RAFT.speed * dt;
-    if (r.pos >= r.b) { r.pos = r.b; r.dir = -1; r.wait = RAFT.pause; } else if (r.pos <= r.a) { r.pos = r.a; r.dir = 1; r.wait = RAFT.pause; }
+    let turned = false;
+    if (r.pos >= r.b) { r.pos = r.b; r.dir = -1; r.wait = RAFT.pause; turned = true; } else if (r.pos <= r.a) { r.pos = r.a; r.dir = 1; r.wait = RAFT.pause; turned = true; }
+    if (turned && r.era === S.era) { const x = r.axis === 'x' ? r.pos : r.fixed, z = r.axis === 'z' ? r.pos : r.fixed; sfx.raftCreak({ x, z }); FX.dust(x, 0.2, z, { n: 5, speed: 1, up: 0.8, size: 0.45, alpha: 0.4, color: FXC[r.era].dust }); } // 선로 끝에서 삐걱
   }
   r.x = r.axis === 'x' ? r.pos : r.fixed; r.z = r.axis === 'z' ? r.pos : r.fixed;
   if (S.era === r.era && S.falling <= 0 && Math.abs(S.p.x - px) < 1 && Math.abs(S.p.z - pz) < 1) { S.p.x += r.x - px; S.p.z += r.z - pz; resolve(); }
@@ -1503,6 +1523,12 @@ function updateActors() {
     if (bl.strip) { const low = 1 - Math.min(1, Math.max(0, (Math.abs(th) - 0.3) / 0.5)); bl.strip.material.opacity = 0.08 + 0.55 * low * low; }
     if (bl.ghost) { if (bl.axis === 'x') bl.ghost.rotation.z = th; else bl.ghost.rotation.x = th; bl.ghost.visible = bl.era !== S.era && !S.ring && nearP(bl.i * T + 1, bl.j * T + 1); }
     if (S.era === bl.era && !S.trans && S.falling <= 0 && bladeHits(bl)) hurt($t('칼날에 베였어요'));
+    // 칼날이 가장 낮은 곳을 지날 때: 바람 소리 + 바닥 먼지 (그 시대에 있고 가까울 때만)
+    if (bl.lastTh != null && Math.sign(th) !== Math.sign(bl.lastTh) && bl.era === S.era && !S.trans) {
+      const p = cellPos(bl.i, bl.j);
+      if (nearP(p.x, p.z, 10)) { sfx.bladeSwish(p); FX.dust(p.x, 0.1, p.z, { n: 3, speed: 1.6, up: 0.3, size: 0.4, alpha: 0.3, color: FXC[bl.era].dust, dir: bl.axis === 'x' ? [Math.sign(th) || 1, 0] : [0, Math.sign(th) || 1] }); }
+    }
+    bl.lastTh = th;
   }
   for (const a of arrows) if (a.ghost) { a.ghost.position.set(a.x, 1.1, a.z); a.ghost.visible = a.era !== S.era && !S.ring && nearP(a.x, a.z); }
 }
@@ -1526,17 +1552,37 @@ function updateMech(dt) {
   // 발판: 밟고 있는 동안 문 시간을 가득 채운다
   for (const pl of plates) {
     const on = !busy && S.era === pl.era && ci === pl.i && cj === pl.j;
-    if (on && S.gateT < gateHold() - 0.05) { if (S.gateT <= 0) { sfx.lever(); sfx.door(); toast($t('어딘가에서 창살이 내려갔어요')); } S.gateT = gateHold(); }
+    if (on && S.gateT < gateHold() - 0.05) {
+      if (S.gateT <= 0) { const p = cellPos(pl.i, pl.j); sfx.plate(p); FX.dustRing(p.x, p.z, 0.6, { n: 10, color: FXC[pl.era].dust, speed: 1.6, alpha: 0.4 }); toast($t('어딘가에서 창살이 내려갔어요')); }
+      S.gateT = gateHold();
+    }
     if (pl.mesh) pl.mesh.position.y += ((S.gateT > 0 ? -0.05 : 0.02) - pl.mesh.position.y) * Math.min(1, dt * 12);
   }
   // 문: 창살이 바닥 속으로 내려간다. 닫힐 때 문 칸에 서 있으면 밀려난다(resolve)
   for (const g of gates) {
     g.a += ((S.gateT > 0 ? 1 : 0) - g.a) * Math.min(1, dt * 10);
     if (g.bars) g.bars.position.y = -3.05 * g.a;
+    // 창살이 내려가고 올라오는 순간: 사슬 소리 · 먼지 · 쇠 불꽃
+    const open = S.gateT > 0;
+    if (g.open != null && open !== g.open) {
+      const p = cellPos(g.i, g.j);
+      if (open) sfx.gateOpen(p); else sfx.gateClose(p);
+      if (g.era === S.era) { FX.dust(p.x, 0.2, p.z, { n: 10, color: FXC[g.era].dust, speed: 1.4, up: 1, size: 0.55 }); if (!open) FX.sparks(p.x, 0.4, p.z, { n: 6, color: FXC[g.era].spark, speed: 3, up: 2, size: 0.13 }); }
+    }
+    g.open = open;
   }
   // 가시: 어제의 시간에서만 움직인다
+  let spikeSnd = 0; // 한 프레임에 가시 소리는 둘까지 (가시 방은 여러 개가 같이 솟는다)
   for (const sp of spikes) {
     const st = spikeState(sp);
+    if (sp.last && st !== sp.last && sp.era === S.era && !S.trans) {
+      const p = cellPos(sp.i, sp.j);
+      if (nearP(p.x, p.z, 11)) {
+        if (st === 'up') { if (spikeSnd++ < 2) sfx.spikeUp(p); FX.dust(p.x, 0.1, p.z, { n: 4, color: FXC.past.dust, speed: 1.2, up: 1.2, size: 0.4, alpha: 0.4 }); FX.sparks(p.x, 0.5, p.z, { n: 3, color: FXC.past.spark, speed: 1.5, up: 3, size: 0.1 }); }
+        else if (st === 'warn' && spikeSnd++ < 2) sfx.spikeWarn(p);
+      }
+    }
+    sp.last = st;
     const ty = st === 'up' ? 0 : st === 'warn' ? -0.48 : -0.72;
     sp.vy += (ty - sp.vy) * Math.min(1, dt * (st === 'up' ? 30 : 10));
     if (sp.mesh) sp.mesh.position.y = sp.vy;
@@ -1553,7 +1599,9 @@ function updateMech(dt) {
     s.mesh.position.y = 0.9 + Math.sin(S.time * 2.4 + s.i) * 0.08;
     if (!busy && S.era === s.era && ci === s.i && cj === s.j) {
       s.got = true; S.got.add(shardId(S.room, s)); s.mesh.visible = false;
-      sfx.exit(); toast($t('모래시계 조각 {0} / {1}', S.got.size, SHARD_TOTAL)); drawHearts();
+      const p = cellPos(s.i, s.j); sfx.shard(p);
+      FX.motes(p.x, 0.9, p.z, { n: 30, color: ['#ffe9a8', '#ffffff', FXC[s.era].glow[0]], speed: 2.4, up: 2.4, life: 1.0, size: 0.13, spread: 0.2 }); FX.flash(p.x, 1.2, p.z, '#ffe9b0', 3); FX.punch(0.15);
+      toast($t('모래시계 조각 {0} / {1}', S.got.size, SHARD_TOTAL)); drawHearts();
     }
   }
   // 다른 시대에 멈춰 있는 장치를 윤곽으로: 열린 문 = 청록, 솟은 가시 = 빨강, 곧 솟을 가시 = 주황
@@ -1635,7 +1683,10 @@ function interact() {
       if (door && overlapCell(door.i, door.j)) { toast($t('문 사이에 서 있어요')); return 'blocked'; }
     }
     S.lever = want; S.doorOpen = want;
-    sfx.lever(); setTimeout(() => sfx.door(), 120);
+    const door = findChar('D'), dp = door ? cellPos(door.i, door.j) : null;
+    sfx.lever({ x: it.x, z: it.z }); setTimeout(() => sfx.door(dp), 120);
+    FX.sparks(it.x, 1.0, it.z, { n: 8, color: FXC.past.spark, speed: 2.5, up: 2.5, size: 0.12 });
+    if (dp) setTimeout(() => FX.dust(dp.x, 2.6, dp.z, { n: 14, color: FXC[S.era].dust, speed: 0.8, up: -0.5, size: 0.55, g: 3, life: 1.3 }), 200); // 문틀에서 먼지가 떨어짐
     toast(want ? $t('어딘가에서 문이 열렸어요') : $t('문이 닫혔어요'));
     buildGhosts();
     return want ? 'opened' : 'closed';
@@ -1787,7 +1838,7 @@ function alertGuard(g, cause) {
   if (!g.alive) return;
   if (g.state !== 'alert') {
     g.state = 'alert'; g.sus = 1; g.lost = 0; g.replan = 0;
-    if (!S.alarmed) { S.alarmed = true; S.alarms++; roomFail(); sfx.alarm(); toast($t('들켰어요! 오늘로 피하세요')); }
+    if (!S.alarmed) { S.alarmed = true; S.alarms++; roomFail(); sfx.alarm({ x: g.x, z: g.z }); toast($t('들켰어요! 오늘로 피하세요')); }
     // 가까운 동료도 소리를 듣는다
     for (const o of guards) if (o !== g && o.alive && o.state !== 'alert' && Math.hypot(o.x - g.x, o.z - g.z) < GUARD.hear) { o.sus = 0.99; o.state = 'alert'; o.lost = 0; }
   }
@@ -1803,7 +1854,8 @@ function stepGuard(g, dt) {
     if (seen) {
       const rate = THREE.MathUtils.lerp(GUARD.susNear, GUARD.susFar, Math.min(1, dist / GUARD.range));
       g.sus = Math.min(1, g.sus + rate * dt);
-    } else g.sus = Math.max(0, g.sus - 0.35 * dt);
+      if (g.sus >= 0.25 && !g.hmm) { g.hmm = true; sfx.hmm({ x: g.x, z: g.z }); } // "흠?" — 의심이 차기 시작
+    } else { g.sus = Math.max(0, g.sus - 0.35 * dt); if (g.sus <= 0) g.hmm = false; }
     if (g.sus >= 1) alertGuard(g, 'seen');
   }
   if (g.state === 'alert') {
@@ -1822,7 +1874,7 @@ function stepGuard(g, dt) {
   } else if (g.rec > 0) g.rec -= dt;
   else if (g.state === 'alert') {
     // 찌를 수 있는 거리면 바로 예비동작 (멈추는 거리 1.3보다 길게 — 서로 노려보기만 하는 일이 없게)
-    if (here && dist < GUARD.reach - 0.15) { g.wind = GUARD.windup; g.anim.once('AS_Combo_Attack_02_01_Seq', { speed: 1.5, dur: GUARD.windup + GUARD.recover }); sfx.windup(); }
+    if (here && dist < GUARD.reach - 0.15) { g.wind = GUARD.windup; g.anim.once('AS_Combo_Attack_02_01_Seq', { speed: 1.5, dur: GUARD.windup + GUARD.recover }); sfx.windup({ x: g.x, z: g.z }); }
     else {
       g.replan -= dt;
       if (g.replan <= 0) { g.replan = 0.3; g.step = nextStep(g, cellOf(S.p.x), cellOf(S.p.z)); }
@@ -1856,7 +1908,7 @@ function killGuard(g, how) {
   g.anim.once(how === 'back' ? 'AS_Knock_Down_Death_F_Seq' : 'AS_Hit_Death_Seq', { speed: 1.3, hold: true });
   g.mark.visible = false; g.cone.visible = false;
   S.kills++; S.hitstop = 0.1; S.shake = 0.25;
-  sfx.kill();
+  sfx.kill({ x: g.x, z: g.z });
   FX.sparks(g.x, 1.2, g.z, { n: 12, color: FXC[g.era].spark }); FX.dust(g.x, 0.2, g.z, { n: 8, color: FXC[g.era].dust }); FX.punch(0.25);
   toast(how === 'back' ? $t('등 뒤에서 한 방') : $t('전환 기습!'), 1.2);
   // 어제 쓰러진 자리에 오늘은 해골이 남는다
@@ -1904,7 +1956,7 @@ function resolveStab() {
     wakeBoss(tgt);
     if (tgt.daze <= 0 && tgt.stagger <= 0 && tgt.wind <= 0 && tgt.rec <= 0 && !tgt.charge && tgt.stun <= 0) startSlam(tgt);
     S.p.x += tx / td * 1.1; S.p.z += tz / td * 1.1; resolve();
-    sfx.clang(); S.shake = 0.2; clangFx(tgt.x, tgt.z);
+    sfx.clang({ x: tgt.x, z: tgt.z }); S.shake = 0.2; clangFx(tgt.x, tgt.z);
     toast($t('돌이 단단해요 — 등 뒤를 노리세요'), 1.2);
     return 'blocked';
   }
@@ -1915,7 +1967,7 @@ function resolveStab() {
     // 골렘: 앞이 단단해서 튕겨 나가고, 곧바로 내려찍기로 받아친다
     alertGolem(tgt); tgt.rec = 0; tgt.wind = GOLEM.windup * 0.8; tgt.yaw = Math.atan2(tx, tz);
     S.p.x += tx / td * 1.1; S.p.z += tz / td * 1.1; resolve();
-    sfx.clang(); S.shake = 0.2; clangFx(tgt.x, tgt.z);
+    sfx.clang({ x: tgt.x, z: tgt.z }); S.shake = 0.2; clangFx(tgt.x, tgt.z);
     toast($t('돌이 단단해요 — 등 뒤를 노리세요'), 1.2);
     return 'blocked';
   }
@@ -1923,7 +1975,7 @@ function resolveStab() {
   tgt.anim.once('AS_Parry_L_Seq', { speed: 1.4, dur: 0.45 });
   alertGuard(tgt, 'parry'); tgt.rec = 0.45; tgt.yaw = Math.atan2(tx, tz);
   S.p.x += tx / td * 0.9; S.p.z += tz / td * 0.9; resolve();
-  sfx.clang(); S.shake = 0.15; clangFx(tgt.x, tgt.z);
+  sfx.clang({ x: tgt.x, z: tgt.z }); S.shake = 0.15; clangFx(tgt.x, tgt.z);
   toast($t('막혔어요 — 등 뒤를 노리세요'), 1.2);
   return 'blocked';
 }
@@ -2052,7 +2104,7 @@ function golemSees(g) {
 function alertGolem(g) {
   if (!g.alive || g.state === 'alert') return;
   g.state = 'alert'; g.sus = 1; g.lost = 0; g.replan = 0;
-  if (!S.alarmed) { S.alarmed = true; S.alarms++; roomFail(); sfx.alarm(); toast($t('골렘이 깨어났어요! 어제로 피하세요')); }
+  if (!S.alarmed) { S.alarmed = true; S.alarms++; roomFail(); sfx.alarm({ x: g.x, z: g.z }); toast($t('골렘이 깨어났어요! 어제로 피하세요')); }
 }
 // 모델 동작: 대기 / 걷기 / 추격. 내려찍기는 attack4의 내려찍는 순간(1.55초)이 예비동작 끝에 오게 중간부터 빠르게
 function animGolem(g, dt, mode) {
@@ -2111,12 +2163,12 @@ function stepGolem(g, dt) {
     turnTo(g, S.p.x, S.p.z, dt, 1.5);
     g.wind -= dt; poseGolem(g, dt, 'wind');
     if (g.wind <= 0) {
-      g.rec = GOLEM.recover; S.shake = Math.max(S.shake, 0.22); sfx.slam();
+      g.rec = GOLEM.recover; S.shake = Math.max(S.shake, 0.22); sfx.slam({ x: g.x, z: g.z }); impactFx(g.x, g.z, g.era, 1.4, 0.7);
       if (here && dist < GOLEM.slamR) hurt($t('골렘에게 맞았어요'));
     }
   } else if (g.rec > 0) { g.rec -= dt; poseGolem(g, dt, 'slam'); }
   else if (g.state === 'alert') {
-    if (here && dist < GOLEM.attackAt) { g.wind = GOLEM.windup; sfx.windup(); }
+    if (here && dist < GOLEM.attackAt) { g.wind = GOLEM.windup; sfx.windup({ x: g.x, z: g.z }); }
     else {
       g.replan -= dt;
       if (g.replan <= 0) { g.replan = 0.35; g.step = nextStep(g, cellOf(S.p.x), cellOf(S.p.z)); }
@@ -2142,7 +2194,7 @@ function stepGolem(g, dt) {
 function killGolem(g, how) {
   g.alive = false; g.wind = 0; g.rec = 0; g.mark.visible = false;
   S.kills++; S.hitstop = 0.12; S.shake = 0.35;
-  sfx.crumble(); toast(how === 'back' ? $t('등 뒤에서 무너뜨렸어요') : $t('전환 기습!'), 1.2);
+  sfx.crumble({ x: g.x, z: g.z }); toast(how === 'back' ? $t('등 뒤에서 무너뜨렸어요') : $t('전환 기습!'), 1.2);
   impactFx(g.x, g.z, g.era, 1.2, 0.8);
   if (g.anim) {
     // 등 뒤면 앞으로 엎어지고, 기습이면 뒤로 넘어간다. 마지막 자세로 오늘에만 남는다
@@ -2878,7 +2930,8 @@ function update(dt) {
   // HUD
   hud.cd.style.width = (100 * (1 - S.shiftCd / SHIFT_CD)) + '%';
   const it = !S.trans && S.falling <= 0 ? nearestInteract() : null;
-  if (it) { hud.prompt.style.display = 'block'; hud.prompt.textContent = S.era === 'past' ? $t('E 레버 당기기') : $t('E 레버 (녹슮)'); } else hud.prompt.style.display = 'none';
+  // 레버는 켜고 끄는 것이라, 당긴 뒤에는 "되돌리기"로 보여 준다 (당긴 뒤에도 "당기기"라 다시 눌러 문을 닫을 수 있었다 — 11/13 직접 플레이)
+  if (it) { hud.prompt.style.display = 'block'; hud.prompt.textContent = S.era === 'past' ? (S.lever ? $t('E 레버 되돌리기 (문이 닫혀요)') : $t('E 레버 당기기')) : $t('E 레버 (녹슮)'); } else hud.prompt.style.display = 'none';
   if (flashA > 0) { flashA = Math.max(0, flashA - dt * 0.8); hud.flash.style.opacity = flashA; }
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) hud.toast.style.opacity = 0; }
   if (titleT > 0) { titleT -= dt; if (titleT <= 0) hud.title.style.opacity = 0; }
