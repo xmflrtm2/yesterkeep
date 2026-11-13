@@ -65,7 +65,8 @@ EXT.foes['t2-echo'] = {
       if (f.stun > 0) { f.stun -= dt; } // 시간 충격: 잠깐 멈칫
       if (f.h == null) f.h = trail.length ? trail[0].t : S.time;
       // 나오기 전: 방에 들어온 뒤 delay초(이 시대 시간)를 기다린다
-      if (!f.out) { f.wait = (f.wait || 0) + dt; if (f.wait < C.delay) { place(); return; } f.out = true; S2.echoHum({ x: f.x, z: f.z }); K.FX.motes(f.x, 0.6, f.z, { n: 18, color: ['#9ff4ff', '#ffffff'], speed: 1.5, up: 1.6, life: 0.8 }); }
+      if (!f.out) { f.wait = (f.wait || 0) + dt; if (f.wait < C.delay) { place(); return; } f.out = true; f.outT = 0; S2.echoHum({ x: f.x, z: f.z }); K.FX.motes(f.x, 0.6, f.z, { n: 18, color: ['#9ff4ff', '#ffffff'], speed: 1.5, up: 1.6, life: 0.8 }); }
+      f.outT += dt;
       if (f.stun <= 0) {
         const lag = S.time - f.h, rate = 1 + Math.min(C.catchUp, Math.max(0, (lag - C.delay - 0.4) / 2.5));
         f.h = Math.min(f.h + rate * dt, S.time - C.delay);
@@ -77,7 +78,7 @@ EXT.foes['t2-echo'] = {
       if (mv > 0.002) turnToYaw(f, Math.atan2(f.x - px, f.z - pz), dt, 14);
       if (f.ani) { if (f.moving > 0.8) f.ani.loop('AS_Run_Loop_F_0_Seq', 0.15, Math.max(0.7, f.moving / 5.2)); else f.ani.loop('AS_Idle_Seq', 0.25); }
       // 닿으면 아프다 → 메아리는 내 길 위로 조금 물러난다
-      if (here(f) && pdist(f) < C.touch && S.invuln <= 0 && K.hurt(K.$t('메아리에 닿았어요 — 내가 지나온 길을 따라와요'))) f.h -= C.knock;
+      if (f.outT > ECHO.emerge && here(f) && pdist(f) < C.touch && S.invuln <= 0 && K.hurt(K.$t('메아리에 닿았어요 — 내가 지나온 길을 따라와요'))) f.h -= C.knock;
       // 발판을 밟아 준다 (그 시대의 p 칸)
       const ci = cellOf(f.x), cj = cellOf(f.z);
       if (K.ch(f.era, ci, cj) === 'p') {
@@ -93,10 +94,13 @@ EXT.foes['t2-echo'] = {
       // 적을 만들 때는 아직 지난 방 자리라서, 나오기 전엔 늘 이 방의 시작 자리(발자취 처음)에 둔다
       if (!f.out && trail.length) { f.x = trail[0].x; f.z = trail[0].z; f.gate.position.set(f.x, 0.08, f.z); place(); }
       f.holder.visible = f.alive && f.out;
+      if (f.out && echoMat) { const k = Math.min(1, (f.outT || 0) / ECHO.emerge); (elite ? echoMat.e : echoMat.n).opacity = 0.15 + 0.4 * k; }
       f.ghost.visible = f.alive && away && ringPassed(f.x, f.z) && f.out;
       if (!f.ani) { f.ghost.position.copy(f.holder.position); f.ghost.rotation.copy(f.holder.rotation); }
+      // 나올 자리 고리: 이 시대 시간으로 delay초 동안 안쪽으로 줄어든다(다 줄면 나옴)
       f.gate.visible = f.alive && !f.out;
-      f.gate.material.opacity = 0.25 + 0.2 * Math.sin(K.S.time * 4);
+      f.gate.scale.setScalar(Math.max(0.15, 1 - (f.wait || 0) / C.delay));
+      f.gate.material.opacity = 0.35 + 0.2 * Math.sin(K.S.time * 4);
       f.gate.material.depthTest = !away;
       if (f.alive && f.out && !away) { f.mist -= dt; if (f.mist <= 0) { f.mist = 0.12; K.FX.motes(f.x, 0.9, f.z, { n: 2, color: elite ? ['#ffd28a'] : ['#9ff4ff'], speed: 0.4, up: 0.6, life: 0.6, size: 0.12 }); } }
     };

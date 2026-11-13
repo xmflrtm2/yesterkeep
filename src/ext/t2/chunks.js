@@ -523,7 +523,7 @@ const ZOO = {
   start: [2, 10], exit: [22, 1],
   foes: [
     { kind: 't2-hound', era: 'past', at: [10, 2], face: -90 },
-    { kind: 't2-shield', at: [16, 5], face: 180 },
+    { kind: 't2-shield', at: [16, 4], face: 90 },
     { kind: 't2-xbow', at: [22, 4], face: -90 },
     { kind: 't2-mage', at: [20, 10], face: -90, blink: [[14, 7], [22, 12], [14, 12], [22, 7]] },
     { kind: 't2-mimic', at: [5, 6], face: 0 },
@@ -534,8 +534,10 @@ const ZOO = {
 };
 
 for (const c of C) EXT.chunks.push(c);
-const room = (id, c, extra) => { EXT.rooms[id] = EXT.chunkRoom(c, Object.assign({ id, label: N('T2 시험') }, extra)); };
+// main.js는 label을 번역 없이 그대로 쓴다 → 등록할 때 지금 언어로 바꿔 둔다
+const L = k => (typeof $t === 'function' ? $t(k) : k);
+const room = (id, c, extra) => { EXT.rooms[id] = EXT.chunkRoom(c, Object.assign({ id, label: L('T2 시험') }, extra)); };
 for (const c of C) room(c.id, c);                    // 조각 id 그대로도 열린다 (?room=t2-hound-pit)
 for (const c of C) if (c.kind) room('t2-' + c.kind, c); // 종류별 시험 방 (?room=t2-hound …)
-EXT.rooms['t2-zoo'] = EXT.chunkRoom(ZOO, { id: 't2-zoo', label: N('T2 시험') });
+EXT.rooms['t2-zoo'] = EXT.chunkRoom(ZOO, { id: 't2-zoo', label: L('T2 시험') });
 export const T2_CHUNKS = C;
