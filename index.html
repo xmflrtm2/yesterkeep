@@ -121,6 +121,7 @@ function i18nDom(root) {
   #endCard button { margin-top: 6px; font: inherit; padding: 8px 22px; border-radius: 8px; border: 1px solid #ffffff55; background: #ffffff14; color: inherit; cursor: pointer; }
   #endCard .credits { margin-top: 6px; font-size: 12px; line-height: 1.5; opacity: .6; }
   /* 시작·멈춤 카드 (main.js setHold): itch 임베드는 한 번 클릭해야 키가 들어온다 / 창 밖을 누르면 멈춤 */
+  #ext { position: fixed; inset: 0; pointer-events: none; } #ext > * { pointer-events: auto; }
   #holdCard { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box;
     background: #000b; text-align: center; cursor: pointer; pointer-events: auto; text-wrap: balance; }
   #holdCard.on { display: flex; }
@@ -150,6 +151,7 @@ function i18nDom(root) {
 <div id="down"><div class="glyph">⟲</div><div class="txt"><span data-t>시간을 되감는 중…</span></div></div>
 <div id="fade"></div>
 <div id="loading"><div><span data-t>불러오는 중…</span></div><div class="bar"><i></i></div></div>
+<div id="ext"></div><!-- 확장 슬롯 화면(고르기 창·지도·상점 등). 각 트랙은 이 안에 자기 요소를 만들고, CSS는 자기 JS에서 <style>로 넣는다 -->
 <div id="holdCard"><div>
   <div class="t start"><span data-t>클릭해서 시작</span></div>
   <div class="t paused"><span data-t>일시정지</span></div>

@@ -184,7 +184,7 @@ class Play:
                         if 'id' in m and m['id'] in self.c.pending:
                             self.c.pending.pop(m['id']).set_result(m)
                         elif m.get('method') == 'Runtime.exceptionThrown':
-                            self.errors.append(m['params']['exceptionDetails'].get('text', '')[:300])
+                            d = m['params']['exceptionDetails']; self.errors.append((d.get('text', '') + ' ' + (d.get('exception') or {}).get('description', '') + ' @' + str(d.get('url', '')) + ':' + str(d.get('lineNumber', '')))[:600])
                 pt = asyncio.ensure_future(pump())
                 await self.c.call('Runtime.enable'); await self.c.call('Page.enable')
                 await self.c.call('Emulation.setDeviceMetricsOverride', width=960, height=600, deviceScaleFactor=1, mobile=False)

@@ -10,6 +10,8 @@ import { loadGolem, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK } from './golem.js'
 import { music } from './music.js';
 import { fx as FX } from './fx.js'; // 타격감 이펙트 (지역 변수 fx와 겹치지 않게 FX)
 import { makeSfx } from './audio.js'; // 효과음 (11/13)
+import { EXT } from './ext.js'; // 확장 슬롯 (11/13 로그라이크 병렬 작업 바탕)
+import './ext/index.js';
 
 const HERO_LOOK = 'rogueF', GUARD_LOOK = 'guardM'; // 플레이어 / 경비병 외형 (hero.js LOOKS)
 const CHAR = { rig: null, clips: null, dagger: null, hero: null, guard: null, golem: null }; // 불러 둔 캐릭터 재료 (golem은 첫 방 뒤 백그라운드)
@@ -23,6 +25,8 @@ const PR = 0.36;             // 플레이어 반지름
 const SPEED = 5.2;
 const ROLL_T = 0.34, ROLL_SPEED = 11, ROLL_CD = 0.8, ROLL_INV = 0.3;
 const SHIFT_CD = 0.5, RING_SPEED = 30;
+// 플레이어 능력치: 아이템(EXT 슬롯)이 바꿀 수 있게 한곳에. 위 상수는 기본값
+const STAT = Object.assign(EXT.stats, { speed: SPEED, maxHearts: 5, shiftCd: SHIFT_CD, rollCd: ROLL_CD, rollInv: ROLL_INV, lunge: 3.0, invuln: 1.2 });
 const GHOST_RANGE = 6;
 const CAM_PITCH = THREE.MathUtils.degToRad(55), CAM_DIST = 16; // 기획 14m → 800×600 화면에서 방이 너무 좁게 보여 16m
 const ERAS = ['past', 'now'];
@@ -82,7 +86,7 @@ const hud = { hearts: $('hearts'), eraName: document.querySelector('#era .name')
 let toastT = 0, titleT = 0;
 function toast(msg, sec = 1.8) { hud.toast.textContent = msg; hud.toast.style.opacity = 1; toastT = sec; }
 function drawHearts() {
-  let s = ''; for (let i = 0; i < 5; i++) s += `<span class="${i < S.hearts ? '' : 'off'}" style="color:#ff5d6c">♥</span>`; hud.hearts.innerHTML = s;
+  let s = ''; for (let i = 0; i < STAT.maxHearts; i++) s +=`<span class="${i < S.hearts ? '' : 'off'}" style="color:#ff5d6c">♥</span>`; hud.hearts.innerHTML = s;
   hud.shards.textContent = SHARD_TOTAL ? `⌛ ${S.got.size} / ${SHARD_TOTAL}` : '';
 }
 function drawEra() {
@@ -188,7 +192,7 @@ function ambientTick(dt) {
     if (S.era === 'past') FX.motes(x, 0.6 + Math.random() * 2.2, z, { n: 1, color: ['#ffe2a0', '#fff4d0'], speed: 0.12, up: 0.08, life: 5, size: 0.06, alpha: 0.55, g: -0.02, drag: 0.4 });
     else FX.motes(x, 1.5 + Math.random() * 2.5, z, { n: 1, color: ['#c8d4e4', '#9fb0c8'], speed: 0.1, up: -0.15, life: 6, size: 0.06, alpha: 0.5, g: 0.02, drag: 0.4 });
   }
-  if (!enemies().some(g => g.alive) && !S.bossPending) for (const e of dyn.exits || []) if (Math.random() < dt * 4) FX.motes(e.position.x, 0.3, e.position.z, { n: 1, color: FXC[S.era].glow, speed: 0.3, up: 1.6, life: 1.4, size: 0.1, spread: 0.5 });
+  if (!enemies().some(g => g.alive && !g.optional) && !S.bossPending) for (const e of dyn.exits || []) if (Math.random() < dt * 4) FX.motes(e.position.x, 0.3, e.position.z, { n: 1, color: FXC[S.era].glow, speed: 0.3, up: 1.6, life: 1.4, size: 0.1, spread: 0.5 });
   for (const s of shards) if (!s.got && s.era === S.era && Math.random() < dt * 1.5) FX.motes(s.i * T + 1, 1.0, s.j * T + 1, { n: 1, color: ['#ffe9a8', '#ffffff'], speed: 0.4, up: 0.6, life: 0.8, size: 0.08, spread: 0.25 });
   for (const g of enemies()) {
     if (g.kind === 'guard' || !g.alive || g.era !== S.era || g.fall) { heavyWalk.delete(g); continue; }
@@ -342,6 +346,7 @@ function solid(era, i, j) {
   if (c === 'D') return !S.doorOpen;
   if (c === 'G') return !(S.gateT > 0);
   if (SOLID_CH.has(c)) return true;
+  if (EXT.solidAt.length) for (const f of EXT.solidAt) { const r = f(era, i, j, c); if (r !== undefined) return r; } // 확장 장치
   // 상자: 어제는 그 칸을 막는다(구덩이에 빠졌으면 바닥). 오늘의 썩은 상자는 바닥 위면 막고, 구덩이 위면 발판
   const cr = crates.length ? crateAt(i, j) : null;
   if (cr && !cr.sunk) return era === 'past' ? true : c !== '_';
@@ -350,6 +355,7 @@ function solid(era, i, j) {
 function floorAt(era, i, j) {
   const c = ch(era, i, j);
   if (c === '#') return false;
+  if (EXT.floorAt.length) for (const f of EXT.floorAt) { const r = f(era, i, j, c); if (r !== undefined) return r; } // 확장 장치(자라난 다리 등)
   if (c === '_') { const cr = crates.length ? crateAt(i, j) : null; return !!cr && (era === 'now' || cr.sunk); }
   return true;
 }
@@ -927,8 +933,10 @@ scene.add(player, blob);
 
 /* ───────── 방 불러오기 ───────── */
 function loadRoom(idx) {
-  idx = ((idx % ROOMS.length) + ROOMS.length) % ROOMS.length;
-  const room = ROOMS[idx];
+  // 번호(ROOMS) 또는 방 데이터 그대로(EXT: 절차 생성·시험 방). 데이터면 roomIdx = ROOMS 안 자리, 없으면 -1
+  let room;
+  if (idx && typeof idx === 'object') { room = idx; idx = ROOMS.indexOf(room); }
+  else { idx = ((idx % ROOMS.length) + ROOMS.length) % ROOMS.length; room = ROOMS[idx]; }
   S.roomIdx = idx; S.room = room;
   S.H = room.past.length; S.W = room.past[0].length;
   for (const E of ERAS) {
@@ -956,6 +964,7 @@ function loadRoom(idx) {
     else if (c === 'A') { G[E][j][i] = '#'; launchers.push({ era: E, i, j, t: room.arrowPhase ? room.arrowPhase(i, j) : j * 0.4, dx: 0, dz: 0 }); }
     else if (c === 'Y') { G[E][j][i] = '.'; blades.push({ era: E, i, j, t: room.bladePhase ? room.bladePhase(i, j) : 0, axis: 'x' }); }
     else if (c === 'M' || c === 'm') { G[E][j][i] = '_'; (trackCells[E] = trackCells[E] || new Set()).add(i + ',' + j); if (c === 'M') rafts.push({ era: E, i, j }); }
+    else if (EXT.chars[c]) { const r = EXT.chars[c](E, i, j, room, EXT.K); G[E][j][i] = r || '.'; } // 확장 장치 글자
   }
   // 화살 발사구는 트인 쪽으로 쏜다 / 칼날은 복도를 가로질러 흔들린다 / 뗏목은 이어진 선로를 왕복
   for (const l of launchers) {
@@ -1008,8 +1017,10 @@ function loadRoom(idx) {
   spawnGuards(room);
   spawnGolems(room);
   spawnBoss(room);
+  extFoes = [];
+  for (const def of room.foes || []) { const F = EXT.foes[def.kind]; if (F) { const f = F.spawn(def, EXT.K); if (f) addFoe(f); } else console.warn('[EXT] unknown foe kind', def.kind); }
   S.roomHurt = 0;
-  if (room.boss) S.hearts = 5;
+  if (room.boss) S.hearts = STAT.maxHearts;
   music.setSong(room.boss ? 'boss' : 'keep');
   if (S.lastRoomId !== room.id) { S.lastRoomId = room.id; if (AC) sfx.room(); } // 새 방에 들어설 때 낮은 울림 (다시 시작할 땐 안 울림)
   // 시작 위치
@@ -1027,11 +1038,12 @@ function loadRoom(idx) {
   camOff.set(0, Math.sin(CAM_PITCH) * cd, Math.cos(CAM_PITCH) * cd);
   scene.fog.near = 18 + cd - CAM_DIST; scene.fog.far = 44 + cd - CAM_DIST;
   S.roomTime = 0;
-  hud.title.innerHTML = `${$t(room.name)}<small>${idx + 1} / ${ROOMS.length}</small>`;
+  hud.title.innerHTML = `${$t(room.name)}<small>${room.label != null ? room.label : `${idx + 1} / ${ROOMS.length}`}</small>`;
   hud.title.style.opacity = 1; titleT = 2.6;
-  hud.hint.textContent = $t(room.hint); hud.hint.classList.remove('tip');
+  hud.hint.textContent = room.hint ? $t(room.hint) : ''; hud.hint.classList.remove('tip');
   toastT = 0; hud.toast.style.opacity = 0;
   drawHearts();
+  EXT.emit('roomLoad', room, EXT.K);
   return room.id;
 }
 function setEraInstant(e) {
@@ -1066,7 +1078,7 @@ function tryShift() {
     return 'blocked';
   }
   startRing(S.era, to);
-  S.era = to; S.shiftCd = SHIFT_CD; S.shifts++;
+  S.era = to; S.shiftCd = STAT.shiftCd; S.shifts++;
   S.shiftStrike = 0.6; // 전환 기습: 다른 시대로 넘어온 직후 0.6초 (어제의 경비, 오늘의 골렘 모두)
   // 시간 충격: 나타난 자리 3m(GUARD.shock) 안의 경비는 0.6초 얼어붙는다 (그 사이에 찌르면 앞에서도 한 방)
   for (const g of enemies()) if (g.alive && g.era === to && g.kind !== 'boss' && Math.hypot(g.x - S.p.x, g.z - S.p.z) < GUARD.shock) { g.stun = 0.6; if (g.anim) g.anim.once('AS_Hit_F_Seq', { speed: 1.2, dur: 0.6 }); }
@@ -1074,6 +1086,7 @@ function tryShift() {
   music.setEra(to); // 떠난 시대의 노래는 그 박자에 멈추고, 이 시대의 노래가 멈췄던 자리에서 이어진다
   FX.motes(S.p.x, 0.4, S.p.z, { n: 22, color: FXC[to].glow, speed: 2.6, up: 1.6, life: 0.9, spread: 0.4 }); // 넘어온 시대 빛 알갱이
   screenFlash(to === 'past' ? '#ffd27a' : '#7fe8ff', 0.1);
+  EXT.emit('shift', other(to), to, EXT.K);
   return stand(to, cellOf(S.p.x), cellOf(S.p.z)) || onRaft() ? 'ok' : 'fall';
 }
 function startRing(from, to) {
@@ -1203,7 +1216,7 @@ function startRoll() {
   if (!S.ready || S.rollCd > 0 || S.falling > 0 || S.trans || S.ended || S.down) return false;
   const [x, z] = inputDir();
   if (x || z) S.rollDir.set(x, 0, z); else S.rollDir.set(Math.sin(S.face), 0, Math.cos(S.face));
-  S.roll = ROLL_T; S.rollCd = ROLL_CD; S.invuln = Math.max(S.invuln, ROLL_INV);
+  S.roll = ROLL_T; S.rollCd = STAT.rollCd; S.invuln = Math.max(S.invuln, STAT.rollInv);
   S.face = Math.atan2(S.rollDir.x, S.rollDir.z);
   if (heroAnim) { const c = CHAR.clips.AS_Roll_F_0_Seq; heroAnim.once('AS_Roll_F_0_Seq', { speed: c ? c.duration / (ROLL_T + 0.25) : 1, dur: ROLL_T + 0.05 }); }
   sfx.roll();
@@ -1270,7 +1283,7 @@ function respawnSafe() {
   S.p.set(at.x, 0, at.z); S.py = 0; S.vel.set(0, 0, 0);
   if (pick.era !== S.era) { if (S.ring) finishRing(); setEraInstant(pick.era); }
   S.safeHist = S.safeHist.filter(h => h.t <= pick.t); // 돌아간 뒤의 기록은 버린다
-  S.invuln = 1.2;
+  S.invuln = STAT.invuln;
   // 돌아갈 곳이 깨어 있는 적 곁뿐이면(가만히 서 있다 들킨 경우) 그 적이 잠깐 멈칫한다 — 되감자마자 또 찔려 하트가 4초 만에 다 빠지던 일 (11/13 직접 플레이)
   for (const g of enemies()) if (g.alive && g.era === S.era && g.kind !== 'boss' && Math.hypot(g.x - S.p.x, g.z - S.p.z) < 3.0) { g.stun = Math.max(g.stun || 0, 1.2); g.wind = 0; } // 경비는 stun이 처음엔 없다(undefined → NaN 주의)
 }
@@ -1315,7 +1328,7 @@ function updatePlayer(dt) {
     vx = S.rollDir.x * ROLL_SPEED; vz = S.rollDir.z * ROLL_SPEED;
     S.vel.set(vx * 0.45, 0, vz * 0.45);
   } else {
-    const k = 1 - Math.exp(-dt * 16), sp = S.stabT > 0 ? SPEED * 0.2 : SPEED; // 찌르는 동안은 거의 멈춤
+    const k = 1 - Math.exp(-dt * 16), sp = S.stabT > 0 ? STAT.speed * 0.2 : STAT.speed; // 찌르는 동안은 거의 멈춤
     S.vel.x += (ix * sp - S.vel.x) * k; S.vel.z += (iz * sp - S.vel.z) * k;
     vx = S.vel.x; vz = S.vel.z;
     // 찌르는 동안(0.4초)은 몸 방향을 고정한다 — 판정은 누르고 0.12초 뒤라, 찌르자마자 빠지려고 방향키를 누르면
@@ -1343,18 +1356,21 @@ function updatePlayer(dt) {
   else if (safeCell(S.era, ci, cj)) { S.lastSafe = { i: ci, j: cj }; noteSafe(); }
 }
 function restartRoom(dead) {
-  if (dead) { S.hearts = 5; toast($t('처음부터 다시')); }
-  loadRoom(S.roomIdx);
+  if (dead) { S.hearts = STAT.maxHearts; toast($t('처음부터 다시')); }
+  if (dead && EXT.ask('death', S.room) !== undefined) return S.room.id; // 런 모드: 죽으면 런이 끝남 (그 슬롯이 처리)
+  loadRoom(S.roomIdx >= 0 ? S.roomIdx : S.room);
   return S.room.id;
 }
 function hurt(msg) {
   if (S.invuln > 0 || S.falling > 0 || S.trans || S.down) return false;
+  if (EXT.ask('beforeHurt', msg) === false) return false; // 방패 유물 등
   S.hearts--; S.hurts++; S.roomHurt++; roomFail();
   sfx.hurt(); screenFlash('#ff3b30', 0.3); S.shake = 0.25; S.hitstop = 0.12;
   FX.sparks(S.p.x, 1.0, S.p.z, { n: 14, color: ['#ff6a6a', '#ffd0d0'], speed: 4, up: 3 }); FX.punch(0.3);
   if (msg) toast(msg);
   drawHearts();
   startDown('hurt');
+  EXT.emit('hurt', msg, EXT.K);
   return true;
 }
 
@@ -1673,6 +1689,7 @@ function nearestInteract() {
 }
 function interact() {
   if (!S.ready || S.falling > 0 || S.trans || S.ended) return 'busy';
+  const er = EXT.ask('interact'); if (er !== undefined) return er; // 확장 장치·상자·제단
   const it = nearestInteract();
   if (!it) return 'none';
   if (it.type === 'lever') {
@@ -1915,11 +1932,13 @@ function killGuard(g, how) {
   const bones = makeMesh('bonePile', 'now'); bones.position.set(g.x, 0, g.z); bones.rotation.y = g.yaw; groups.now.add(bones);
   // 다른 경비가 쓰러지는 걸 보면 바로 경보
   for (const o of guards) if (o.alive && o.state !== 'alert' && canSee(o, g.x, g.z)) alertGuard(o, 'body');
-  if (!enemies().some(o => o.alive)) roomCleared();
+  EXT.emit('kill', g, how, EXT.K);
+  if (!enemies().some(o => o.alive && !o.optional)) roomCleared();
 }
 // 방의 적을 다 쓰러뜨림. 출구 앞에 닫힌 창살이 있으면 "출구가 열렸어요" 대신 발판으로 열라고 알리고, 힌트도 발판 요령으로 바꾼다
 // (11/12: 초소에서 "열렸다"는데 창살이 닫혀 있어 버그처럼 보였다)
 function roomCleared() {
+  EXT.emit('cleared', S.room, EXT.K);
   const gated = gates.length > 0 && S.gateT <= 0;
   toast(gated ? $t('모두 쓰러뜨렸어요 — 이제 발판으로 창살을 여세요') : $t('출구가 열렸어요'), gated ? 2.8 : 2);
   sfx.door();
@@ -1929,7 +1948,7 @@ function roomCleared() {
 function stab() {
   if (!S.ready || S.stabT > 0 || S.falling > 0 || S.roll > 0 || S.trans || S.ended || S.down) return 'busy';
   // 가까운 경비 쪽으로 몸을 돌려 준다(탑다운에서 조준 보조)
-  let best = null, bd = GUARD.lunge;
+  let best = null, bd = STAT.lunge;
   for (const g of enemies()) if (g.alive && g.era === S.era && !g.fall) { const d = Math.hypot(g.x - S.p.x, g.z - S.p.z); if (d < bd) { bd = d; best = g; } }
   if (best) S.face = Math.atan2(best.x - S.p.x, best.z - S.p.z);
   S.stabT = 0.4; S.stabHit = false;
@@ -1939,7 +1958,7 @@ function stab() {
 }
 function resolveStab() {
   const fx = Math.sin(S.face), fz = Math.cos(S.face);
-  let tgt = null, bd = GUARD.lunge;
+  let tgt = null, bd = STAT.lunge;
   for (const g of enemies()) {
     if (!g.alive || g.era !== S.era || g.fall) continue;
     const dx = g.x - S.p.x, dz = g.z - S.p.z, d = Math.hypot(dx, dz);
@@ -1950,6 +1969,9 @@ function resolveStab() {
   if (bd > 1.2) { const k = (bd - 1.1) / bd; S.p.x += (tgt.x - S.p.x) * k; S.p.z += (tgt.z - S.p.z) * k; resolve(); }
   const [gx, gz] = gFwd(tgt), tx = S.p.x - tgt.x, tz = S.p.z - tgt.z, td = Math.max(Math.hypot(tx, tz), 0.01);
   const behind = (tx * gx + tz * gz) / td < Math.cos(THREE.MathUtils.degToRad(110));
+  const ov = EXT.ask('stab', tgt, { behind, shift: S.shiftStrike > 0, tx, tz, td });
+  if (ov !== undefined) return ov;
+  if (tgt.ext) return tgt.onStab ? tgt.onStab({ behind, shift: S.shiftStrike > 0, tx, tz, td }) : 'miss'; // 확장 적은 스스로 판정
   if (tgt.kind === 'boss') {
     // 성채지기: 등 뒤면 1칸. 앞·옆은 튕기고(휘청이는 중이 아니면) 내려찍기로 받아친다
     if (behind) return 'boss-' + hitBoss(tgt, 'back');
@@ -2007,7 +2029,8 @@ function updateGuardsView() {
 function pushFromGuards() {
   for (const g of enemies()) {
     if (!g.alive || g.era !== S.era || g.fall) continue;
-    const dx = S.p.x - g.x, dz = S.p.z - g.z, d = Math.hypot(dx, dz), m = PR + (g.kind === 'boss' ? BOSS.r : g.kind === 'golem' ? GOLEM.r : GUARD.r);
+    if (g.ext && g.solidBody === false) continue; // 몸이 없는 확장 적(유령 등)
+    const dx = S.p.x - g.x, dz = S.p.z - g.z, d = Math.hypot(dx, dz), m = PR + (g.ext ? g.r : g.kind === 'boss' ? BOSS.r : g.kind === 'golem' ? GOLEM.r : GUARD.r);
     if (d < m && d > 1e-4) { S.p.x = g.x + dx / d * m; S.p.z = g.z + dz / d * m; }
   }
 }
@@ -2020,7 +2043,23 @@ function pushFromGuards() {
 // slamR 2.4: 앞에서 찔러 튕겨 나간 자리(2.2m)도 닿는다 → 가만히 있으면 맞고, 구르거나 시대를 바꾸면 피한다
 const GOLEM = { walk: 1.1, run: 2.6, turn: 3.2, r: 0.6, sense: 4.5, susNear: 1.6, susFar: 0.7, windup: 0.85, recover: 0.9, slamR: 2.4, attackAt: 1.9, lose: 6 };
 let golems = [], bosses = [];
-const enemies = () => guards.concat(golems, bosses);
+const enemies = () => guards.concat(golems, bosses, extFoes);
+// 확장 적(EXT.foes): 그 시대에 있을 때만 update, view는 매 프레임(extView). 약속은 src/ext.js의 FOE 주석
+let extFoes = [];
+function addFoe(f) {
+  f.ext = true; f.alive = f.alive ?? true; f.stun = f.stun || 0; f.r = f.r || 0.45; f.state = f.state || 'patrol';
+  extFoes.push(f);
+  if (f.update) entities.push({ era: f.era === 'both' ? 'both' : f.era, t: 0, update(dt) { if (f.alive || f.updateDead) f.update(dt); } });
+  return f;
+}
+function extView(dt) { for (const f of extFoes) if (f.view) try { f.view(dt); } catch (e) { console.error('[EXT view]', f.kind, e); } EXT.emit('frame', dt, EXT.K); }
+// 확장 적이 쓰러질 때 부른다: 처치 수·소리·흔들림은 적 쪽에서 원하는 만큼, 방 정리는 여기서
+function extKilled(f, how) {
+  if (!f.alive && f.counted) return;
+  f.alive = false; f.counted = true; S.kills++;
+  EXT.emit('kill', f, how, EXT.K);
+  if (!enemies().some(o => o.alive && !o.optional)) roomCleared();
+}
 const golemGhostMat = new THREE.MeshBasicMaterial({ color: '#ff5a5a', transparent: true, opacity: 0.38, depthTest: false, depthWrite: false });
 const golemEyeMat = new THREE.MeshBasicMaterial({ color: '#7fe8ff' });
 const senseRingGeo = new THREE.RingGeometry(GOLEM.sense - 0.08, GOLEM.sense, 80);
@@ -2212,7 +2251,8 @@ function killGolem(g, how) {
   }
   }
   for (const o of enemies()) if (o !== g && o.alive && o.era === g.era && o.state !== 'alert' && o.kind === 'golem' && Math.hypot(o.x - g.x, o.z - g.z) < GOLEM.sense) alertGolem(o);
-  if (!enemies().some(o => o.alive)) roomCleared();
+  EXT.emit('kill', g, how, EXT.K);
+  if (!enemies().some(o => o.alive && !o.optional)) roomCleared();
 }
 function stepCrumble(g, dt) {
   if (!g.crumble) return;
@@ -2759,6 +2799,7 @@ function hitBoss(b, how) {
 }
 function killBoss(b, how) {
   b.alive = false; b.daze = 0; b.stagger = 0; b.shockArm = false;
+  EXT.emit('kill', b, how, EXT.K);
   bossCalm(b); clearRocks();
   S.kills++; S.hitstop = 0.3; S.shake = 0.7;
   deathFx(b);
@@ -2834,13 +2875,15 @@ function roomStars() {
 function updateExit() {
   if (S.trans || S.falling > 0) return;
   if (ch(S.era, cellOf(S.p.x), cellOf(S.p.z)) === '>') {
-    if (S.bossPending || enemies().some(g => g.alive)) { if (toastT <= 0) toast($t('적이 남아 있어요')); return; }
+    if (S.bossPending || enemies().some(g => g.alive && !g.optional)) { if (toastT <= 0) toast($t('적이 남아 있어요')); return; }
+    if (EXT.ask('canExit', S.room) === false) return; // 확장 퍼즐이 아직 안 풀림 (안내는 그 슬롯이)
     sfx.exit();
     // 기록: 이 방에서 어제에 머문 시간과 별
     const st = roomStars(), best = loadBest(), id = S.room.id, prev = best[id];
     if (!prev || S.pastTime < prev.t || st > prev.stars) { best[id] = { t: +S.pastTime.toFixed(2), stars: Math.max(st, prev ? prev.stars : 0) }; try { localStorage.setItem('yk-best', JSON.stringify(best)); } catch (e) { /* 이번만 */ } }
     S.runPast += S.pastTime; S.runStars += st; S.runAlarms = (S.runAlarms || 0) + S.alarms;
     if (S.room.par != null || enemies().length) toast($t('어제 {0}초', S.pastTime.toFixed(1)) + '  ' + '★'.repeat(st) + '☆'.repeat(3 - st), 2.4);
+    EXT.emit('exit', S.room, EXT.K);
     S.trans = { t: 0, next: S.roomIdx + 1 };
   }
 }
@@ -2850,8 +2893,9 @@ function updateTrans(dt) {
   tr.t += dt;
   if (!tr.loaded && tr.t >= 0.4) {
     tr.loaded = true;
-    if (tr.next >= ROOMS.length) { showEnd(); S.trans = null; hud.fade.style.opacity = 0; return; }
-    loadRoom(tr.next);
+    const nx = EXT.ask('nextRoom', tr.next); // 런 모드가 다음 방(데이터)을 고르거나 'end'
+    if (nx === 'end' || (nx === undefined && (tr.next >= ROOMS.length || tr.next <= 0))) { showEnd(); S.trans = null; hud.fade.style.opacity = 0; return; }
+    loadRoom(nx !== undefined ? nx : tr.next);
   }
   hud.fade.style.opacity = tr.t < 0.4 ? tr.t / 0.4 : Math.max(0, 1 - (tr.t - 0.4) / 0.4);
   if (tr.t >= 0.8) { S.trans = null; hud.fade.style.opacity = 0; }
@@ -2866,10 +2910,11 @@ function showEnd() {
     + `<div class="small">${$t('걸린 시간 {0}분 {1}초', m, s)} · ${$t('시대 전환 {0}번', S.shifts)} · ${$t('쓰러뜨린 적 {0}', S.kills)}<br>`
     + `${$t('모래시계 조각 {0} / {1}', S.got.size, SHARD_TOTAL)} · ${$t('추락 {0}번', S.falls)} · ${$t('함정 {0}번', S.hurts)}</div>`;
   hud.end.style.display = 'flex';
+  EXT.emit('end', EXT.K);
 }
 $('endRestart').addEventListener('click', () => {
   hud.end.style.display = 'none';
-  S.ended = false; S.hearts = 5; S.shifts = 0; S.falls = 0; S.blocked = 0; S.time = 0; S.hurts = 0; S.got.clear(); S.kills = 0; S.runPast = 0; S.runStars = 0; S.runAlarms = 0;
+  S.ended = false; S.hearts = STAT.maxHearts; S.shifts = 0; S.falls = 0; S.blocked = 0; S.time = 0; S.hurts = 0; S.got.clear(); S.kills = 0; S.runPast = 0; S.runStars = 0; S.runAlarms = 0;
   loadRoom(0);
 });
 
@@ -2891,7 +2936,7 @@ function update(dt) {
     stepDown(dt); animatePlayer(dt); drawPlayer(dt);
     camTarget.lerp(_v.set(S.p.x, 0, S.p.z), 1 - Math.exp(-dt * 5));
     camera.position.copy(camTarget).add(camOff); camera.lookAt(camTarget.x, 0.6, camTarget.z);
-    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt); fxTick(dt);
+    updateRing(dt); updateLights(dt); updateGuardsView(); updateGolemsView(); updateBossView(); extView(dt); musicTick(dt); fxTick(dt);
     if (toastT > 0) { toastT -= dt; if (toastT <= 0) hud.toast.style.opacity = 0; }
     if (flashA > 0) { flashA = Math.max(0, flashA - dt * 0.8); hud.flash.style.opacity = flashA; }
     return;
@@ -2910,9 +2955,10 @@ function update(dt) {
   updateTrans(dt);
   // 떠난 시대는 멈춘다: 지금 시대(또는 두 시대 공통) 엔티티만 갱신
   for (const e of entities) if (e.era === 'both' || e.era === S.era) e.update(dt, e);
+  EXT.emit('update', dt, EXT.K);
   updateRing(dt);
   updateLights(dt);
-  updateGuardsView(); updateGolemsView(); updateBossView(); musicTick(dt); fxTick(dt);
+  updateGuardsView(); updateGolemsView(); updateBossView(); extView(dt); musicTick(dt); fxTick(dt);
   hud.ptime.textContent = $t('어제 {0}초', S.pastTime.toFixed(1));
   // 카메라 (조금 늦게 따라옴). 깨어 있는 보스가 있으면 둘 사이 쪽으로 조금 당겨 둘 다 보이게
   _v.set(S.p.x, 0, S.p.z);
@@ -2928,8 +2974,10 @@ function update(dt) {
   ghostGroundMat.uniforms.uPlayer.value.set(S.p.x, 0, S.p.z);
   ghostGroundMat.uniforms.uTime.value = S.time;
   // HUD
-  hud.cd.style.width = (100 * (1 - S.shiftCd / SHIFT_CD)) + '%';
-  const it = !S.trans && S.falling <= 0 ? nearestInteract() : null;
+  hud.cd.style.width = (100 * (1 - Math.min(1, S.shiftCd / STAT.shiftCd))) + '%';
+  const ep = !S.trans && S.falling <= 0 ? EXT.ask('prompt') : undefined; // 확장 장치의 "E …" 안내가 먼저
+  const it = ep === undefined && !S.trans && S.falling <= 0 ? nearestInteract() : null;
+  if (ep !== undefined) { hud.prompt.style.display = ep ? 'block' : 'none'; if (ep) hud.prompt.textContent = ep; } else
   // 레버는 켜고 끄는 것이라, 당긴 뒤에는 "되돌리기"로 보여 준다 (당긴 뒤에도 "당기기"라 다시 눌러 문을 닫을 수 있었다 — 11/13 직접 플레이)
   if (it) { hud.prompt.style.display = 'block'; hud.prompt.textContent = S.era === 'past' ? (S.lever ? $t('E 레버 되돌리기 (문이 닫혀요)') : $t('E 레버 당기기')) : $t('E 레버 (녹슮)'); } else hud.prompt.style.display = 'none';
   if (flashA > 0) { flashA = Math.max(0, flashA - dt * 0.8); hud.flash.style.opacity = flashA; }
@@ -2955,9 +3003,10 @@ function stepSim(sec = 0.1, dt = 1 / 60) {
   render();
 }
 window.__yk = {
+  ext: EXT, // 확장 슬롯 (EXT.rooms·foes·hooks …)
   ready: () => S.ready,
   rooms: () => ROOMS.map(r => r.id),
-  room(n) { const idx = typeof n === 'string' ? ROOMS.findIndex(r => r.id === n) : n; S.ended = false; S.trans = null; S.down = null; hud.down.style.opacity = 0; hud.fade.style.opacity = 0; hud.end.style.display = 'none'; loadRoom(idx); render(); return this.state(); },
+  room(n) { const idx = typeof n === 'string' ? (EXT.rooms[n] || ROOMS.findIndex(r => r.id === n)) : n; /* EXT 방 id·방 데이터도 */ S.ended = false; S.trans = null; S.down = null; hud.down.style.opacity = 0; hud.fade.style.opacity = 0; hud.end.style.display = 'none'; loadRoom(idx); render(); return this.state(); },
   era(e) { if (e && e !== S.era) { if (S.ring) finishRing(); setEraInstant(e); render(); } return S.era; },
   shift() { const r = tryShift(); render(); return r; },
   finishRing() { finishRing(); render(); },
@@ -3026,9 +3075,21 @@ window.__yk = {
     hud.loading.firstElementChild.textContent = $t('불러오기에 실패했어요');
     return;
   }
+  // 확장 슬롯 손잡이(K). 방마다 바뀌는 것(world·entities·G 안 글자)은 getter로
+  EXT.init({
+    THREE, S, T, PR, ERAS, other, STAT, G, groups, ghosts, scene, camera, renderer, CHAR, ROOMS, GUARD, GOLEM, BOSS,
+    get world() { return world; }, get dyn() { return dyn; }, get entities() { return entities; }, get guards() { return guards; }, get golems() { return golems; }, get bosses() { return bosses; }, get extFoes() { return extFoes; },
+    get crates() { return crates; }, get interactables() { return interactables; }, get lightSpecs() { return lightSpecs; },
+    ch, solid, floorAt, stand, safeCell, isOpen, cellOf, cellPos, overlapCell, overlapSolids, nearP, SOLID_CH,
+    addEntity(e) { entities.push(e); return e; }, addFoe, killed: extKilled, enemies, roomCleared, loadRoom, restartRoom, setEraInstant, buildGhosts,
+    hurt, toast, screenFlash, drawHearts, resolve, hud, $t, sfx, music, FX, FXC, impactFx, clangFx, makeMesh, eraMaterial, eraPlain,
+    guardGhostMat, ghostRedMat, makeCone, MARK, assemble, Animator, buildGolem, GCLIP, GOLEM_LOOK, BOSS_LOOK, LOOKS,
+    freeze(on) { S.held = !!on; if (!on && S.hold === 'paused') setHold(null); }, // 고르기 창 등을 띄우는 동안 세상 멈춤
+    get ac() { return AC; },
+  });
   // ?room=heart 처럼 방 이름(또는 1부터 센 번호)을 주면 그 방에서 시작 (손으로 시험할 때)
   const want = new URLSearchParams(location.search).get('room');
-  const startIdx = want ? Math.max(0, /^\d+$/.test(want) ? +want - 1 : ROOMS.findIndex(r => r.id === want)) : 0;
+  const startIdx = want ? (EXT.rooms[want] || Math.max(0, /^\d+$/.test(want) ? +want - 1 : ROOMS.findIndex(r => r.id === want))) : (EXT.ask('startRoom') ?? 0); // EXT 시험 방·런 시작 방
   loadRoom(startIdx);
   // 셰이더를 미리 컴파일해 첫 전환 때 끊기지 않게
   for (const E of ERAS) groups[E].visible = true;
