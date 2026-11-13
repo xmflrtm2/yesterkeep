@@ -5,7 +5,7 @@
 //   망령: 한 시대(기본 오늘)에 있고 그 시대에선 거의 안 보인다(서리 알갱이·속삭임만). 다른 시대에서 보면 붉게 또렷하다.
 //         벽을 지나 다가와 닿으면 아프다. 칼은 그냥 지나간다. 그 시대로 넘어오는 순간 몸이 겹치면(푸른 원 안) 흩어진다.
 import { EXT } from '../../ext.js';
-import { T2, cellOf, C2, other, pdist, here, fromBehind, turnToYaw, decal, ringGeo, discGeo, ghostCopy, ringPassed, mat, glowMat, killFx, t2Foes, fail } from './core.js';
+import { T2, cellOf, C2, other, pdist, here, fromBehind, turnToYaw, decal, ringGeo, discGeo, ghostCopy, ringPassed, mat, glowMat, killFx, t2Foes, fail, prepared, stayHere } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -122,8 +122,8 @@ EXT.t2 = EXT.t2 || {};
 EXT.t2.pressers = era => t2Foes().filter(f => f.kind === 't2-echo' && f.alive && f.out && f.era === era).map(f => ({ x: f.x, z: f.z }));
 
 /* ───────── 망령 ───────── */
-const WRAITH = { drift: 1.15, lunge: 3.0, lungeAt: 2.4, lungeT: 0.8, touch: 0.75, killR: 1.3, recoil: 3.0, cool: 1.6 };
-const WRAITH_E = { drift: 1.5, lunge: 3.6, killR: 1.05 };
+const WRAITH = { drift: 1.15, lunge: 3.0, lungeAt: 2.4, lungeT: 0.8, touch: 0.75, killR: 1.0, recoil: 3.0, cool: 1.6, startle: 3.0 };
+const WRAITH_E = { drift: 1.5, lunge: 3.6, killR: 0.85 };
 function makeWraith(K, elite) {
   const THREE = K.THREE, g = new THREE.Group();
   const m = new THREE.MeshBasicMaterial({ color: elite ? '#ffd9a0' : '#cfe8ff', transparent: true, opacity: 0.08, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -179,9 +179,10 @@ EXT.foes['t2-wraith'] = {
       const showK = f.alive && away && ringPassed(f.x, f.z);
       f.kill.visible = f.killFill.visible = showK;
       if (showK) {
-        const inside = d < C.killR;
-        f.kill.position.set(f.x, 0.1, f.z); f.kill.scale.setScalar(C.killR); f.kill.material.opacity = inside ? 0.85 : 0.45;
-        f.killFill.position.set(f.x, 0.09, f.z); f.killFill.scale.setScalar(C.killR); f.killFill.material.opacity = inside ? 0.25 + 0.1 * Math.sin(S.time * 10) : 0.06;
+        // 고리는 이 시대에 온 지 PREP초 동안 안쪽에서부터 차오른다 → 다 차야 겹쳐 넘어올 때 흩어진다 (연타 방지가 눈에 보이게)
+        const inside = d < C.killR, arm = Math.min(1, stayHere() / T2.PREP);
+        f.kill.position.set(f.x, 0.1, f.z); f.kill.scale.setScalar(C.killR * (0.35 + 0.65 * arm)); f.kill.material.opacity = arm < 1 ? 0.3 : inside ? 0.9 : 0.5;
+        f.killFill.position.set(f.x, 0.09, f.z); f.killFill.scale.setScalar(C.killR * arm); f.killFill.material.opacity = arm < 1 ? 0.04 : inside ? 0.25 + 0.1 * Math.sin(S.time * 10) : 0.07;
       }
       // 서리 알갱이: 제 시대에서도 대충 어디 있는지는 보이게
       if (f.alive && !away) { f.mist -= dt; if (f.mist <= 0) { f.mist = 0.14; K.FX.motes(f.x + (Math.random() - 0.5) * 0.6, 0.5 + Math.random(), f.z + (Math.random() - 0.5) * 0.6, { n: 2, color: elite ? ['#ffe0b0'] : ['#bfe6ff', '#ffffff'], speed: 0.3, up: 0.4, life: 0.9, size: 0.1 }); } }
@@ -189,12 +190,12 @@ EXT.foes['t2-wraith'] = {
     f.onStab = () => 'miss';
     f.onShift = (from, to) => {
       if (!f.alive || to !== f.era) return;
-      if (pdist(f) < C.killR) {
+      if (pdist(f) < C.killR && prepared()) {
         f.alive = false; f.mk.g.visible = false; f.ghost.visible = false; f.kill.visible = f.killFill.visible = false;
         S2.disperse({ x: f.x, z: f.z }); K.FX.motes(f.x, 1.0, f.z, { n: 50, color: ['#cfe8ff', '#7fe8ff', '#ffffff'], speed: 4, up: 2.5, life: 1.2 });
         killFx(f, 'shift', { msg: K.$t('겹쳐 넘어와 망령을 흩었어요'), color: ['#cfe8ff', '#ffffff'] });
         K.killed(f, 'shift');
-      }
+      } else if (pdist(f) < C.startle && f.cool <= 0) { f.lungeT = C.lungeT; S2.wail({ x: f.x, z: f.z }); } // 어설프게 곁으로 넘어오면 바로 덤벼든다
     };
     f.revive = () => { f.alive = true; f.counted = false; f.cool = 1.5; f.mk.g.visible = true; K.S.kills = Math.max(0, K.S.kills - 1); };
     return f;

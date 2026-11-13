@@ -8,7 +8,7 @@
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, sees, los, rayLen, turnTo, turnToYaw, moveTo, nextStep, nearestStand,
   fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, laneGeo, makeCone, updateCone, paintCone, makeMark, paintMark, buildHuman, ghostCopy,
-  ringPassed, mat, glowMat, blocked, killFx, t2Foes } from './core.js';
+  ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -112,8 +112,9 @@ function reviveHuman(f) {
 }
 
 /* ───────── 방패병 ───────── */
-const SHIELD = { walk: 1.4, run: 2.7, turn: 9, range: 6.5, half: rad(50), hear: 3.2, react: 0.28, windup: 0.5, recover: 0.8, reach: 1.9, arc: rad(55), lose: 6 };
-const SHIELD_E = { turn: 10, range: 8, hear: 4.6, react: 0.22, windup: 0.42 };
+// 등 뒤 창: 반응 react초 + 70°(등 뒤 부채꼴 끝)까지 돌기 = 보통 0.30+0.15 = 0.45초, 정예 0.28+0.14 = 0.42초 (찌르기 판정 0.12초 포함해 Shift 뒤 0.25초 안에 J)
+const SHIELD = { walk: 1.4, run: 2.7, turn: 8, range: 6.5, half: rad(50), hear: 3.2, react: 0.30, windup: 0.5, recover: 0.8, reach: 1.9, arc: rad(55), lose: 6 };
+const SHIELD_E = { turn: 8.5, range: 8, hear: 4.6, react: 0.28, windup: 0.42 };
 function makeShieldMesh(K) {
   const g = new K.THREE.Group();
   const face = new K.THREE.Mesh(new K.THREE.BoxGeometry(0.95, 1.35, 0.1), mat('#56657a', { metalness: 0.6, roughness: 0.45 }));
@@ -140,7 +141,8 @@ EXT.foes['t2-shield'] = {
       const S = K.S, d = pdist(f), h = here(f);
       const seen = senseSight(f, dt, C.range, C.half, 2.2, 0.6);
       // 귀: 3.2m(정예 4.6) 안이면 반응 시간 뒤 곧장 돌아선다 (벽 너머는 못 들음)
-      const heard = h && d < C.hear && los(f.era, f.x, f.z, S.p.x, S.p.z);
+      // 경보 중이면 어디 있든 쫓는다(같은 시대에서 빙빙 돌기로 등을 못 잡게). 넘어온 순간엔 heard가 0부터라 반응 시간만큼 틈이 있다
+      const heard = h && (f.state === 'alert' || (d < C.hear && los(f.era, f.x, f.z, S.p.x, S.p.z)));
       f.heard = heard ? f.heard + dt : 0;
       if (f.wind > 0) {
         turnTo(f, S.p.x, S.p.z, dt, 5);
@@ -149,7 +151,7 @@ EXT.foes['t2-shield'] = {
           f.rec = C.recover; S2.bash({ x: f.x, z: f.z }); K.impactFx(f.x + Math.sin(f.yaw) * 1.1, f.z + Math.cos(f.yaw) * 1.1, f.era, 0.8, 0.4);
           if (h && d < C.reach && inFront(f, S.p.x, S.p.z, C.arc) && K.hurt(K.$t('방패에 부딪혔어요'))) { /* 되감기가 자리를 옮긴다 */ }
         }
-      } else if (f.rec > 0) { f.rec -= dt; if (f.heard > C.react) turnTo(f, S.p.x, S.p.z, dt, C.turn * 0.5); }
+      } else if (f.rec > 0) { f.rec -= dt; if (f.heard > C.react) turnTo(f, S.p.x, S.p.z, dt, C.turn); } // 받아친 뒤에도 그대로 돌아선다 (같은 시대에서 빙빙 돌기로는 못 잡게)
       else if (f.state === 'alert') {
         if (h && d < C.reach - 0.25 && inFront(f, S.p.x, S.p.z, rad(70))) { f.wind = C.windup; S2.shieldUp({ x: f.x, z: f.z }); if (f.ani) f.ani.once(CLIP.atk, { speed: 1.3, dur: C.windup + C.recover }); }
         else { chase(f, dt, C.run, 1.5); if (f.heard > C.react || seen) turnTo(f, S.p.x, S.p.z, dt, C.turn); }
@@ -179,6 +181,17 @@ EXT.foes['t2-shield'] = {
       return blocked(f, info, K.$t('방패에 막혔어요 — 오늘에서 등 뒤로 돌아가 넘어오세요'), 1.2);
     };
     f.revive = () => { reviveHuman(f); f.heard = 0; };
+    f.onPlayerHurt = () => { f.rec = Math.max(f.rec, 1.3); }; // 친 뒤 방패를 고쳐 잡는다 (stun은 안 먹으므로)
+    // 급히 오가면(다른 시대에 0.6초도 안 머물고 돌아오면) 그 기척을 듣고 이미 돌아서 있다 → Shift 연타로는 등을 못 잡는다
+    f.onShift = (from, to) => {
+      if (to !== f.era || !f.alive || prepared() || pdist(f) > C.hear + 1) return;
+      f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z); f.heard = C.react + 1; S2.shieldUp({ x: f.x, z: f.z });
+    };
+    // 석궁 화살: 앞이면 방패에 박히고, 등에 맞으면 쓰러진다 (석궁병이 동료를 쏘게 만들 수 있다)
+    f.boltHit = b => {
+      if (inFront(f, b.x - b.dx * 2, b.z - b.dz * 2, rad(80))) { S2.boltHit({ x: f.x, z: f.z }); return true; }
+      die(f, 'bolt', K.$t('동료의 화살이 방패병의 등에 꽂혔어요')); return true;
+    };
     return f;
   },
 };

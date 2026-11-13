@@ -90,6 +90,15 @@ export function nearestStand(era, i0, j0, avoid) {
   return [i0, j0];
 }
 export const t2Foes = () => (T2.K ? T2.K.extFoes.filter(f => f.t2) : []);
+// 맞은 뒤 한숨 돌리기: 하트가 줄면 곁(4.5m)의 T2 적은 1.3초 물러선다 (되감기 1.15초 + 무적 1.2초 동안 또 물려 하트가 한꺼번에 빠지지 않게).
+// main.js도 되살아난 자리 3m 안의 적에 stun을 주지만, 시간 충격을 안 먹는 적(사냥개·방패병)은 stun을 지우므로 따로. (11/13 직접 플레이: 사냥개 둘에 2초 만에 하트 4개)
+EXT.on('hurt', (msg, K) => {
+  for (const f of t2Foes()) {
+    if (!f.alive || f.era !== K.S.era || pdist(f) > 4.5) continue;
+    f.wind = 0;
+    if (f.onPlayerHurt) f.onPlayerHurt(); else f.stun = Math.max(f.stun || 0, 1.3);
+  }
+});
 
 // ───────── 실패 · 경보 (main.js roomFail·alertGuard와 같은 일) ─────────
 export function fail() {
@@ -211,7 +220,14 @@ export function ghostCopy(root) {
 /** 시대 전환 물결이 (x, z)를 지나갔는가 — 물결이 지나기 전엔 윤곽을 숨긴다 (main.js ringOk와 같은 뜻) */
 export function ringPassed(x, z) { const S = T2.K.S; return !S.ring || S.ring.r > Math.hypot(x - T2.shiftAt.x, z - T2.shiftAt.z) + 1.0; }
 T2.shiftAt = { x: 0, z: 0 };
-EXT.on('shift', (from, to, K) => { T2.shiftAt = { x: K.S.p.x, z: K.S.p.z }; });
+// "준비된 전환": 넘어오기 전에 다른 시대에서 PREP초 이상 머물렀는가. T2 적의 넘어오며 치기(방패병 등 뒤·잠든 미믹·망령 겹치기)는 이때만 통한다
+// → Shift를 0.5초마다 마구 누르는 것으론 안 되고, 다른 시대에서 자리를 잡고 넘어와야 한다 (11/13 게으른 봇: 연타로 방패병·미믹·망령이 깨졌다)
+T2.PREP = 1.0; // 0.6초로는 Shift 재사용 대기(0.5초) 때문에 봇의 연타 간격(0.5~0.6초)이 걸려 망령이 연타로 깨졌다 → 1초
+T2.enteredAt = -1e9; T2.lastStay = 1e9;
+export const prepared = () => T2.lastStay >= T2.PREP;
+export const stayHere = () => T2.K.S.time - T2.enteredAt; // 지금 시대에 머문 시간
+EXT.on('shift', (from, to, K) => { T2.shiftAt = { x: K.S.p.x, z: K.S.p.z }; T2.lastStay = K.S.time - T2.enteredAt; T2.enteredAt = K.S.time; });
+EXT.on('roomLoad', (room, K) => { T2.enteredAt = K.S.time - 10; T2.lastStay = 1e9; });
 
 // ───────── 머티리얼 ─────────
 export function mat(color, o = {}) { return new (THREE_().MeshStandardMaterial)(Object.assign({ color, roughness: 0.75, metalness: 0.1 }, o)); }

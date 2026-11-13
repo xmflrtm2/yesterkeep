@@ -6,7 +6,7 @@
 //   쥐구멍: 오늘에 쥐를 계속 내보낸다. 어제의 같은 자리에서 E로 돌을 밀어 막으면 오늘의 구멍도 막혀 있다. 쥐는 한 번 찌르면 앞쪽 여러 마리.
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, sees, los, turnTo, turnToYaw, moveTo, nextStep, nearestStand,
-  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes } from './core.js';
+  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -68,7 +68,8 @@ EXT.foes['t2-hound'] = {
     };
     const landing = () => {
       const S = K.S, E = S.era, i = cellOf(f.x), j = cellOf(f.z);
-      if (!K.floorAt(E, i, j)) return elite && !f.sniffed ? { kind: 'dodge', at: nearestStand(E, i, j) } : { kind: 'pit' };
+      // 정예가 피할 자리: 가장 가까운 바닥이되 플레이어와 3m 넘게 (곁에 내려앉아 바로 물지 않게)
+      if (!K.floorAt(E, i, j)) return elite && !f.sniffed ? { kind: 'dodge', at: nearestStand(E, i, j, (a, b) => Math.hypot(C2(a) - S.p.x, C2(b) - S.p.z) < 3) } : { kind: 'pit' };
       if (K.solid(E, i, j)) return { kind: 'move', at: nearestStand(E, i, j) };
       return { kind: 'ok' };
     };
@@ -79,7 +80,7 @@ EXT.foes['t2-hound'] = {
       if (L.kind === 'pit') { f.fallT = 0.001; f.fall = true; S2.yelp({ x: f.x, z: f.z }); return; }
       if (L.kind === 'dodge') { f.sniffed = true; S2.growl({ x: f.x, z: f.z }); K.toast(K.$t('정예 사냥개는 구덩이 냄새를 맡아요 — 한 번 더!'), 1.8); }
       if (L.at) { f.x = C2(L.at[0]); f.z = C2(L.at[1]); }
-      f.daze = C.daze; f.wind = 0; f.rec = 0;
+      f.daze = L.kind === 'dodge' ? 0.8 : C.daze; f.wind = 0; f.rec = 0;
       f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z);
     };
     K.addEntity({ era: 'both', t: 0, update(dt) {
@@ -164,6 +165,7 @@ EXT.foes['t2-hound'] = {
       return 'dodged';
     };
     f.boltHit = () => false; // 화살도 피한다
+    f.onPlayerHurt = () => { f.daze = Math.max(f.daze, 1.4); f.wind = 0; f.rec = 0; }; // 물고 나면 잠깐 물러선다
     f.revive = () => { // 되살아나면 떨어진 자리 옆 바닥에서
       const [i, j] = nearestStand(f.era, cellOf(f.x), cellOf(f.z));
       f.x = C2(i); f.z = C2(j); f.alive = true; f.counted = false; f.fall = false; f.fallT = 0; f.daze = 1; f.state = 'alert'; f.follow = null;
@@ -277,7 +279,9 @@ EXT.foes['t2-mimic'] = {
     };
     f.onStab = info => {
       const behind = fromBehind(f, info, 60);
-      if (behind || (f.state !== 'alert' && info.shift)) { // 등 뒤, 또는 궤짝인 척하는 동안 넘어오며 기습
+      // 등 뒤, 또는 궤짝인 척하는 동안 옆에서 넘어오며 기습(준비된 전환만). 앞은 늘 이빨
+      const side = info.shift && prepared() && f.state !== 'alert' && !inFront(f, f.x + info.tx, f.z + info.tz, rad(60));
+      if (behind || side) {
         f.alive = false; f.mk.lidG.rotation.x = -0.6; f.mk.eyeM.opacity = 0;
         K.sfx.crumble({ x: f.x, z: f.z }); killFx(f, behind ? 'back' : 'shift', { msg: K.$t(behind ? '등 뒤에서 한 방' : '궤짝인 척하던 미믹을 기습!') });
         K.FX.debris(f.x, 0.6, f.z, { n: 8, color: ['#4f4232', '#3a3226'], speed: 3, up: 3, size: 0.12 });
@@ -290,7 +294,8 @@ EXT.foes['t2-mimic'] = {
     // 어제의 궤짝 밀기: 걸어서 밀면 한 칸. 구덩이로 밀면 빠진다
     ch.tryPush = (dt) => {
       const S = K.S;
-      if (!f.alive || ch.sunk || S.era !== 'past' || S.roll > 0 || S.falling > 0 || S.trans || S.down) { ch.pushT = 0; return; }
+      // 미믹이 사라져도 어제의 궤짝은 남는다(엄폐물·발판으로 계속 밀 수 있음)
+      if (ch.sunk || S.era !== 'past' || S.roll > 0 || S.falling > 0 || S.trans || S.down) { ch.pushT = 0; return; }
       const cx = C2(ch.i), cz = C2(ch.j), dx = S.p.x - cx, dz = S.p.z - cz, vx = S.vel.x, vz = S.vel.z;
       let dir = null;
       if (Math.abs(dz) < 0.95 && Math.abs(dx) < 1 + 0.36 + 0.12 && Math.abs(dx) > 0.6 && -Math.sign(dx) * vx > 2.2) dir = [-Math.sign(dx), 0];
@@ -305,8 +310,9 @@ EXT.foes['t2-mimic'] = {
       ch.warned = false;
       ch.i = ti; ch.j = tj; K.sfx.scrape({ x: C2(ti), z: C2(tj) });
       K.FX.dust(C2(ti), 0.2, C2(tj), { n: 6, color: K.FXC.past.dust, speed: 1, up: 0.6, size: 0.45, alpha: 0.4 });
-      f.x = C2(ti); f.z = C2(tj); // 오늘의 미믹은 어제 궤짝이 놓인 자리에 있다
-      if (!K.floorAt('past', ti, tj)) { ch.sunk = true; K.sfx.crateSink({ x: f.x, z: f.z }); vanish('sunk', K.$t('궤짝이 어제의 구덩이에 빠졌어요 — 오늘의 미믹도 없어요')); }
+      if (f.alive) { f.x = C2(ti); f.z = C2(tj); } // 오늘의 미믹은 어제 궤짝이 놓인 자리에 있다
+      if (!K.floorAt('past', ti, tj)) { ch.sunk = true; K.sfx.crateSink({ x: C2(ti), z: C2(tj) }); vanish('sunk', K.$t('궤짝이 어제의 구덩이에 빠졌어요 — 오늘의 미믹도 없어요')); }
+      else if (!f.alive) { /* 미믹은 이미 없다 — 궤짝만 움직인다 */ }
       else if (K.ch('now', ti, tj) === '#' || K.solid('now', ti, tj)) vanish('crushed', K.$t('오늘엔 그 자리가 벽이라 미믹이 깔렸어요'));
       else if (!K.floorAt('now', ti, tj)) vanish('fall', K.$t('오늘엔 그 자리가 구덩이라 미믹이 떨어졌어요'));
       else if (f.state === 'alert') { f.state = 'patrol'; f.wind = 0; f.rec = 0; }
