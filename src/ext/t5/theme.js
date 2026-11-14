@@ -108,5 +108,13 @@ body.now #era .cd i { background: linear-gradient(180deg, #d6fbff, #6cc4cc 60%, 
 #prompt { background: var(--pn-tex), var(--pn-bg); border: 1px solid var(--pn-edge); border-radius: 5px; box-shadow: 0 0 0 1px #000c, inset 0 0 0 1px var(--pn-edge-dk), 0 4px 14px #000a; color: var(--pn-ink); }
 #down .glyph .yi { width: 72px; height: 72px; filter: drop-shadow(0 0 14px #7fe8ff88); animation: yk5rew 1.2s linear infinite; }
 @keyframes yk5rew { to { transform: rotate(-360deg); } }
+/* 휴대폰 세로: 단검 커서는 단추 안쪽, 방 이름·토스트는 오른쪽 유물 칸(T4)을 비켜서 */
+@media (max-width: 520px) {
+  .yk-btn.sel::before { left: 6px; width: 20px; height: 20px; margin-top: -10px; }
+  #roomTitle { font-size: 23px; padding: 0 100px 0 10px; }
+  #roomTitle small { font-size: 13px; }
+  #toast { font-size: 17px; max-width: calc(100vw - 104px); left: calc(50% - 40px); }
+  #hearts { font-size: 24px; }
+}
 `;
 }
