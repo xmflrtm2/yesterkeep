@@ -63,7 +63,7 @@ const D = {
     this.load(id);
     const c = CHUNKS.find(c => c.id === id);
     const sv = T3().solver(), r = sv ? sv.solve({ opt: false }) : null;
-    return { id, tier: c && c.tier, mode: c && c.solver, timing: !!(c && c.timing), ...(r || { ok: null }) };
+    return { id, tier: c && c.tier, mode: c && c.solver, timing: !!(c && c.timing), combat: !!(c && ((c.tags && c.tags.includes('combat')) || (c.foes && c.foes.length) || (c.guards && c.guards.length))), ...(r || { ok: null }) };
   },
   /** 봇 풀이 */
   bot(id, steps) {

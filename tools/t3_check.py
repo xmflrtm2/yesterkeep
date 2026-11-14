@@ -66,7 +66,7 @@ async def main():
         lazy = ' '.join('깸!' if z['exited'] else '못깸' for z in r['lazy'])
         problems = []
         if not v.get('ok'): problems.append('풀이기 못 풂')
-        if v.get('ok') and v.get('actions') == 0 and v.get('tier', 1) > 1 and not v.get('timing'): problems.append('장치 없이 깨짐')  # timing 조각은 박자·멈추기로 푸는 게 의도
+        if v.get('ok') and v.get('actions') == 0 and v.get('tier', 1) > 1 and not v.get('timing') and not v.get('combat'): problems.append('장치 없이 깨짐')  # timing 조각은 박자·멈추기로 푸는 게 의도, combat 조각은 장치가 적을 다루는 데 쓰여 풀이기(적을 안 봄)엔 0이 정상
         if not b['ok']: problems.append('봇 실패: ' + str(b.get('fail')))
         if any(z['exited'] for z in r['lazy']): problems.append('게으른 봇이 깸')
         if r['errs']: problems.append('오류 ' + '; '.join(r['errs'])[:120])

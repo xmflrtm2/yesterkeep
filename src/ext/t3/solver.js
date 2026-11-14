@@ -41,13 +41,14 @@ function model(opt) {
     const pw = pastWater.get(k);
     return { sunk: pw ? M.flooded(st, pw) : false };
   };
-  // 무게 문을 누를 무언가가 아직 있나 (적은 풀이기가 못 다루므로 '있으면 열릴 수 있음'으로): 그 시대의 살아 있는 적·메아리, 판 위의 몸, 판과 문이 가까움(나 혼자 밟고 0.5초 안에)
+  // 무게 문을 누를 무언가가 아직 있나 (적은 풀이기가 못 다루므로 '있으면 열릴 수 있음'으로): 그 시대의 순찰 경비·골렘·메아리(정해진 길을 걸어 판을 밟을 수 있음),
+  // 판 위의 몸, 판과 문이 가까움(나 혼자 밟고 0.5초 안에). 쫓아오기만 하는 적(사냥개 등)은 셈하지 않는다 — 밀물 방에서 상자가 필요 없다고 잘못 봤다(11/15)
   M.weightMaybe = o => {
     const k = EXT.K, p = o.plate; if (!p) return false;
     if (Math.abs(p.i - o.i) + Math.abs(p.j - o.j) <= 2) return true; // 혼자 밟고 0.5초(2.6m) 안에 문 칸에 닿을 수 있음
     for (const f of k.enemies()) {
       if (f.era !== p.era) continue;
-      if (f.alive && !f.fall) return true;
+      if (f.alive && !f.fall && (f.kind === 'guard' || f.kind === 'golem' || f.kind === 't2-echo')) return true;
       if (!f.alive && (f.kind === 'guard' || f.kind === 'golem') && Math.floor(f.x / 2) === p.i && Math.floor(f.z / 2) === p.j) return true;
     }
     return false;
@@ -82,7 +83,7 @@ function cell(M, st, cs, era, i, j, noLit) {
       case 'clock:door': if (era !== 'now' || x.o.era !== 'now') return WALL; return x.o.c && M.b(st, 'crank', x.o.c) ? FLOOR : WALL;
       case 'turn:pivot': case 'turn:arm': return FLOOR; // 낙관: 어제에서 기다리면 원하는 방향
       case 'weight:plate': return FLOOR;
-      case 'weight:door': { if (era !== x.o.era) break; const pl = x.o.plate; if (pl && M.crate(st, cs, pl.i, pl.j)) return FLOOR; return M.opt && M.weightMaybe(x.o) ? FLOOR : WALL; } // 적·메아리가 누를 수 있으면 낙관
+      case 'weight:door': { if (era !== x.o.era) break; const pl = x.o.plate; if (pl && M.crate(st, cs, pl.i, pl.j)) return FLOOR; return M.weightMaybe(x.o) ? FLOOR : WALL; } // 경비·메아리가 누를 수 있으면 낙관 (점검·막힘 둘 다)
     }
   }
   if (c === '|' || c === '*' || c === 'b') return WALL;
