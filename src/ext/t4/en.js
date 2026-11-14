@@ -238,7 +238,7 @@ Object.assign(window.I18N.en = window.I18N.en || {}, {
   '맞을 때마다 하트가 2개씩 줄어요 (떨어질 땐 1개)': 'Each hit costs 2 hearts (falls still cost 1)',
   '얇은 오늘': 'Thin Today',
   '오늘에서 걸음 +40% (성채지기 앞에선 빼고)': '+40% speed in Today (not against the Keeper)',
-  '어제에서 걸음 −20%': '−20% speed in Yesterday',
+  '오늘에서 맞으면 하트가 2개 줄어요, 어제에서 걸음 −20%': 'Hits in Today cost 2 hearts; −20% speed in Yesterday',
   '빚진 시간': 'Borrowed Time',
   '지금 금화 +20': '+20 coins now',
   '상점 값 1.6배': 'Shop prices x1.6',

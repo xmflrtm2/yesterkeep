@@ -42,8 +42,10 @@ EXT.on('shift', () => {
 });
 
 // ───────── 저주 '금 간 심장': 맞으면 하트 하나 더 (떨어짐은 hurt가 아니라서 1개) ─────────
+// 저주 '얇은 오늘'도: 오늘에서 맞을 때만. 오늘 +40% 걸음에 어제 −20%뿐일 땐 오늘에서 판을 짜고 어제로 넘어가 찌르는 흐름에
+// 대가가 거의 없었다(11/15 직접 플레이: 쌍둥이 간수의 땅울림 띠(6.5m/s)보다 빨리 달아나 하트 하나 안 잃고 1층을 넘김)
 EXT.on('hurt', (msg, K) => {
-  if (!live() || !T4.st.glassHeart) return;
+  if (!live() || !(T4.st.glassHeart || (T4.st.thinHurt && K.S.era === 'now'))) return;
   K.S.hearts = Math.max(0, K.S.hearts - 1); K.drawHearts();
 });
 
