@@ -495,7 +495,8 @@ const PAST_RUN = {
   't3-m-mimiccrumble': 4.5, 't3-m-xbowclock': 8.8, 't3-m-houndturn': 6.3, 't3-m-houndroots': 1.7, 't3-m-mageseal': 5.8,
   't3-m-echoclock': 8.4, 't3-m-tide': 7.9,
 };
-for (const c of [...CHUNKS1, ...CHUNKS2]) if (PAST_RUN[c.id]) c.pastRun = PAST_RUN[c.id];
+// T1 2차 런은 조각의 riddle을 첫 안내로 쓴다(없으면 T1의 일반 수수께끼) → 내 hint가 이미 수수께끼라 그대로 넘긴다
+for (const c of [...CHUNKS1, ...CHUNKS2]) { if (PAST_RUN[c.id]) c.pastRun = PAST_RUN[c.id]; if (!c.riddle) c.riddle = c.hint; }
 
 const tierMark = t => '◆'.repeat(t) + '◇'.repeat(4 - t);
 function register() {
