@@ -53,17 +53,29 @@ body.now {
 }
 
 /* ───────── 판넬 틀 (.yk-frame) — 네 귀퉁이 장식은 ::before 하나에 배경 넷 ───────── */
-.yk-frame { position: relative; background: var(--pn-tex), var(--pn-bg); border: 1.5px solid var(--pn-edge); border-radius: 5px; color: var(--pn-ink);
+.yk-frame, #endCard .inner, #holdCard > div { position: relative; background: var(--pn-tex), var(--pn-bg); border: 1.5px solid var(--pn-edge); border-radius: 5px; color: var(--pn-ink);
   box-shadow: 0 0 0 1px #000c, inset 0 0 0 1px var(--pn-edge-dk), inset 0 0 0 3px #0009, inset 0 0 0 4px color-mix(in srgb, var(--pn-edge) 30%, transparent), 0 14px 34px #000d, 0 0 26px var(--pn-glow); }
-.yk-frame::before { content: ''; position: absolute; inset: -7px; pointer-events: none; background: ${cp.map(u => u + ' no-repeat').join(', ')}; background-size: 26px 26px; background-position: ${pos}; }
-body.now .yk-frame::before { background: ${cn.map(u => u + ' no-repeat').join(', ')}; background-size: 24px 24px; background-position: ${pos}; }
-.yk-h { color: var(--pn-title); font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 0 #000, 0 0 18px var(--pn-glow); }
-.yk-h::after { content: ''; display: block; height: 12px; margin: 6px auto 0; width: min(320px, 80%); background: var(--pn-div) center / 100% 100% no-repeat; }
-.yk-btn { font: inherit; color: var(--pn-ink); background: var(--pn-tex), var(--pn-btn); border: 1px solid var(--pn-edge-dk); border-radius: 5px; cursor: pointer; position: relative;
+.yk-frame::before, #endCard .inner::before, #holdCard > div::before { content: ''; position: absolute; inset: -7px; pointer-events: none; background: ${cp.map(u => u + ' no-repeat').join(', ')}; background-size: 26px 26px; background-position: ${pos}; }
+body.now .yk-frame::before, body.now #endCard .inner::before, body.now #holdCard > div::before { background: ${cn.map(u => u + ' no-repeat').join(', ')}; background-size: 24px 24px; background-position: ${pos}; }
+.yk-h, #endCard h2 { color: var(--pn-title); font-weight: 800; letter-spacing: 1px; text-shadow: 0 2px 0 #000, 0 0 18px var(--pn-glow); }
+.yk-h::after, #endCard h2::after { content: ''; display: block; height: 12px; margin: 6px auto 0; width: min(320px, 80%); background: var(--pn-div) center / 100% 100% no-repeat; }
+.yk-btn, #endCard button { font: inherit; color: var(--pn-ink); background: var(--pn-tex), var(--pn-btn); border: 1px solid var(--pn-edge-dk); border-radius: 5px; cursor: pointer; position: relative;
   box-shadow: inset 0 1px 0 #ffffff1c, inset 0 -2px 0 #0006, 0 2px 0 #000b; transition: background .12s, border-color .12s, box-shadow .12s, transform .12s; }
-.yk-btn.sel, .yk-btn:hover { border-color: var(--pn-edge); background: var(--pn-tex), var(--pn-btn-sel); box-shadow: inset 0 1px 0 #ffffff2a, 0 0 0 1px var(--pn-edge), 0 0 18px var(--pn-glow), 0 2px 0 #000b; }
+.yk-btn.sel, .yk-btn:hover, #endCard button:hover, #endCard button:focus-visible { border-color: var(--pn-edge); background: var(--pn-tex), var(--pn-btn-sel); box-shadow: inset 0 1px 0 #ffffff2a, 0 0 0 1px var(--pn-edge), 0 0 18px var(--pn-glow), 0 2px 0 #000b; }
 .yk-btn.sel::before { content: ''; position: absolute; left: -30px; top: 50%; width: 26px; height: 26px; margin-top: -13px; background: ${iconUrl('cursor')} center / contain no-repeat; filter: drop-shadow(0 1px 1px #000); animation: yk5nudge .9s ease-in-out infinite; }
 @keyframes yk5nudge { 50% { transform: translateX(4px); } }
+
+/* 끝 화면·시작/멈춤 카드(index.html)도 같은 틀 */
+#endCard .inner { padding: 22px 30px 18px; box-sizing: border-box; width: min(780px, 100%); }
+#endCard .thanks { color: var(--pn-accent); font-weight: 700; }
+#endCard button { padding: 9px 26px; }
+#endStats .score { color: var(--pn-title); font-weight: 800; }
+#holdCard > div { padding: 22px 34px 18px; max-width: min(640px, 92vw); box-sizing: border-box; cursor: pointer; }
+#holdCard .t { color: var(--pn-title); align-items: center; justify-content: center; gap: 12px; }
+#holdCard.start .t.start, #holdCard.paused .t.paused { display: flex; } /* 보이는 쪽만 (index.html이 다른 쪽을 숨김) */
+#holdCard .t.start::before, #holdCard .t.start::after { content: ''; width: 34px; height: 34px; flex: none; background: ${iconUrl('era-past')} center / contain no-repeat; }
+#holdCard .t.start::after { background-image: ${iconUrl('era-now')}; }
+#holdCard .t.paused::before { content: ''; width: 30px; height: 30px; flex: none; background: ${iconUrl('sand')} center / contain no-repeat; }
 
 /* ───────── HUD ───────── */
 /* 고르기·쉼터 창(T4)이 떠 있으면 그 뒤 HUD 글을 숨긴다 (T1 덮개는 T1 CSS가 이미 함) */
