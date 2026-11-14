@@ -41,7 +41,7 @@ function freshStats() {
     // 2차: T2 적·T3 장치·저주 (r2.js)
     follow: 0, shieldReact: 0, shieldHear: 0, aimMul: 1, revDelay: 0, beast: 0, beastStun: 0, spirit: 0, springRate: 1, springMax: 0,
     feather: 0, eliteHunt: 0, moonEdge: 0, houndCoins: 0, mageSand: 0,
-    coinMul: 1, thinNow: 1, thinPast: 1, foeSpeed: 1, pickPlus: 0, glassHeart: 0,
+    coinMul: 1, thinNow: 1, thinPast: 1, thinHurt: 0, foeSpeed: 1, pickPlus: 0, glassHeart: 0,
   };
 }
 export const has = id => T4.inv.some(e => e.id === id);

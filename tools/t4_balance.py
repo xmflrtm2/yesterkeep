@@ -138,6 +138,12 @@ async def main(mode, bot, n, give, rooms, limit):
             else:
                 await c.eval("(async () => { window.__P = (await import('/src/dev/play.js?' + Date.now())).default; await __P.ready(); return 1; })()")
                 await c.eval(ROOM_BOTS)
+                # 경비 모델은 첫 방 뒤에 받는다(core: ec719d3) — 받기 전에 경비 방을 열면 경비가 아직 없어 '0초에 깼다'로 잘못 나온다(11/15)
+                await c.eval("__P.room('ambush'), 1")
+                for _ in range(150):
+                    if await c.eval('!__yk.S.guardPending'):
+                        break
+                    await asyncio.sleep(0.2)
                 for room in rooms:
                     for k in range(n):
                         r = await asyncio.wait_for(c.eval(f'(() => {{ try {{ return JSON.stringify(__T4B.run({json.dumps(room)}, {json.dumps(bot)}, {limit})); }} catch (e) {{ return "ERROR " + e.stack; }} }})()'), 180)

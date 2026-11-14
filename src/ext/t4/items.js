@@ -127,7 +127,7 @@ export const ITEMS = [
     desc: [N('정예를 쓰러뜨리면 금화 +4, 하트 +1'), N('금화 +6, 하트 +1, 모래 +3초')],
     stat(st, lv) { st.eliteHunt = Math.max(st.eliteHunt, lv); } },
   { id: 't4-moon-edge', kind: 'relic', rar: 'legend', icon: '🌕', name: N('달빛 칼날'), r2: true,
-    desc: [N('오늘의 달빛 줄기 위에 선 적은 그 자리에 묶여요 (거울로 줄기를 옮겨 붙잡기)'), N('묶인 적은 앞에서 찔러도 한 방')],
+    desc: [N('오늘의 달빛 줄기 위에 선 적은 그 자리에 묶이고, 망령은 흩어져요 (거울로 줄기를 옮겨 붙잡기)'), N('묶인 적은 앞에서 찔러도 한 방')],
     stat(st, lv) { st.moonEdge = Math.max(st.moonEdge, lv); } },
 
   // ───────── 저주 (대가가 있는 유물): 강하지만 손해가 있다. 런 끝 기억이 늘어난다(memBonus). 강화 안 됨, 쉼터에서 정화 ─────────
@@ -143,8 +143,8 @@ export const ITEMS = [
     desc: [N('최대 하트 +2')], cost: N('맞을 때마다 하트가 2개씩 줄어요 (떨어질 땐 1개)'),
     stat(st) { st.add.maxHearts += 2; st.glassHeart = 1; } },
   { id: 't4-curse-thin', kind: 'curse', rar: 'curse', icon: '🌫️', name: N('얇은 오늘'), memBonus: 0.25,
-    desc: [N('오늘에서 걸음 +40% (성채지기 앞에선 빼고)')], cost: N('어제에서 걸음 −20%'),
-    stat(st) { st.thinNow = 1.4; st.thinPast = 0.8; } },
+    desc: [N('오늘에서 걸음 +40% (성채지기 앞에선 빼고)')], cost: N('오늘에서 맞으면 하트가 2개 줄어요, 어제에서 걸음 −20%'),
+    stat(st) { st.thinNow = 1.4; st.thinPast = 0.8; st.thinHurt = 1; } },
   { id: 't4-curse-debt', kind: 'curse', rar: 'curse', icon: '📜', name: N('빚진 시간'), memBonus: 0.25,
     desc: [N('지금 금화 +20')], cost: N('상점 값 1.6배'),
     stat(st) { st.price *= 1.6; }, onGive(T4) { T4.coins += 20; } },
