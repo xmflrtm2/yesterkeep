@@ -5,9 +5,10 @@
 //   ['push', i, j, di, dj] (i,j)의 상자를 한 칸 밂 · ['waitTurn', 다리 번호, 'x'|'z'] 어제의 회전 다리가 그 방향이 될 때까지
 // 숫자는 docs/roguelike/t3.md에 (풀이기 최소 행동 수, 봇 풀이 시간, 게으른 봇 결과).
 import { EXT } from '../../ext.js';
+import { CHUNKS2 } from './chunks2.js';
 
 const N = k => k; // main.js와 같은 뜻: 표시만 해 두고 그릴 때 $t
-export const CHUNKS = [
+const CHUNKS1 = [
   // ───────── tier 1: 장치 하나씩 (두 단계) ─────────
   {
     id: 't3-seed1', track: 't3', tier: 1, tags: ['puzzle', 'seed'], mech: 'seed', name: N('씨앗 다리'),
@@ -60,7 +61,8 @@ export const CHUNKS = [
     solve: [['go', 3, 3], ['shift'], ['E'], ['shift'], ['go', 11, 3]],
   },
   {
-    id: 't3-mirror1', track: 't3', tier: 1, tags: ['puzzle', 'mirror'], mech: 'mirror', name: N('달빛 봉인'),
+    id: 't3-mirror1', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
+    tier: 1, tags: ['puzzle', 'mirror'], mech: 'mirror', name: N('달빛 봉인'),
     hint: N('달빛이 봉인 수정에 닿으면 문이 열려요. 거울은 어제만 돌아가요'),
     tip: N('어제로 가서 거울 옆에서 E. 옅은 빛줄기가 오늘의 달빛 길 — 수정까지 이어지게 하세요'),
     startEra: 'now', start: [2, 5], exit: [12, 3],
@@ -188,7 +190,8 @@ export const CHUNKS = [
   },
   // ───────── tier 2: 두 장치 / 반전 ─────────
   {
-    id: 't3-mirror2', track: 't3', tier: 2, tags: ['puzzle', 'mirror', 'crate'], mech: 'mirror', name: N('두 거울과 상자'),
+    id: 't3-mirror2', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
+    tier: 2, tags: ['puzzle', 'mirror', 'crate'], mech: 'mirror', name: N('두 거울과 상자'),
     hint: N('달빛이 수정까지 가려면 거울 둘이 맞아야 해요. 오늘 길을 막는 썩은 상자는 어제의 상자예요'),
     tip: N('어제 첫 거울을 돌리고, 상자를 빛줄기 밖(위나 아래)으로 밀고, 둘째 거울을 돌리세요'),
     startEra: 'now', start: [2, 7], exit: [13, 1],
@@ -357,7 +360,8 @@ export const CHUNKS = [
     solve: [['go', 9, 2], ['E'], ['shift'], ['go', 11, 6], ['shift'], ['go', 9, 2], ['E'], ['go', 3, 1], ['E'], ['go', 1, 1]],
   },
   {
-    id: 't3-garden', track: 't3', tier: 3, tags: ['puzzle', 'seed', 'mirror'], mech: 'seed', name: N('달빛 정원'),
+    id: 't3-garden', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
+    tier: 3, tags: ['puzzle', 'seed', 'mirror'], mech: 'seed', name: N('달빛 정원'),
     hint: N('거울은 섬 위에 있어요. 달빛이 수정에 닿으면 문이 열려요'),
     tip: N('나무가 달빛을 가린다면? 어제 심은 씨앗은 어제 다시 캘 수 있어요'),
     startEra: 'now', start: [2, 1], exit: [13, 7],
@@ -412,7 +416,8 @@ export const CHUNKS = [
   },
   // ───────── tier 4: 네 장치를 차례로 ─────────
   {
-    id: 't3-grand', track: 't3', tier: 4, tags: ['puzzle', 'water', 'key', 'mirror'], mech: 'mirror', name: N('달과 물의 방'),
+    id: 't3-grand', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
+    tier: 4, tags: ['puzzle', 'water', 'key', 'mirror'], mech: 'mirror', name: N('달과 물의 방'),
     hint: N('달빛이 봉인에 닿아야 출구가 열려요. 거울은 잠긴 문 안쪽에, 열쇠는 오늘의 저수지에'),
     tip: N('열고 → 줍고 → 닫고: 어제 수문을 열어야 열쇠가 드러나지만, 그러면 어제의 물길을 못 건너요'),
     startEra: 'past', start: [3, 4], exit: [1, 1],
@@ -482,7 +487,8 @@ export const LAB = {
 
 const tierMark = t => '◆'.repeat(t) + '◇'.repeat(4 - t);
 function register() {
-  const list = CHUNKS;
+  // 1차 16 + 2차(적+장치) — 시험 순서는 단계 순서 (t3-tour)
+  const list = [...CHUNKS1, ...CHUNKS2].sort((a, b) => a.tier - b.tier);
   list.forEach((c, n) => {
     EXT.chunks.push(c);
     EXT.rooms[c.id] = EXT.chunkRoom(c, { label: `${tierMark(c.tier)}  ${n + 1} / ${list.length}`, t3next: n + 1 < list.length ? list[n + 1].id : '_end' });
@@ -495,3 +501,6 @@ function register() {
 register();
 // 내 시험 방에서 출구로 나가면 다음 조각으로 (런 모드(T1)가 먼저 고르면 그쪽이 이긴다)
 EXT.on('nextRoom', () => { const r = EXT.K && EXT.K.S.room; if (!r || !r.t3next) return undefined; return r.t3next === '_end' ? 'end' : EXT.rooms[r.t3next]; });
+
+// 모든 T3 조각 (dev.js·시험 도구가 씀)
+export const CHUNKS = [...CHUNKS1, ...CHUNKS2];

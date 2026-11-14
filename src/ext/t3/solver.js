@@ -70,6 +70,8 @@ function cell(M, st, cs, era, i, j, noLit) {
       case 'crumble:tile': if (cr) return FLOOR; return x.t.st === 'gone' ? PIT : FLOOR;
       case 'clock:door': if (era !== 'now' || x.o.era !== 'now') return WALL; return x.o.c && M.b(st, 'crank', x.o.c) ? FLOOR : WALL;
       case 'turn:pivot': case 'turn:arm': return FLOOR; // 낙관: 어제에서 기다리면 원하는 방향
+      case 'weight:plate': return FLOOR;
+      case 'weight:door': { if (era !== x.o.era) break; if (M.opt) return FLOOR; const pl = x.o.plate; return pl && M.crate(st, cs, pl.i, pl.j) ? FLOOR : WALL; } // 적·메아리가 누르는 건 풀이기가 모름 → 막힘 검사는 낙관
     }
   }
   if (c === '|' || c === '*' || c === 'b') return WALL;

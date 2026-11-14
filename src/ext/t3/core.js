@@ -178,6 +178,13 @@ EXT.on('update', (dt, k) => {
   if (!live() || !C.has) return;
   C.t += dt;
   for (const m of MECHS) if (m.update) m.update(C.d[m.id], dt, k);
+  // 2차: 내 장치 칸의 바닥이 사라지면(물이 차오름·뿌리 다리가 사라짐·바닥이 무너짐) 그 위에 서 있던 사냥개는 떨어진다.
+  // 사냥개는 시대를 따라올 때만 발밑을 보므로(T2 beasts.js), 다른 시대에서 바꿔 두고 돌아오면 그대로 서 있었다
+  for (const f of k.extFoes) {
+    if (f.kind !== 't2-hound' || !f.alive || f.fall || f.fallT > 0 || f.follow || f.era !== k.S.era) continue;
+    const i = Math.floor(f.x / 2), j = Math.floor(f.z / 2);
+    if (at(f.era, i, j) && !k.floorAt(f.era, i, j)) { f.fallT = 0.001; f.fall = true; k.FX.dust(f.x, 0.2, f.z, { n: 12, color: k.FXC[f.era].dust, speed: 2, up: 1.5, size: 0.5 }); }
+  }
   // 추락은 hurt 훅이 안 오므로 여기서 센다
   const f = k.S.falling > 0;
   if (f && !wasFalling) addFail();

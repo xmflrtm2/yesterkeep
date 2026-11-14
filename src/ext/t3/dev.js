@@ -18,6 +18,28 @@ let lastExit = null;
 EXT.on('exit', r => { lastExit = r.id; });
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 const st = () => Y().state();
+const KK = () => Y().ext.K;
+const OTHER = { past: 'now', now: 'past' };
+/** 적 찾기: 'guard' / 'golem' = 기본 경비·골렘, 그 밖 = EXT 적 kind (예 't2-hound') */
+function foe(kind, n = 0) { const k = KK(); return (kind === 'guard' ? k.guards : kind === 'golem' ? k.golems : k.extFoes.filter(f => f.kind === kind))[n]; }
+/** 적 조건: 'alert' 'sleep' 'dead' 'alive' 'out'(메아리) 'x<12' 'z>4' 'cell=3,4' 'band=10,16'(x가 그 사이) 'near<3'(나와의 거리) */
+function foeIs(f, cond) {
+  if (!f) return cond === 'dead';
+  const s = st();
+  if (cond === 'alert') return f.state === 'alert';
+  if (cond === 'sleep') return f.state === 'sleep';
+  if (cond === 'dead') return !f.alive;
+  if (cond === 'alive') return f.alive;
+  if (cond === 'out') return !!f.out;
+  let m;
+  if ((m = cond.match(/^([xz])([<>])(-?[\d.]+)$/))) { const v = f[m[1]]; return m[2] === '<' ? v < +m[3] : v > +m[3]; }
+  if ((m = cond.match(/^cell=(\d+),(\d+)$/))) return Math.floor(f.x / 2) === +m[1] && Math.floor(f.z / 2) === +m[2];
+  if ((m = cond.match(/^band=(-?[\d.]+),(-?[\d.]+)$/))) return f.x > +m[1] && f.x < +m[2];
+  if ((m = cond.match(/^zband=(-?[\d.]+),(-?[\d.]+)$/))) return f.z > +m[1] && f.z < +m[2];
+  if ((m = cond.match(/^near<([\d.]+)$/))) return Math.hypot(f.x - s.x, f.z - s.z) < +m[1];
+  if ((m = cond.match(/^box=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)$/))) return f.x > +m[1] && f.x < +m[2] && f.z > +m[3] && f.z < +m[4];
+  throw new Error('foe cond ' + cond);
+}
 
 const D = {
   errs,
@@ -72,6 +94,62 @@ const D = {
           ev('keyup', key); tick(0.25);
           if (moved == null) fail = `crate ${a},${b} did not move`;
         }
+      } else if (op === 'to') { P.moveTo(a, b, { exact: true, tol: 0.2, max: 4, until: () => !!lastExit }); }
+      else if (op === 'stab') { P.stab(); tick(0.45); }
+      else if (op === 'waitFoe') { const f = foe(a, b); if (P.waitUntil(() => foeIs(foe(a, b), cc), dd || 10, 1 / 60) == null) fail = `waited for ${a}#${b} ${cc}`; void f; }
+      else if (op === 'goUntil') { // ['goUntil', i, j, [kind, n, cond]] 걸어가다 적 조건이 되면 멈춤
+        const [kind, n, cond] = cc; P.goCell(a, b, { until: () => !!lastExit || foeIs(foe(kind, n), cond) });
+      } else if (op === 'behind' || op === 'near') { // ['behind', kind, n, d] 다른 시대에서 등 뒤 d m(또는 아무 쪽)로 가서 1초 넘게 머문 뒤 넘어와 찌르기
+        const f = foe(a, b), d = cc || 2.0, k = KK();
+        if (!f || !f.alive) fail = `no foe ${a}#${b}`;
+        else {
+          const e = OTHER[f.era];
+          for (let q = 0; q < 3 && st().era !== e; q++) { for (let w = 0; w < 40 && st().shiftCd > 0; w++) tick(1 / 30); P.shift(); tick(0.1); }
+          let tx, tz;
+          if (op === 'behind') { const fx = Math.sin(f.yaw), fz = Math.cos(f.yaw); tx = f.x - fx * d; tz = f.z - fz * d; }
+          else {
+            let bd = 1e9; const s0 = st();
+            for (let q = 0; q < 24; q++) { const an = q / 24 * Math.PI * 2, x = f.x + Math.sin(an) * d, z = f.z + Math.cos(an) * d, i = Math.floor(x / 2), j = Math.floor(z / 2);
+              if (!k.stand(e, i, j) || !k.stand(f.era, i, j)) continue; const c = Math.hypot(x - s0.x, z - s0.z) + (Math.cos(an - f.yaw) < -0.3 ? -3 : 0); if (c < bd) { bd = c; tx = x; tz = z; } }
+          }
+          if (tx == null) fail = `no place near ${a}#${b}`;
+          else {
+            P.goCell(Math.floor(tx / 2), Math.floor(tz / 2)); P.moveTo(tx, tz, { exact: true, tol: 0.2, max: 2 });
+            // 다른 시대 쪽을 보고 서기 (넘어오자마자 찌르기 판정이 앞 60°)
+            const yaw = Math.atan2(f.x - st().x, f.z - st().z); Y().S.face = yaw;
+            tick(1.1); // 준비된 전환(T2: 다른 시대에 1초 넘게)
+            for (let w = 0; w < 40 && st().shiftCd > 0; w++) tick(1 / 30);
+            P.shift(); Y().S.face = Math.atan2(f.x - st().x, f.z - st().z); tick(dd != null ? dd : 0.1); P.stab(); tick(0.5);
+            if (f.alive) fail = `${op} strike failed on ${a}#${b}`;
+          }
+        }
+      } else if (op === 'waitJs') { // ['waitJs', '식', 최대초] — C = __t3.C
+        const fn = new Function('C', 'K', 'S', 'return (' + a + ')');
+        if (P.waitUntil(() => fn(T3().C, KK(), Y().S), b || 8, 1 / 60) == null) fail = 'waitJs ' + a;
+      } else if (op === 'chest') { // ['chest', 미믹 번호, di, dj] 어제의 궤짝을 한 칸 밀기
+        const f = foe('t2-mimic', a), ch = f && f.chest;
+        if (!ch) fail = 'no chest';
+        else {
+          const i0 = ch.i, j0 = ch.j, ok = P.goCell(i0 - b, j0 - cc);
+          if (!ok) fail = `no path behind chest ${i0},${j0}`;
+          else {
+            const key = b > 0 ? 'KeyD' : b < 0 ? 'KeyA' : cc > 0 ? 'KeyS' : 'KeyW';
+            ev('keydown', key); const moved = P.waitUntil(() => ch.i !== i0 || ch.j !== j0 || ch.sunk, 3, 1 / 60); ev('keyup', key); tick(0.3);
+            if (moved == null) fail = `chest ${i0},${j0} did not move`;
+          }
+        }
+      } else if (op === 'wraithRing') { // ['wraithRing', n] 어제에서 망령의 멈춘 자리(고리 안)로 가서 1초 넘게 머문 뒤 오늘로
+        const f = foe('t2-wraith', a);
+        if (!f || !f.alive) fail = 'no wraith';
+        else {
+          if (st().era === f.era) { P.shift(); tick(0.1); }
+          P.goCell(Math.floor(f.x / 2), Math.floor(f.z / 2)); P.moveTo(f.x, f.z, { exact: true, tol: 0.15, max: 2 });
+          tick(1.15); for (let w = 0; w < 40 && st().shiftCd > 0; w++) tick(1 / 30); P.shift(); tick(0.6);
+          if (f.alive) fail = 'wraith not dispelled';
+        }
+      } else if (op === 'waitWarn') { // ['waitWarn', 다리 번호, 'x'|'z'] 그 방향으로 놓였다가 주황으로 깜빡이기 시작할 때까지
+        const tb = () => T3().C.d.turn.tables[a].st;
+        P.waitUntil(() => tb().ori !== b, 8, 1 / 60); P.waitUntil(() => tb().ori === b && tb().warn, 8, 1 / 60);
       } else if (op === 'waitTurn') {
         const tb = () => T3().C.d.turn.tables[a].st.ori;
         P.waitUntil(() => tb() !== b, 8, 1 / 60); P.waitUntil(() => tb() === b, 8, 1 / 60);
@@ -84,7 +162,7 @@ const D = {
     // 출구까지 마저 (마지막 go가 출구 칸이면 이미 나감)
     P.waitUntil(() => !!lastExit, 2, 1 / 30);
     const s = st();
-    return { id, ok: !!lastExit, fail, hearts: (lastExit ? h0 : s.hearts) - h0, falls: s.falls, hurts: s.hurts, log };
+    return { id, ok: !!lastExit, fail, hearts: -(s.falls + s.hurts), falls: s.falls, hurts: s.hurts, past: +Y().S.runPastT || null, log }; void h0;
   },
   /** 시간 재기용: 봇 풀이 동안 흐른 게임 시간 */
   timedBot(id) { const t0 = Y().S.time; const r = this.bot(id); r.sec = +(Y().S.time - t0).toFixed(1); return r; },

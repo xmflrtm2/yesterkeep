@@ -1,5 +1,5 @@
 // 수문 → 물 높이 (t3-sluice)
-//  W  수문 바퀴 (두 시대 같은 칸, 막힘). 어제만 돌아간다. 처음엔 닫혀 있음
+//  W  수문 바퀴 (두 시대 같은 칸, 막힘). 어제만 돌아간다. 처음엔 닫혀 있음 (V = 처음부터 열린 바퀴)
 //  ~  물 칸. 어제 그리드 = 수로: 수문을 열면 물이 흘러 잠긴다 / 오늘 그리드 = 저수지: 수문이 닫혀 있으면(오랜 세월 물이 고여) 잠기고, 열려 있으면 말라 있다
 //     → 한 번 돌리면 두 시대가 반대로 바뀐다. 가장 가까운 바퀴에 묶임. 바퀴가 없으면 오늘은 늘 잠김, 어제는 늘 마름
 //  q  물 칸 + 그 바닥에 떨어진 열쇠 (물이 빠져야 주울 수 있다)
@@ -16,6 +16,8 @@ export default mech({
   count: d => d.wheels.length + d.water.length,
   chars: {
     W(d, E, i, j) { let w = d.wheels.find(w => w.i === i && w.j === j); if (!w) { w = { i, j, open: false, spin: 0, spinV: 0 }; d.wheels.push(w); } both(i, j, { m: 'water', k: 'wheel', w }); return '.'; },
+    // V = 처음부터 열려 있는 수문 (2차): 어제의 물길은 차 있고 오늘의 저수지는 말라 있는 채로 시작
+    V(d, E, i, j) { let w = d.wheels.find(w => w.i === i && w.j === j); if (!w) { w = { i, j, open: true, spin: 0, spinV: 0 }; d.wheels.push(w); } w.open = true; both(i, j, { m: 'water', k: 'wheel', w }); return '.'; },
     '~'(d, E, i, j) { const w = { era: E, i, j, wheel: null, level: 0 }; d.water.push(w); put(E, i, j, { m: 'water', k: 'water', w }); return '_'; },
     q(d, E, i, j) { const w = { era: E, i, j, wheel: null, level: 0 }; d.water.push(w); put(E, i, j, { m: 'water', k: 'water', w }); C.d.key.keys.push({ era: E, i, j, got: false, under: true }); return '_'; },
   },
