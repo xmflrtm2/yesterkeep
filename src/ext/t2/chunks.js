@@ -5,11 +5,7 @@
 import { EXT } from '../../ext.js';
 
 const N = k => k;
-// 모든 T2 적 공통: 배치(def)에 optional: true면 출구를 막지 않는다
-for (const [k, F] of Object.entries(EXT.foes)) if (k.startsWith('t2-') && !F.wrapped) {
-  const sp = F.spawn; F.wrapped = true;
-  F.spawn = (def, K) => { const f = sp(def, K); if (f && def.optional) f.optional = true; return f; };
-}
+// (모든 T2 적 공통 포장 — optional·정예 접두어·다른 길 처치 — 은 2차부터 wrap.js)
 const C = [];
 const add = c => { C.push(Object.assign({ track: 't2', startEra: 'now' }, c)); return c; };
 
@@ -49,7 +45,7 @@ add({
   id: 't2-shield-wall', kind: 'shield', tier: 1, tags: ['combat'], name: N('방패가 지키는 틈'),
   hint: N('방패병은 소리에 돌아서요 — 등 뒤로 넘어오는 순간만 통해요'),
   tip: N('오늘엔 북쪽 벽이 무너져 있어요. 그리로 돌아가 방패병의 멈춘 등 뒤 2m에서 어제로 바꾸고 바로 J'),
-  solve: N('오늘에서 북쪽 무너진 벽(6,1)으로 동쪽 방 → 방패병 윤곽 등 뒤(9,3) → 어제로 → 바로 찌르기 → 출구'),
+  solve: N('오늘에서 북쪽 무너진 벽(6,1)으로 동쪽 방 → 방패병 윤곽 등 뒤(10,2) → 1초 → 어제로 → 바로 찌르기 → 출구'),
   par: 2,
   past: [
     '###############',
@@ -69,8 +65,9 @@ add({
     '#..,..#.......#',
     '###############',
   ],
-  start: [1, 3], exit: [13, 3],
-  foes: [{ kind: 't2-shield', at: [8, 3], face: -90 }],
+  start: [1, 3], exit: [13, 5],
+  // 11/15: 방패병이 서쪽(틈)을 보고 출구가 바로 등 뒤였더니, 출구로 걷기만 해도 등 뒤에 서서 Shift 연타 봇이 20초에 깼다 → 출구(남동)를 보게
+  foes: [{ kind: 't2-shield', at: [10, 3], face: 0 }],
 });
 add({
   id: 't2-xbow-hall', kind: 'xbow', tier: 1, tags: ['combat'], name: N('석궁이 겨누는 복도'),

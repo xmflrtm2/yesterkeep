@@ -8,16 +8,16 @@
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, sees, los, rayLen, turnTo, turnToYaw, moveTo, nextStep, nearestStand,
   fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, laneGeo, makeCone, updateCone, paintCone, makeMark, paintMark, buildHuman, ghostCopy,
-  ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared } from './core.js';
+  ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill, thrownToStab } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
 const rad = T2.rad;
-const CLIP = { idle: 'AS_Idle_Combat_Seq', walk: 'AS_Walk_Loop_F_0_Seq', run: 'AS_Run_Loop_F_0_Seq', atk: 'AS_Combo_Attack_02_01_Seq', skill: 'AS_Skill_02_Seq', hit: 'AS_Hit_F_Seq',
+export const CLIP = { idle: 'AS_Idle_Combat_Seq', walk: 'AS_Walk_Loop_F_0_Seq', run: 'AS_Run_Loop_F_0_Seq', atk: 'AS_Combo_Attack_02_01_Seq', skill: 'AS_Skill_02_Seq', hit: 'AS_Hit_F_Seq',
   die: 'AS_Hit_Death_Seq', dieBack: 'AS_Knock_Down_Death_F_Seq', parry: 'AS_Parry_L_Seq', calm: 'AS_Idle_Seq' };
 
 /* ───────── 공용 바탕: 순찰·시야·의심·추격 ───────── */
-function base(def, K, kind, look, cfg) {
+export function base(def, K, kind, look, cfg) {
   const path = (def.path || [def.at]).map(([i, j]) => [C2(i), C2(j)]);
   const f = {
     t2: true, kind, era: def.era || 'past', x: path[0][0], z: path[0][1], yaw: 0, r: cfg.r || 0.42, elite: !!def.elite,
@@ -34,12 +34,14 @@ function base(def, K, kind, look, cfg) {
   f.mark = makeMark(f.holder, 2.25 * (look.scale || 1));
   f.cone = makeCone();
   f.hearAlarm = () => { if (f.alive && f.state !== 'alert') { f.state = 'alert'; f.sus = 1; f.lost = 0; } };
+  f.onExternalKill = how => dieLook(f, how);
+  f.onThrown = t => thrownToStab(f, t);
   return f;
 }
-function place(f) { f.holder.position.set(f.x, 0, f.z); f.holder.rotation.y = f.yaw; }
-function play(f, name, fade = 0.2, speed = 1) { if (f.ani) f.ani.loop(name, fade, speed); }
+export function place(f) { f.holder.position.set(f.x, 0, f.z); f.holder.rotation.y = f.yaw; }
+export function play(f, name, fade = 0.2, speed = 1) { if (f.ani) f.ani.loop(name, fade, speed); }
 /** 시야·의심. 반환: 보이는가 */
-function senseSight(f, dt, range, half, near = 2.0, far = 0.55) {
+export function senseSight(f, dt, range, half, near = 2.0, far = 0.55) {
   const K = T2.K, S = K.S, d = pdist(f);
   const seen = here(f) && sees(f, S.p.x, S.p.z, range, half);
   if (f.state !== 'alert') {
@@ -54,12 +56,12 @@ function senseSight(f, dt, range, half, near = 2.0, far = 0.55) {
   }
   return seen;
 }
-function alert(f) {
+export function alert(f) {
   if (!f.alive || f.state === 'alert') return;
   f.state = 'alert'; f.sus = 1; f.lost = 0; f.replan = 0;
   raiseAlarm(f, T2.K.$t(f.cfg.alarmMsg || '들켰어요! 오늘로 피하세요'));
 }
-function patrol(f, dt, walk) {
+export function patrol(f, dt, walk) {
   if (f.path.length > 1) {
     const [tx, tz] = f.path[f.wp];
     if (f.waitT > 0 && Math.hypot(tx - f.x, tz - f.z) < 0.2) {
@@ -72,7 +74,7 @@ function patrol(f, dt, walk) {
     else { if (f.faceYaw != null) turnToYaw(f, f.faceYaw, dt, 3); play(f, CLIP.idle, 0.25); }
   }
 }
-function chase(f, dt, speed, stop) {
+export function chase(f, dt, speed, stop) {
   const S = T2.K.S, d = pdist(f);
   f.replan -= dt;
   if (f.replan <= 0) { f.replan = 0.3; f.step = nextStep(f, cellOf(S.p.x), cellOf(S.p.z)); }
@@ -81,7 +83,7 @@ function chase(f, dt, speed, stop) {
   play(f, d < stop ? CLIP.idle : CLIP.run, 0.15);
 }
 /** 매 프레임 보이기: 다른 시대면 멈춘 붉은 몸 + 붉은 멈춘 시야, 아니면 진짜 몸 */
-function viewCommon(f, range, half) {
+export function viewCommon(f, range, half) {
   const K = T2.K, away = f.era !== K.S.era;
   const gh = f.m ? f.m.ghost : f.ghostBody;
   if (gh) { gh.visible = away && f.alive && ringPassed(f.x, f.z); if (!f.m) { gh.position.copy(f.holder.position); gh.rotation.copy(f.holder.rotation); } }
@@ -91,21 +93,27 @@ function viewCommon(f, range, half) {
   return away;
 }
 /** 쓰러짐: 동작 · 오늘의 해골(어제 쓰러졌으면) · 처치 */
-function die(f, how, msg) {
+export function die(f, how, msg) {
   const K = T2.K;
-  f.alive = false; f.wind = 0; f.rec = 0; f.aimT = 0;
+  if (!kill(K, f, how)) return false; // 정예 갑옷·되감기가 막았으면 그대로 서 있다
+  dieLook(f, how, msg);
+  return true;
+}
+/** 쓰러지는 모습만 (다른 길 — T4 유물 등 — 로 쓰러졌을 때도) */
+export function dieLook(f, how, msg) {
+  const K = T2.K;
+  f.wind = 0; f.rec = 0; f.aimT = 0;
   if (f.ani) { f.ani.onceLeft = 0; f.ani.once(how === 'back' ? CLIP.dieBack : CLIP.die, { speed: 1.3, hold: true }); }
   f.mark.visible = false; f.cone.visible = false;
   K.sfx.kill({ x: f.x, z: f.z });
   killFx(f, how, { msg });
   if (f.era === 'past' && !f.bones) { f.bones = K.makeMesh('bonePile', 'now'); f.bones.position.set(f.x, 0, f.z); f.bones.rotation.y = f.yaw; K.groups.now.add(f.bones); }
   f.diedAt = K.S.time;
-  K.killed(f, how);
 }
 /** 시간 마법사가 되살릴 때 */
-function reviveHuman(f) {
+export function reviveHuman(f) {
   const K = T2.K;
-  f.alive = true; f.counted = false; f.state = 'patrol'; f.sus = 0.6; f.wind = 0; f.rec = 0; f.stun = 0.9; f.lost = 0; f.aimT = 0;
+  f.alive = true; f.counted = false; f._dying = false; f.state = 'patrol'; f.sus = 0.6; f.wind = 0; f.rec = 0; f.stun = 0.9; f.lost = 0; f.aimT = 0;
   if (f.ani) { f.ani.onceLeft = 0; f.ani.loop(CLIP.idle, 0.4); }
   if (f.bones) { f.bones.parent && f.bones.parent.remove(f.bones); f.bones = null; }
   K.S.kills = Math.max(0, K.S.kills - 1);
@@ -184,6 +192,8 @@ EXT.foes['t2-shield'] = {
     f.onPlayerHurt = () => { f.rec = Math.max(f.rec, 1.3); }; // 친 뒤 방패를 고쳐 잡는다 (stun은 안 먹으므로)
     // 급히 오가면(다른 시대에 0.6초도 안 머물고 돌아오면) 그 기척을 듣고 이미 돌아서 있다 → Shift 연타로는 등을 못 잡는다
     f.onShift = (from, to) => {
+      // 넘어오는 순간 '들은 시간'은 0부터 (다른 시대에 있는 동안은 이 적의 시간이 멈춰 예전 값이 남아 있었다 → 경보 중인 방패병은 반응 없이 바로 돌아섰다)
+      if (to === f.era && f.alive) f.heard = 0;
       if (to !== f.era || !f.alive || prepared() || pdist(f) > C.hear + 1) return;
       f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z); f.heard = C.react + 1; S2.shieldUp({ x: f.x, z: f.z });
     };
@@ -367,7 +377,9 @@ EXT.foes['t2-mage'] = {
     const blink = () => {
       const S = K.S;
       let best = null, bd = -1;
-      const cand = f.blinkSpots.length ? f.blinkSpots : (() => { const o = []; for (let j = 0; j < S.H; j++) for (let i = 0; i < S.W; i++) if (K.stand(f.era, i, j)) o.push([C2(i), C2(j)]); return o; })();
+      // 뒤집힌 조각(T1)에선 blink 자리가 안 뒤집혀 벽 속일 수 있다 → 설 수 있는 자리만, 없으면 방 전체에서
+      const okSpots = f.blinkSpots.filter(([x, z]) => K.stand(f.era, cellOf(x), cellOf(z)));
+      const cand = okSpots.length ? okSpots : (() => { const o = []; for (let j = 0; j < S.H; j++) for (let i = 0; i < S.W; i++) if (K.stand(f.era, i, j)) o.push([C2(i), C2(j)]); return o; })();
       for (const [x, z] of cand) {
         const d = Math.hypot(x - S.p.x, z - S.p.z), dm = Math.hypot(x - f.x, z - f.z);
         if (dm < 1 || d < 4.5) continue;

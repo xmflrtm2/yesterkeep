@@ -5,7 +5,7 @@
 //   망령: 한 시대(기본 오늘)에 있고 그 시대에선 거의 안 보인다(서리 알갱이·속삭임만). 다른 시대에서 보면 붉게 또렷하다.
 //         벽을 지나 다가와 닿으면 아프다. 칼은 그냥 지나간다. 그 시대로 넘어오는 순간 몸이 겹치면(푸른 원 안) 흩어진다.
 import { EXT } from '../../ext.js';
-import { T2, cellOf, C2, other, pdist, here, fromBehind, turnToYaw, decal, ringGeo, discGeo, ghostCopy, ringPassed, mat, glowMat, killFx, t2Foes, fail, prepared, stayHere } from './core.js';
+import { T2, cellOf, C2, other, pdist, here, fromBehind, turnToYaw, decal, ringGeo, discGeo, ghostCopy, ringPassed, mat, glowMat, killFx, t2Foes, fail, prepared, stayHere, kill, thrownToStab } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -107,10 +107,11 @@ EXT.foes['t2-echo'] = {
     f.onStab = info => {
       if (!f.out) return 'miss';
       if (fromBehind(f, info, 70)) {
-        f.alive = false; f.holder.visible = false; f.ghost.visible = false;
+        if (!kill(K, f, 'back')) return 'armor';
+        f.holder.visible = false; f.ghost.visible = false;
         S2.echoBreak({ x: f.x, z: f.z }); K.FX.motes(f.x, 0.9, f.z, { n: 40, color: elite ? ['#ffd28a', '#ffffff'] : ['#9ff4ff', '#ffffff'], speed: 3.5, up: 2, life: 1 });
         killFx(f, 'back', { msg: K.$t('메아리를 흩었어요'), color: ['#9ff4ff', '#ffffff'] });
-        K.killed(f, 'back'); return 'kill-back';
+        return 'kill-back';
       }
       K.FX.motes(f.x, 1, f.z, { n: 10, color: ['#9ff4ff'], speed: 2, up: 1, life: 0.5 }); S2.echoHum({ x: f.x, z: f.z });
       fail();
@@ -195,10 +196,10 @@ EXT.foes['t2-wraith'] = {
     f.onShift = (from, to) => {
       if (!f.alive || to !== f.era) return;
       if (pdist(f) < C.killR && prepared()) {
-        f.alive = false; f.mk.g.visible = false; f.ghost.visible = false; f.kill.visible = f.killFill.visible = false;
+        if (!kill(K, f, 'shift')) return;
+        f.mk.g.visible = false; f.ghost.visible = false; f.kill.visible = f.killFill.visible = false;
         S2.disperse({ x: f.x, z: f.z }); K.FX.motes(f.x, 1.0, f.z, { n: 50, color: ['#cfe8ff', '#7fe8ff', '#ffffff'], speed: 4, up: 2.5, life: 1.2 });
         killFx(f, 'shift', { msg: K.$t('겹쳐 넘어와 망령을 흩었어요'), color: ['#cfe8ff', '#ffffff'] });
-        K.killed(f, 'shift');
       } else if (pdist(f) < C.startle && f.cool <= 0) { f.lungeT = C.lungeT; S2.wail({ x: f.x, z: f.z }); } // 어설프게 곁으로 넘어오면 바로 덤벼든다
     };
     f.revive = () => { f.alive = true; f.counted = false; f.cool = 1.5; f.mk.g.visible = true; K.S.kills = Math.max(0, K.S.kills - 1); };
