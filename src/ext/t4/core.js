@@ -8,6 +8,7 @@ const MSG = { // main.js가 hurt()에 넘기는 글자 (비교용, 그때 언어
   arrow: () => $t('화살에 맞았어요'), spike: () => $t('가시에 찔렸어요'), blade: () => $t('칼날에 베였어요'),
 };
 const DEG = Math.PI / 180;
+const SHOCK_MAX = 5.0; // 시간 충격(넘어올 때 얼어붙는) 범위의 끝
 // T2 적의 피해 글자 (짐승 가죽·혼령 부적이 알아보는 것)
 const T2MSG = [['beast', () => $t('사냥개에게 물렸어요')], ['beast', () => $t('미믹에게 물렸어요')], ['beast', () => $t('쥐 떼에 물렸어요')],
   ['spirit', () => $t('메아리에 닿았어요 — 내가 지나온 길을 따라와요')], ['spirit', () => $t('망령에 닿았어요 — 다른 시대에서 보고, 겹쳐 넘어오세요')]];
@@ -74,13 +75,15 @@ export function apply() {
   put(K.GUARD, 'half', 'GUARD', st.mul.half);
   put(K.GUARD, 'susNear', 'GUARD', st.mul.sus);
   put(K.GUARD, 'susFar', 'GUARD', st.mul.sus);
-  put(K.GUARD, 'shock', 'GUARD', st.mul.shock);
+  // 얼어붙는 범위는 5m까지 — 납 모래시계(×1.5)와 충격 종 II(×5/3)가 곱해져 7.5m가 되자 Shift 연타 봇이 T2 방 7개 중 5개를 깼다 (11/15)
+  { const b = T4.base['GUARD.shock'] ?? K.GUARD.shock; put(K.GUARD, 'shock', 'GUARD', Math.min(st.mul.shock, SHOCK_MAX / b)); }
   put(K.GOLEM, 'sense', 'GOLEM', st.mul.sense);
   put(K.GOLEM, 'susNear', 'GOLEM', st.mul.sus);
   put(K.GOLEM, 'susFar', 'GOLEM', st.mul.sus);
   for (const key of ['walk', 'run']) { put(K.GUARD, key, 'GUARD', st.foeSpeed); put(K.GOLEM, key, 'GOLEM', st.foeSpeed); } // 저주: 무거운 왕관
   // T1이 읽는 모래 배수 (T1이 없으면 아무도 안 읽음)
   if (st.mul.sandMul !== 1 || 'STAT.sandMul' in T4.base) { if (STAT.sandMul == null) STAT.sandMul = 1; put(STAT, 'sandMul', 'STAT', st.mul.sandMul); }
+  if (st.mul.sandDrain !== 1 || 'STAT.sandDrain' in T4.base) { if (STAT.sandDrain == null) STAT.sandDrain = 1; put(STAT, 'sandDrain', 'STAT', st.mul.sandDrain); } // T1이 어제에서 모래 줄이는 속도에 곱함
   dynStats();
   if (STAT.maxHearts !== oldMax && S) {
     if (STAT.maxHearts > oldMax) S.hearts += STAT.maxHearts - oldMax; else S.hearts = Math.min(S.hearts, STAT.maxHearts);

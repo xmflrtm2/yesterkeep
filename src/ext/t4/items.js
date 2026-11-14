@@ -135,8 +135,10 @@ export const ITEMS = [
     desc: [N('쓰러뜨릴 때 금화 두 배')], cost: N('경비 시야 +20%, 골렘 감지 +15%'),
     stat(st) { st.coinMul *= 2; st.mul.range *= 1.2; st.mul.sense *= 1.15; } },
   { id: 't4-curse-lead', kind: 'curse', rar: 'curse', icon: '⚓', name: N('납 모래시계'), memBonus: 0.25,
-    desc: [N('전환 기습 +0.6초, 얼어붙는 범위 ×1.5')], cost: N('시대 전환 대기 0.5초 → 1.2초'),
-    stat(st) { st.strike += 0.6; st.mul.shock *= 1.5; st.mul.shiftCd *= 2.4; } },
+    desc: [N('전환 기습 +0.6초, 얼어붙는 범위 ×1.5')], cost: N('어제에서 모래가 1.6배 빨리 줄어요'),
+    // 대가를 처음엔 '전환 대기 1.2초'로 했더니, 억지로 1초 넘게 기다리게 돼 T2의 '준비된 전환'(1초)이 저절로 채워졌다 →
+    // Shift 연타 봇이 T2 방 5개 중 4개를 깸 (11/15). 0.7초로 줄여도 0.5초마다 누르는 봇은 1초 박자로 바뀌어 같은 일 → 대기는 그대로, 모래로만 값을 치르게
+    stat(st) { st.strike += 0.6; st.mul.shock *= 1.5; st.mul.sandDrain *= 1.6; } },
   { id: 't4-curse-glass', kind: 'curse', rar: 'curse', icon: '🫙', name: N('금 간 심장'), memBonus: 0.25,
     desc: [N('최대 하트 +2')], cost: N('맞을 때마다 하트가 2개씩 줄어요 (떨어질 땐 1개)'),
     stat(st) { st.add.maxHearts += 2; st.glassHeart = 1; } },

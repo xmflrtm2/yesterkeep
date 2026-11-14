@@ -88,7 +88,7 @@ function build() {
 
 // ───────── 글자 조각 ─────────
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-const rarLine = it => `${$t(RAR[it.rar].name)} · ${$t(KIND[it.kind])}`;
+const rarLine = it => (it.kind === 'curse' ? $t(KIND.curse) : `${$t(RAR[it.rar].name)} · ${$t(KIND[it.kind])}`);
 export const synFor = id => SYN.filter(s => (s.a === id && has(s.b)) || (s.b === id && has(s.a)));
 const synNames = id => synFor(id).map(s => $t(s.name)).join(', ');
 export function itemCard(it, { lv = 1, price = null, note = '', showUp = false, key = '' } = {}) {
@@ -122,6 +122,14 @@ export function showHud() {
   h += '</div>';
   if (T4.inv.length) h += `<div class="key">${$t('Tab 유물 보기')}</div>`;
   bar.innerHTML = h;
+  // 유물이 많으면 아래로 넘치지 않게 열을 늘린다(왼쪽으로). 창 높이에서 위쪽 HUD·아래 안내 몫을 뺀 만큼만 세로로
+  const icons = bar.querySelector('.icons'), n = T4.inv.length;
+  if (icons && n) {
+    const small = innerWidth <= 640 || innerHeight <= 520, cell = small ? 35 : 39, base = small ? 2 : 3;
+    const rows = Math.max(3, Math.floor((innerHeight - bar.getBoundingClientRect().top - 90) / cell));
+    const cols = Math.max(base, Math.ceil(n / rows));
+    icons.style.gridTemplateColumns = `repeat(${cols}, ${small ? 30 : 34}px)`;
+  }
   for (const el of bar.querySelectorAll('.ic')) {
     el.addEventListener('pointerenter', () => showTip(el));
     el.addEventListener('pointerleave', hideTip);
@@ -282,7 +290,7 @@ export function openCursePick({ count = 3 } = {}) {
     const list = roll(count, { curse: true });
     if (!list.length) { resolve(null); return; }
     snd.open();
-    const cards = [{ html: `<div class="ico">🕯️</div><div class="nm">${$t('저주 없이')}</div><div class="rk">${$t('보통 런')}</div><div class="ds">${$t('그대로 시작해요')}</div>`, cls: 'r-plain', onPick: P => { P.close(); resolve(null); } }]
+    const cards = [{ html: `<div class="k">1</div><div class="ico">🕯️</div><div class="nm">${$t('저주 없이')}</div><div class="rk">${$t('보통 런')}</div><div class="ds">${$t('그대로 시작해요')}</div>`, cls: 'r-plain', onPick: P => { P.close(); resolve(null); } }]
       .concat(list.map((id, k) => { const it = byId(id); return { html: itemCard(it, { key: String(k + 2) }), cls: 'r-curse', onPick: P => { P.close(); give(id); snd.take(); resolve(id); } }; }));
     panel({ title: $t('저주를 들고 갈까요?'), sub: $t('강하지만 대가가 있어요. 대신 런이 끝나면 기억을 더 받아요'), cards,
       foot: $t('←→ 고르기 · Enter 정하기 · Esc 저주 없이'), onCancel: P => { P.close(); resolve(null); } });
@@ -346,3 +354,4 @@ T4.listeners.add(why => {
   if (typeof why === 'string' && why.startsWith('coins:')) { const n = +why.slice(6); if (n) pop((n > 0 ? '+' : '') + n + ' 🪙'); }
 });
 EXT.on('init', () => { build(); showHud(); });
+addEventListener('resize', () => { if (built) showHud(); }); // 창 크기가 바뀌면 유물 줄 열 수도 다시
