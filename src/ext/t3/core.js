@@ -2,6 +2,7 @@
 // 방마다 바뀌는 것은 C(현재 방 기록)에 둔다. 칸 판정(EXT.solidAt/floorAt)은 방을 짓는 도중(buildEra·buildGhosts)에도 불리므로
 // 글자 처리기가 불리는 그 순간부터 기록이 살아 있어야 한다 → 글자 처리기에서 방을 열고(begin), roomLoad에서 닫는다(sealed).
 import { EXT } from '../../ext.js';
+import { S3 } from './sfx3.js';
 
 export const C = {
   room: null, sealed: true,
@@ -34,7 +35,7 @@ export const markDirty = () => { C.dirty = true; };
 
 function begin(room) {
   if (C.room === room && !C.sealed) return;
-  C.room = room; C.sealed = false; C.cells = new Map(); C.inv = { seed: 0, key: 0 }; C.stuck = false; C.stuckT = 0; C.once = new Set(); C.dirty = false;
+  C.room = room; C.sealed = false; C.t = 0; C.cells = new Map(); C.inv = { seed: 0, key: 0 }; C.stuck = false; C.stuckT = 0; C.once = new Set(); C.dirty = false;
   for (const m of MECHS) C.d[m.id] = m.fresh();
 }
 /** 장치 등록. m = { id, fresh(), chars: { 글자: (d, E, i, j, room, K) → 기본 글자 }, solid(x, era, i, j, c), floor(x, era, i, j, c),
@@ -176,6 +177,12 @@ EXT.on('roomLoad', (room, k) => {
 });
 // 2차(11/15) 런의 모래 바닥: 이 조각을 풀려면 어제에 연달아 pastRun초쯤 있어야 한다(조각마다 chunks.js PAST_RUN).
 // 모래가 바닥이면 오늘에서 3초까지만 차오르므로, 모자란 채로 들어오거나 R로 다시 하면 '풀 만큼'까지만 채운다(그 이상은 안 줌)
+// 11/16 T1 2차 런의 안내 3단계(수수께끼 → 2번 실패: 조각의 hint → 4번: tip)에서 T3 조각은 hint가 곧 수수께끼라
+// 2단계에 바뀌는 게 없고 tip은 4번 실패해야 나왔다(런 직접 플레이: 0.7초의 다리에서 두 번 물려도 같은 줄) → T3 조각은 2단계를 tip으로
+EXT.on('roomEnter', room => {
+  if (!room || !room.t1riddle || !room.t3chunk || !room.t1tip2 || !room.tip || !room.hint) return;
+  if ($t(room.tip) === $t(room.hint)) room.tip = room.t1tip2;
+});
 export const SANDFLOOR = { on: true, mul: 1.25, add: 1, cap: 12 };
 export const sandNeed = room => room && room.pastRun ? Math.min(SANDFLOOR.cap, Math.ceil(room.pastRun * SANDFLOOR.mul + SANDFLOOR.add)) : 0;
 EXT.on('roomEnter', room => {
@@ -187,10 +194,25 @@ EXT.on('roomEnter', room => {
     const r = EXT.K.S.room; setTimeout(() => { if (EXT.K.S.room === r) EXT.K.toast($t('풀 만큼 모래를 채웠어요 ({0}초)', need), 2.6); }, 900);
   }
 });
+// 11/16 예고: T3 조각 안에서 사냥개가 처음 나를 노릴 때 · 망령이 처음 12m 안에 있을 때(망령은 늘 다가오므로 방에 들어와 0.8초 뒤면 거의 바로) 한 번(방 id마다, R로 다시 해도 반복 안 함).
+// 직접 플레이: 밀물 방은 어제로 넘어가 수문을 닫고 둘러보는 3초 사이에, 망령 방은 첫 걸음에 아무 낌새 없이 맞았다
+const WARNED = new Set();
+function foeTells(k) {
+  const r = C.room; if (!r || !r.t3chunk || C.t < 0.8) return;
+  for (const f of k.extFoes) {
+    if (!f.alive || f.era !== k.S.era) continue;
+    let key = null, msg = null;
+    if (f.kind === 't2-hound' && f.state === 'alert') { key = 'hound'; msg = $t('사냥개 — 바꾸면 0.7초 뒤 따라와요'); }
+    else if (f.kind === 't2-wraith' && Math.hypot(f.x - k.S.p.x, f.z - k.S.p.z) < 12) { key = 'wraith'; msg = $t('무언가 다가와요 — 다른 시대에서 보세요'); }
+    if (!key || WARNED.has(r.id + ':' + key)) continue;
+    WARNED.add(r.id + ':' + key); k.toast(msg, 2.8); S3.warn({ x: f.x, z: f.z });
+  }
+}
 EXT.on('update', (dt, k) => {
   if (!live() || !C.has) return;
   C.t += dt;
   for (const m of MECHS) if (m.update) m.update(C.d[m.id], dt, k);
+  foeTells(k);
   // 2차: 내 장치 칸의 바닥이 사라지면(물이 차오름·뿌리 다리가 사라짐·바닥이 무너짐) 그 위에 서 있던 사냥개는 떨어진다.
   // 사냥개는 시대를 따라올 때만 발밑을 보므로(T2 beasts.js), 다른 시대에서 바꿔 두고 돌아오면 그대로 서 있었다
   for (const f of k.extFoes) {
