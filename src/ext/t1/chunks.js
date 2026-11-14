@@ -35,7 +35,8 @@ const SPARE = [
     id: 'spikes', tier: 2, tags: ['puzzle'], weight: 0.5,
     name: N('가시 회랑'),
     hint: N('가시는 어제만 움직여요. 가시가 내려간 순간을 붙잡아 두세요'),
-    tip: N('9열에서 가시가 막 내려간 순간 오늘로 → 12열 끝까지 걸어가서 → 어제로 돌아와 건너세요'),
+    // 런에서는 칸 번호가 안 보이고, 뒤집거나 이어 붙이면 번호도 틀려서 (11/16) 번호 없이 풀어 쓴다
+    tip: N('구덩이 너머 빈 줄에서 가시가 막 내려간 순간 오늘로 → 녹슨 가시 끝까지 걸어가서 → 어제로 돌아와 남은 가시를 건너세요'),
     startEra: 'past',
     spikePhase: i => (i >= 10 ? 1.15 : 0),
     past: ['#################', '#...^^....^^^$^.#', '#@..^^....^^^^^>#', '#...^^....^^^^^.#', '#...^^....^^^^^.#', '#################'],
@@ -175,6 +176,9 @@ export const GEN = [
   },
 ];
 
+// T3가 "T1 flip()이 거울 글자를 안 바꿔서" 달아 둔 flip: false — 2차(11/16)에 flip()이 '/'↔'\'·blink까지 바꾸게 고친 뒤
+// tools/t1_flipcheck.js(T3 풀이 봇에 좌우로 뒤집은 단계)로 8개 모두 뒤집어도 하트 0으로 풀리는 걸 확인 → 뒤집기를 다시 허용
+export const FLIP_OK = new Set(['t3-mirror1', 't3-mirror2', 't3-garden', 't3-grand', 't3-m-wraithmirror', 't3-m-mageseal', 't3-m-mimiccrumble', 't3-m-xbowclock']);
 const KNOWN = new Set(['id', 'track', 'tier', 'tags', 'name', 'hint', 'tip', 'gateTip', 'past', 'now', 'start', 'exit', 'startEra', 'foes', 'guards', 'golems', 'shards', 'arrowPhase', 'bladePhase', 'spikePhase', 'gateHold', 'par', 'solve', 'weight', 'flip', 'join', 'vary', 'extra', 'cam', 'remap', 'roomId']);
 
 let cache = null, cacheN = -1;
@@ -192,6 +196,7 @@ export function library(EXT) {
       const c = normalize(ch, { src: ch.track || 'ext', weight: ch.weight || 1.6 });
       // 좌표가 든 자기 필드가 있는데 remap이 없으면 이어 붙이지 않는다(뒤집기는 flip:false로 막을 수 있음)
       if (custom.length && ch.join !== true && typeof ch.remap !== 'function') c.join = false;
+      if (FLIP_OK.has(ch.id)) c.flip = true;
       if (!c.start || !c.exit) { console.warn('[T1] chunk without start/exit', ch.id); continue; }
       out.push(c);
     } catch (e) { console.error('[T1] bad chunk', ch && ch.id, e); }

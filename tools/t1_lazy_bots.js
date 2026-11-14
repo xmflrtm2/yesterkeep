@@ -5,10 +5,10 @@ const Y = () => window.__yk;
 const R = () => Y().ext.run;
 const DT = 1 / 30;
 const st = () => Y().state();
+// 경비·골렘에 더해 T2 적(쌍둥이·여왕 등 EXT)과 보스까지 — 11/16: 예전엔 경비·골렘만 봐서 문지기 방에서 봇이 적을 못 봤다
 function foes() {
-  const g = Y().guards().filter(x => x.alive).map(x => ({ ...x, era: 'past' }));
-  const k = Y().golems().filter(x => x.alive).map(x => ({ ...x, era: 'now' }));
-  return [...g, ...k];
+  const K = Y().ext.K;
+  return K.enemies().filter(e => e.alive && !e.optional).map(e => ({ x: e.x, z: e.z, era: e.era || (K.guards.includes(e) ? 'past' : 'now') }));
 }
 function exitXZ() {
   const G = Y().grid('past');
@@ -63,7 +63,7 @@ const M = {
   run(name, opts = {}) {
     const { floor = 1, type = 'combat', seed = 'lz' + Math.random(), sec = 60 } = opts;
     Y().pause(true);
-    R()._dev.jump(floor, type, seed);
+    if (opts.chunk) R()._dev.jumpChunk(opts.chunk, floor, seed); else R()._dev.jump(floor, type, seed);
     const room = Y().S.room, n0 = foes().length, h0 = st().hearts, sand0 = R().sand();
     BOTS[name](sec);
     const ended = !R().state;
