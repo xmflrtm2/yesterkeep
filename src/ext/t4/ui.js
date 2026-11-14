@@ -40,7 +40,6 @@ body:has(#endCard[style*="flex"]) #t4-bar, body:has(#holdCard.on) #t4-bar, body:
   text-align: left; font-size: 13.5px; line-height: 1.45; pointer-events: none; word-break: keep-all; overflow-wrap: anywhere; }
 #t4-near .nm { font-size: 16px; font-weight: 700; color: var(--rc); } #t4-near .rk { font-size: 12px; opacity: .7; } #t4-near .p { margin-top: 3px; color: var(--gold); font-weight: 700; } #t4-near .p .yi { width: 18px; height: 18px; }
 #t4-near .sy { margin-top: 3px; color: var(--gold); font-size: 12.5px; } #t4-near .ico, #t4-near .k, #t4-near .pr { display: none; }
-#t4-near .gm, #t4-tip .gm { display: none; }
 #t4-ov { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow-y: auto;
   background: radial-gradient(ellipse at center, #000b 0%, #000e 100%); pointer-events: auto; z-index: 4; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
 #t4-ov.on { display: flex; }
