@@ -5,7 +5,7 @@ const CSS = `
 /* T5(11/15): 판넬 틀·제목·단추는 ../t5/theme.js의 .yk-frame·.yk-h·.yk-btn (UI.show가 붙임), 색은 시대 변수(--pn-*). 지도 칸 그림은 ../t5/icons.js */
 #ext .t1-ov { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 18px 14px; box-sizing: border-box;
   background: radial-gradient(ellipse at center, #05070cd8 0%, #000000f2 75%); overflow-y: auto; z-index: 0; }
-#ext .t1-box { margin: auto; width: min(640px, 100%); box-sizing: border-box; padding: 22px 30px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; text-wrap: balance; }
+#ext .t1-box { margin: auto; width: min(640px, 100%); box-sizing: border-box; padding: 22px 30px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
 #ext .t1-h { font-size: 30px; }
 #ext .t1-logo { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 34px; }
 #ext .t1-logo::after { flex-basis: 100%; }
