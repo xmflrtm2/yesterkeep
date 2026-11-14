@@ -2963,8 +2963,14 @@ function update(dt) {
   hud.ptime.textContent = $t('어제 {0}초', S.pastTime.toFixed(1));
   // 카메라 (조금 늦게 따라옴). 깨어 있는 보스가 있으면 둘 사이 쪽으로 조금 당겨 둘 다 보이게
   _v.set(S.p.x, 0, S.p.z);
-  const bb = bosses[0];
-  if (bb && bb.alive && bb.state !== 'dormant' && !bb.fall) { const ox = (bb.x - S.p.x) * 0.3, oz = (bb.z - S.p.z) * 0.3, ol = Math.hypot(ox, oz), k = ol > 4 ? 4 / ol : 1; _v.x += ox * k; _v.z += oz * k; }
+  // 확장 미니 보스(T2 문지기, bossHp가 있음)도 깨어 있으면 같은 식으로 — 휴대폰 세로 화면에서 문지기가 화면 밖에 있던 일 (11/15)
+  let bb = bosses[0];
+  if (!(bb && bb.alive && bb.state !== 'dormant' && !bb.fall)) {
+    bb = null; let bd = 1e9;
+    for (const f of extFoes) if (f.bossHp != null && f.alive && !f.fall && f.state !== 'sleep' && (f.era === S.era || f.era === 'both')) { const d = (f.x - S.p.x) ** 2 + (f.z - S.p.z) ** 2; if (d < bd) { bd = d; bb = f; } }
+  }
+  if (bb) { const narrow = camera.aspect < 1, w = narrow ? 0.5 : 0.3, cap = narrow ? 6 : 4; // 세로 화면은 옆이 ±3m쯤만 보여서 더 당긴다
+    const ox = (bb.x - S.p.x) * w, oz = (bb.z - S.p.z) * w, ol = Math.hypot(ox, oz), k = ol > cap ? cap / ol : 1; _v.x += ox * k; _v.z += oz * k; }
   camTarget.lerp(_v, 1 - Math.exp(-dt * 5));
   S.shake = Math.max(0, S.shake - dt);
   const sh = S.shake * S.shake * 0.9;
