@@ -28,7 +28,8 @@ const mustJoin = (c, floor, row) => c.think === 0 || THINK0.has(c.id) || (floor 
 // 모래(초). 어제에 있으면 1초에 1(×EXT.stats.sandDrain)씩 준다. 오늘에서는 reserve까지만 천천히 차올라 갇히지 않게
 // 11/13 직접 플레이(시드 123, 14방): 최대 20·처치 1.5·조각 4로는 방을 나올 때마다 거의 가득 → 모래가 고민거리가 안 됐다(상점에서 쓴 뒤에만 빠듯)
 // → 최대 16, 처치 1, 조각 3, 층 보너스 5, 상점 5. 어제에서 기다리기만 하는 풀이(경비가 돌아서길 어제에서 기다림)는 바닥나게
-export const SAND = { max: 16, start: 16, shard: 3, kill: 1.0, elite: 3, floorBonus: 5, reserve: 3, trickle: 0.3, enterMin: 0.35, low: 4,
+// 2차(11/15 직접 플레이): 오늘에서 차오르는 한도 3초로는 사냥개 꾀기(띠 건너 깨우고 다시 건너오기 ≈ 4초)를 못 해 방이 막혔다 → 5초. 차오르는 빠르기는 그대로(0.3/초, 0→5에 17초)
+export const SAND = { max: 16, start: 16, shard: 3, kill: 1.0, elite: 3, floorBonus: 5, reserve: 5, trickle: 0.3, enterMin: 0.35, low: 4,
   // 성채지기 방: 싸움 자체가 시대 전환이라 모래가 바닥나면 이길 길이 없었다(11/13 봇: 모래 0 → 150초 동안 4번만 맞힘, 런 끝)
   // → 이 방에서는 0.6배로 줄고, 성채지기를 맞힐 때마다 모래가 쏟아진다(+4)
   bossDrain: 0.6, bossHit: 4 };
@@ -190,6 +191,8 @@ function buildNodeRoom(node, resume = false) {
     }
     if (!built) { rec = { a: 't1-sentry', fa: false, b: null, tier: 1, type: node.type }; built = fromRecipe(rec, vr()); }
     room = toRoom(built.c, { id, name: built.name, label });
+    // 2차: 런에서는 시작 칸이 오늘에도 서 있을 수 있으면 오늘에서 시작 — 어제에서 시작하면 방을 읽는 동안 모래가 줄었다(11/15 직접 플레이: 가라앉은 열쇠·달과 물의 방)
+    if (room.startEra === 'past') { const j = room.now.findIndex(r => r.includes('@')), i = j >= 0 ? room.now[j].indexOf('@') : -1; const below = i >= 0 ? (built.c.now[j] || '')[i] : null; if (below && '.,%='.includes(below) || below === '@') room.startEra = 'now'; }
     setHints(room);
     const tparts = (room.t1parts || []).filter(p => /^(t1|tut)-/.test(p.id));
     addRubble(room, f, makeRng(st.seed, 'rubble', f, node.row, node.col), (i, j) => tparts.some(p => i >= p.x && i < p.x + p.w && j >= p.y && j < p.y + p.h));
@@ -441,6 +444,8 @@ EXT.on('roomLoad', room => {
     save();
   }
   if (m.kind === 'landing' && m.floor > 1 && !restart && !R.warned['f' + m.floor]) { R.warned['f' + m.floor] = 1; SND.floor(K); }
+  // 쉼터 칸: 모래는 T1 몫이라 들어서면 가득 (T4 모닥불은 하트·유물 강화만 — 11/15 합친 판 직접 플레이에서 모래가 안 차서)
+  if (m.kind === 'node' && m.type === 'rest' && !restart && st.sand < sandMax()) { const got = addSand(sandMax(), 'rest'); if (got > 0.05) K.toast($t('모닥불 곁에서 모래가 차올라요 (+{0}초)', got.toFixed(1)), 2); }
   EXT.emit('roomEnter', room, m, st);
 });
 EXT.on('update', dt => {
@@ -448,6 +453,7 @@ EXT.on('update', dt => {
   if (R.mode !== 'run' || !R.cur || !st) return;
   const S = K.S, m = R.cur.t1;
   st.stats.time += dt;
+  R.saveT = (R.saveT || 0) + dt; if (R.saveT > 3) { R.saveT = 0; saveLive(); }
   if (S.got.size > R.gotN) { // main.js의 "모래시계 조각 n / 튜토리얼 합계" 알림 대신 (런에서는 그 합계가 틀림)
     const got = addSand(SAND.shard * (S.got.size - R.gotN), 'shard'); R.gotN = S.got.size;
     K.toast($t('모래시계 조각 — 모래 +{0}초', (Math.round(got * 10) / 10)), 1.6);
@@ -548,12 +554,15 @@ EXT.on('death', () => {
   endRun('dead');
   return true;
 });
-EXT.on('hurt', () => { if (R.mode === 'run' && st) st.stats.hurts++; });
+// 2차: 방 안에서도 하트·모래를 저장(맞을 때·처치할 때·3초마다). 전엔 방에 들어올 때만 저장해서, 창을 닫았다 열면 들어올 때의 하트·모래로 되돌아가는 구멍이 있었다
+function saveLive() { if (R.mode !== 'run' || !st || st.pending || !R.cur) return; st.hearts = K.S.hearts; save(); }
+EXT.on('hurt', () => { if (R.mode === 'run' && st) { st.stats.hurts++; saveLive(); } });
 EXT.on('shift', () => { if (R.mode === 'run' && st) st.stats.shifts++; });
 EXT.on('kill', foe => {
   if (R.mode !== 'run' || !st || !R.cur || R.cur.t1.kind !== 'node') return;
   st.stats.kills++;
   if (R.killsRewarded < R.enemies0) { R.killsRewarded++; addSand(SAND.kill, 'kill'); }
+  saveLive();
 });
 EXT.on('prompt', () => {
   if (!altar || !nearAltar()) return undefined;

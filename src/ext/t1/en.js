@@ -109,6 +109,7 @@ Object.assign(window.I18N.en, {
   '금빛 적은 한 번 더 생각한다': 'Golden foes think twice',
   '어제 한 일은 오늘에 남는다': 'What you do yesterday remains today',
   '공격하는 순간, 그는 시간을 놓친다': 'The moment he attacks, he loses track of time',
+  '모닥불 곁에서 모래가 차올라요 (+{0}초)': 'Sand refills by the fire (+{0}s)',
   '기억의 서고': 'Hall of Memories',
   '기억으로 새 유물·해금': 'Spend memories on new relics and unlocks',
   '문지기를 넘었어요 — 하나를 고르세요': 'Past the gatekeeper — choose one',
