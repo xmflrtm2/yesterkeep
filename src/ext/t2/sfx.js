@@ -43,5 +43,23 @@ export const S2 = {
   seal(pos) { go(pos, { rev: 0.3 }, (s, o) => { s.noise(0.35, cents(220), cents(480), 0.18, 3, 'bandpass', o); s.thud(cents(80), 0.3, 0.3, W(o, 0.3)); s.noise(0.3, 700, 150, 0.12, 0.8, 'lowpass', W(o, 0.3)); }); },
   // 메아리
   echoHum(pos) { go(pos, { rev: 0.8 }, (s, o) => { s.fm(cents(440, 10), 2.01, 0.5, 0.6, 0.015, o); s.fm(cents(660, 10), 2.01, 0.5, 0.6, 0.01, W(o, 0.15)); }); },
+  // ── 2차: 문지기 · 새 적 ──
+  roar(pos) { go(pos, { rev: 0.5 }, (s, o) => { s.voiceish(cents(110, 60), cents(80), 0.9, 0.12, [420, 900], o); s.noise(0.8, 300, 120, 0.12, 0.8, 'lowpass', o); }); },
+  bigSwing(pos) { go(pos, {}, (s, o) => { s.noise(0.3, 400, 2400, 0.32, 0.9, 'bandpass', o); s.noise(0.25, 2400, 600, 0.2, 0.9, 'bandpass', W(o, 0.12)); }); },
+  bossHit(pos) { go(pos, { rev: 0.5 }, (s, o) => { s.fm(cents(300, 60), 2.76, 3, 0.6, 0.12, o); s.thud(cents(90), 0.35, 0.35, o); s.voiceish(cents(150, 60), cents(95), 0.45, 0.08, [520, 980], W(o, 0.05)); }); },
+  oath(pos) { go(pos, { rev: 0.7 }, (s, o) => { [392, 494, 587].forEach((f, k) => s.fm(cents(f, 10), 3.5, 1, 0.9, 0.03, W(o, k * 0.12))); }); },
+  quake(pos) { go(pos, { rev: 0.4 }, (s, o) => { s.tone(cents(70), 35, 1.0, 'sine', 0.36, o); s.noise(1.0, 500, 90, 0.22, 0.7, 'lowpass', o); }); },
+  screech(pos) { go(pos, { rev: 0.4 }, (s, o) => { s.voiceish(cents(900, 80), cents(1400), 0.45, 0.07, [1800, 3200], o); s.noise(0.4, 4000, 7000, 0.08, 2, 'bandpass', o); }); },
+  pounce(pos) { go(pos, {}, (s, o) => { s.noise(0.25, 1200, 300, 0.18, 0.9, 'bandpass', o); }); },
+  land(pos) { go(pos, { rev: 0.3 }, (s, o) => { s.thud(cents(110), 0.25, 0.34, o); s.noise(0.2, 900, 200, 0.16, 0.8, 'lowpass', o); }); },
+  webShot(pos) { go(pos, {}, (s, o) => { s.noise(0.18, 3000, 800, 0.16, 1.4, 'bandpass', o); s.tone(cents(500), 300, 0.15, 'triangle', 0.04, o); }); },
+  eggCrack(pos) { go(pos, {}, (s, o) => { s.noise(0.08, 2500, 1200, 0.2, 1, 'bandpass', o); s.thud(cents(300), 0.08, 0.12, o); s.noise(0.25, 800, 300, 0.08, 1, 'lowpass', W(o, 0.05)); }); },
+  eyeHum(pos) { go(pos, { rev: 0.5 }, (s, o) => { s.fm(cents(220, 10), 1.5, 0.4, 0.8, 0.012, o); }); },
+  lock(pos) { go(pos, { rev: 0.4 }, (s, o) => { for (let k = 0; k < 4; k++) s.fm(cents(1200, 100), 2.76, 1.2, 0.08, 0.05, W(o, k * 0.06)); s.thud(cents(140), 0.2, 0.2, W(o, 0.25)); }); },
+  fuse(pos) { go(pos, {}, (s, o) => { s.noise(0.5, 5000, 3000, 0.05, 2, 'highpass', o); }); },
+  boom(pos) { go(pos, { rev: 0.5 }, (s, o) => { s.tone(cents(80), 30, 0.7, 'sine', 0.42, o); s.noise(0.9, 2200, 100, 0.32, 0.7, 'lowpass', o); s.noise(0.3, 6000, 1500, 0.1, 1, 'bandpass', o); }); },
+  throwIt(pos) { go(pos, {}, (s, o) => { s.noise(0.2, 700, 1800, 0.14, 1, 'bandpass', o); }); },
+  rewindWhoosh(pos) { go(pos, { rev: 0.6 }, (s, o) => { s.noise(0.45, 5000, 600, 0.12, 1.2, 'bandpass', o); s.tone(cents(900), 300, 0.45, 'triangle', 0.05, o); }); },
+  parry(pos) { go(pos, { rev: 0.3 }, (s, o) => { s.fm(cents(1500, 100), 2.76, 2.5, 0.3, 0.1, o); s.noise(0.06, 7000, 4000, 0.08, 1, 'highpass', o); }); },
   echoBreak(pos) { go(pos, { rev: 0.8 }, (s, o) => { [880, 1108, 1318, 1760].forEach((f, k) => s.fm(cents(f, 15), 3.5, 1.4, 0.6, 0.035, W(o, k * 0.05))); s.noise(0.5, 8000, 2000, 0.06, 1, 'highpass', o); }); },
 };

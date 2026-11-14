@@ -6,7 +6,7 @@
 //   쥐구멍: 오늘에 쥐를 계속 내보낸다. 어제의 같은 자리에서 E로 돌을 밀어 막으면 오늘의 구멍도 막혀 있다. 쥐는 한 번 찌르면 앞쪽 여러 마리.
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, sees, los, turnTo, turnToYaw, moveTo, nextStep, nearestStand,
-  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared } from './core.js';
+  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill, thrownToStab } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -83,12 +83,13 @@ EXT.foes['t2-hound'] = {
       f.daze = L.kind === 'dodge' ? 0.8 : C.daze; f.wind = 0; f.rec = 0;
       f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z);
     };
-    K.addEntity({ era: 'both', t: 0, update(dt) {
+    K.addEntity({ era: 'both', t: 0, update(dt0) {
+      const dt = dt0 * (f.timeScale || 1); // 정예 '서두르는'
       const S = K.S;
       if (!f.alive) return;
       if (f.fallT > 0) { // 구덩이: 빙글 돌며 가라앉고 1초 뒤 사라짐
         f.fallT += dt; f.mk.root.position.y = -9 * f.fallT * f.fallT; f.mk.root.rotation.z += dt * 6;
-        if (f.fallT > 1.0) { f.alive = false; f.mk.root.visible = false; K.killed(f, 'fall'); K.toast(K.$t('사냥개가 구덩이에 떨어졌어요'), 1.6); }
+        if (f.fallT > 1.0) { f.mk.root.visible = false; kill(K, f, 'fall'); K.toast(K.$t('사냥개가 구덩이에 떨어졌어요'), 1.6); }
         return;
       }
       if (f.follow) { if (S.era === f.era) f.follow = null; else { f.follow.t -= dt; if (f.follow.t <= 0) arrive(); } return; }
@@ -232,10 +233,10 @@ EXT.foes['t2-mimic'] = {
     place();
     const vanish = (how, msg) => { // 어제의 일 때문에 오늘에서 사라짐
       if (!f.alive) return;
-      f.alive = false; f.gone = true; f.mk.g.visible = false;
+      f.gone = true; f.mk.g.visible = false;
       K.FX.dust(f.x, 0.3, f.z, { n: 14, color: K.FXC.now.dust }); K.FX.debris(f.x, 0.6, f.z, { n: 6, color: ['#4f4232', '#3a3226'], speed: 2, up: 3, size: 0.12 });
       S2.mimicWake({ x: f.x, z: f.z });
-      K.killed(f, how); if (msg) K.toast(msg, 2.4);
+      kill(K, f, how); if (msg) K.toast(msg, 2.4);
     };
     const wake = () => { if (f.state === 'alert') return; f.state = 'alert'; f.farT = 0; S2.mimicWake({ x: f.x, z: f.z }); K.S.shake = Math.max(K.S.shake, 0.15); fail(); };
     f.update = dt => {
@@ -282,10 +283,11 @@ EXT.foes['t2-mimic'] = {
       // 등 뒤, 또는 궤짝인 척하는 동안 옆에서 넘어오며 기습(준비된 전환만). 앞은 늘 이빨
       const side = info.shift && prepared() && f.state !== 'alert' && !inFront(f, f.x + info.tx, f.z + info.tz, rad(60));
       if (behind || side) {
-        f.alive = false; f.mk.lidG.rotation.x = -0.6; f.mk.eyeM.opacity = 0;
+        if (!kill(K, f, behind ? 'back' : 'shift')) return 'armor';
+        f.mk.lidG.rotation.x = -0.6; f.mk.eyeM.opacity = 0;
         K.sfx.crumble({ x: f.x, z: f.z }); killFx(f, behind ? 'back' : 'shift', { msg: K.$t(behind ? '등 뒤에서 한 방' : '궤짝인 척하던 미믹을 기습!') });
         K.FX.debris(f.x, 0.6, f.z, { n: 8, color: ['#4f4232', '#3a3226'], speed: 3, up: 3, size: 0.12 });
-        K.killed(f, behind ? 'back' : 'shift'); return 'kill';
+        return 'kill';
       }
       wake(); f.rec = 0; f.wind = C.windup * 0.7; f.yaw = Math.atan2(info.tx, info.tz);
       return blocked(f, info, K.$t('이빨에 막혔어요 — 어제 궤짝을 밀어 보세요'), 1.1);
@@ -337,10 +339,19 @@ function makeRat(K) {
   for (const x of [-0.06, 0.06]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 4), glowMat('#ff5040', { opacity: 1 })); e.position.set(x, 0.2, 0.33); g.add(e); }
   return g;
 }
-function spawnRat(K, nest, x, z) {
+// 2차: 거미 새끼(거미 여왕의 알에서) — 쥐와 같은 떼 규칙, 모양·속도만 다름
+function makeSpiderling(K) {
+  const THREE = K.THREE, g = new THREE.Group(), body = mat('#4a3a5a', { emissive: '#1a0f24', emissiveIntensity: 1 }), leg = mat('#2a2030');
+  const ab = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8), body); ab.scale.set(1, 0.75, 1.2); ab.position.set(0, 0.16, -0.1); g.add(ab);
+  const hd = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), body); hd.position.set(0, 0.14, 0.14); g.add(hd);
+  for (let k = 0; k < 4; k++) for (const s of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.03, 0.03), leg); l.position.set(s * 0.2, 0.12, 0.08 - k * 0.07); l.rotation.z = s * 0.5; l.rotation.y = s * (0.5 - k * 0.3); g.add(l); }
+  const mark = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), glowMat('#ff9a2a', { opacity: 1 })); mark.position.set(0, 0.29, -0.12); g.add(mark);
+  return g;
+}
+export function spawnRat(K, nest, x, z, look = 'rat') {
   const f = { t2: true, kind: 't2-rat', era: 'now', x, z, yaw: Math.random() * 6.28, r: RAT.r, alive: true, optional: true, solidBody: false, state: 'alert', stun: 0, nest,
-    speed: RAT.run * (0.85 + Math.random() * 0.3), replan: Math.random() * 0.3, step: null, t: Math.random() * 10, scat: 0, sx: 0, sz: 0 };
-  f.mk = makeRat(K); K.groups.now.add(f.mk);
+    speed: RAT.run * (look === 'spider' ? 1.15 : 1) * (0.85 + Math.random() * 0.3), replan: Math.random() * 0.3, step: null, t: Math.random() * 10, scat: 0, sx: 0, sz: 0, look };
+  f.mk = look === 'spider' ? makeSpiderling(K) : makeRat(K); K.groups.now.add(f.mk);
   f.ghost = ghostCopy(f.mk);
   f.update = dt => {
     if (!f.alive) return;
@@ -370,17 +381,19 @@ function spawnRat(K, nest, x, z) {
       const dx = o.x - S.p.x, dz = o.z - S.p.z, dd = Math.hypot(dx, dz);
       if (o === f || (dd < RAT.kill && (dx * fx + dz * fz) / Math.max(dd, 0.01) > Math.cos(RAT.killHalf))) { ratDie(K, o); n++; }
     }
-    if (n > 1) K.toast(K.$t('쥐 {0}마리를 한 번에', n), 1);
+    if (n > 1) K.toast(K.$t(f.look === 'spider' ? '새끼 거미 {0}마리를 한 번에' : '쥐 {0}마리를 한 번에', n), 1);
     return 'kill-front';
   };
   f.boltHit = () => { ratDie(K, f); return true; };
+  f.onExternalKill = () => { f.mk.visible = false; f.ghost.visible = false; };
+  f.onThrown = () => { ratDie(K, f); return undefined; };
   K.addFoe(f);
   return f;
 }
 function ratDie(K, o) {
-  o.alive = false; o.mk.visible = false; S2.ratDie({ x: o.x, z: o.z });
+  if (!kill(K, o, 'stab')) return;
+  o.mk.visible = false; S2.ratDie({ x: o.x, z: o.z });
   K.FX.sparks(o.x, 0.3, o.z, { n: 5, color: ['#c06060', '#ffd0d0'], speed: 2, up: 1.5, size: 0.08 });
-  K.killed(o, 'stab');
 }
 // 쥐가 물어뜯는 것: 붙어 있는 쥐 수만큼 빨리 찬다 → 다 차면 하트 1, 붙어 있던 쥐는 흩어진다
 EXT.on('update', (dt, K) => {
@@ -390,7 +403,7 @@ EXT.on('update', (dt, K) => {
     if (gnawSnd <= 0) { gnawSnd = 0.18; S2.squeak({ x: rats[0].x, z: rats[0].z }); }
     if (gnaw >= RAT.gnaw) {
       gnaw = 0;
-      if (K.hurt(K.$t('쥐 떼에 물렸어요'))) { for (const o of t2Foes()) if (o.kind === 't2-rat' && o.alive && pdist(o) < 1.6) { const d = Math.max(pdist(o), 0.01); o.scat = 0.6; o.sx = (o.x - K.S.p.x) / d * 3; o.sz = (o.z - K.S.p.z) / d * 3; } }
+      if (K.hurt(K.$t(rats.some(o => o.look === 'spider') ? '새끼 거미에게 물렸어요 — 어제의 알을 깨 두세요' : '쥐 떼에 물렸어요'))) { for (const o of t2Foes()) if (o.kind === 't2-rat' && o.alive && pdist(o) < 1.6) { const d = Math.max(pdist(o), 0.01); o.scat = 0.6; o.sx = (o.x - K.S.p.x) / d * 3; o.sz = (o.z - K.S.p.z) / d * 3; } }
     }
   } else gnaw = Math.max(0, gnaw - dt * 0.8);
 });
@@ -436,11 +449,11 @@ EXT.foes['t2-nest'] = {
     f.onStab = () => { K.toast(K.$t('쥐구멍은 찔러도 소용없어요 — 어제 같은 자리에서 E로 막으세요'), 2); return 'blocked'; };
     f.seal = () => {
       if (!f.alive) return;
-      f.alive = false; f.sealed = true;
+      f.sealed = true;
       f.slab.position.set(f.x, 0.08, f.z); f.slab.rotation.set(0, 0.4, 0); f.crack.visible = false;
       f.hole.visible = false; f.lid.visible = true; f.ghost.visible = false; f.mark.visible = false;
       S2.seal({ x: f.x, z: f.z }); K.FX.dust(f.x, 0.2, f.z, { n: 12, color: K.FXC.past.dust });
-      K.killed(f, 'sealed');
+      kill(K, f, 'sealed');
       K.toast(K.$t('어제 막은 구멍 — 오늘엔 쥐가 더 안 나와요'), 2.2);
     };
     return f;

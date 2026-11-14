@@ -5,11 +5,7 @@
 import { EXT } from '../../ext.js';
 
 const N = k => k;
-// 모든 T2 적 공통: 배치(def)에 optional: true면 출구를 막지 않는다
-for (const [k, F] of Object.entries(EXT.foes)) if (k.startsWith('t2-') && !F.wrapped) {
-  const sp = F.spawn; F.wrapped = true;
-  F.spawn = (def, K) => { const f = sp(def, K); if (f && def.optional) f.optional = true; return f; };
-}
+// (모든 T2 적 공통 포장 — optional·정예 접두어·다른 길 처치 — 은 2차부터 wrap.js)
 const C = [];
 const add = c => { C.push(Object.assign({ track: 't2', startEra: 'now' }, c)); return c; };
 

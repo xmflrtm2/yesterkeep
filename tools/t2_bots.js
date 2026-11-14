@@ -31,10 +31,13 @@ function goXZ(x, z, o = {}) {
   return ok;
 }
 /** 적 f의 다른 시대에서 그 등 뒤 d m로 가서 넘어와 찌르기 */
+// 2차: T2 적의 넘어오며 치기는 '준비된 전환'(다른 시대에 1초 이상)만 통한다 → 짧게 걸었으면 기다린다
+function waitPrep() { const t2 = Y().ext.t2; if (t2 && t2.stay) P.waitUntil(() => t2.stay() >= 1.05, 2); }
 function behindStrike(f, d = 2.0, rt) {
   ensureEra(OTHER[f.era]);
   const fx = Math.sin(f.yaw), fz = Math.cos(f.yaw);
   goXZ(f.x - fx * d, f.z - fz * d);
+  waitPrep();
   shiftNow(); strike(rt);
   return !f.alive;
 }
@@ -51,6 +54,7 @@ function nearStrike(f, d = 2.0) {
   }
   if (!best) return false;
   goXZ(best[0], best[1]);
+  waitPrep();
   shiftNow(); strike();
   return !f.alive;
 }
@@ -157,7 +161,111 @@ const SOLVE = {
     }
     return goExit(15, 7);
   },
+
+  /* ───── 2차 ───── */
+  // 쌍둥이 간수: 형을 1칸 → 아우를 1칸 → 아우를 쓰러뜨림(형의 맹세 시계는 어제에서만) → 오늘에 머문 채 형 등 뒤로 넘어와 끝
+  't2-gk-twins'() {
+    const [E, Yg] = [foes('t2-twin').find(f => f.role === 'elder'), foes('t2-twin').find(f => f.role === 'younger')];
+    // 상황을 보고 다음 수: 둘 다 살아 있으면 칸이 많은 쪽부터 1칸씩(형 = 오늘에서 멈춘 등 뒤로 넘어와, 아우 = 같은 시대 받아치기).
+    // 하나만 남으면 그 맹세 시계가 안 가는 시대(다른 시대)에서 등 뒤로 가 넘어와 끝낸다
+    for (let k = 0; k < 16 && (E.alive || Yg.alive); k++) {
+      if (E.alive && !Yg.alive) {
+        if (E.act && E.act.k !== 'slash') { ensureEra('now'); const s = st(), dx = s.x - E.x, dz = s.z - E.z, d = Math.max(Math.hypot(dx, dz), 0.01); P.moveTo(E.x + dx / d * 6, E.z + dz / d * 6, { exact: true, max: 2 }); waitPrep(); ensureEra('past'); P.waitUntil(() => !E.act, 3); retreat(E); ensureEra('now'); }
+        behindStrike(E, 2.0); continue;
+      }
+      if (Yg.alive && !E.alive) { behindStrike(Yg, 2.0); continue; }
+      if (E.bossHp > 1 && E.bossHp >= Yg.bossHp) { behindStrike(E, 2.0); ensureEra('now'); continue; }
+      punish(Yg, ['slam'], 'now');
+    }
+    return goExit(17, 5);
+  },
+  // 거미 여왕: 어제의 알 넷을 깬다 → 덮치기는 옆으로 구르고, 착지해 굳은 사이 어제로 가 등 뒤에서 넘어와 찌르기 ×3
+  't2-gk-queen'() {
+    const q = foe('t2-queen');
+    ensureEra('past');
+    for (const e of foes('t2-egg').slice().sort((a, b) => a.z - b.z || a.x - b.x)) { if (!e.alive) continue; goXZ(e.x + (e.x < 18 ? 1.6 : -1.6), e.z); P.stab(); Y().step(0.45); }
+    ensureEra('now'); Y().step(0.3);
+    goXZ(q.x - 7, q.z, { until: () => q.state !== 'sleep' }); // 다가가 깨운다
+    // 사람처럼: 5.5m쯤 거리를 두고 돌다가 — 거미줄 예고면 옆으로 비키고, 덮치기 예고 끝 무렵 옆으로 구르고, 착지해 굳으면 어제로 가 등 뒤에서
+    let t = 0;
+    while (q.alive && t < 70) {
+      const s = st(), a = q.act, d = Math.hypot(s.x - q.x, s.z - q.z);
+      if (s.era !== 'now') { ensureEra('now'); t += 0.2; continue; }
+      if (a && a.k === 'pounce' && a.ph === 'rec') { behindStrike(q, 1.8); t += 3; continue; }
+      if (a && a.k === 'pounce' && a.ph === 'wind' && a.t > 0.42) { const g = Math.atan2(s.x - q.x, s.z - q.z) + Math.PI / 2; dodge(Math.sin(g), Math.cos(g)); t += 0.4; continue; }
+      if (a && a.k === 'web' && a.ph === 'wind') { const g = a.aim + Math.PI / 2; P.moveTo(s.x + Math.sin(g) * 2, s.z + Math.cos(g) * 2, { exact: true, max: 0.45, tol: 0.3 }); t += 0.45; continue; }
+      if ((a && (a.k === 'bite' || a.k === 'swipe')) || d < 3.2) { retreat(q); t += 0.6; continue; }
+      if (Y().ext.t2.T2.root > 0) { ensureEra('past'); Y().step(0.2); ensureEra('now'); t += 0.4; continue; } // 거미줄: 어제로 빠져나간다
+      // 거리 5.5m 유지(옆으로 조금씩 돈다)
+      const g = Math.atan2(s.x - q.x, s.z - q.z) + 0.25, want = 5.5;
+      P.moveTo(q.x + Math.sin(g) * want, q.z + Math.cos(g) * want, { exact: true, max: 0.3, tol: 0.5 });
+      Y().step(0.05); t += 0.35;
+    }
+    return goExit(17, 6, 'now');
+  },
+  't2-watcher-hall'() {
+    const sh = foe('t2-shield');
+    for (let k = 0; k < 3 && sh.alive; k++) { P.waitUntil(() => !(Y().ext.t2.T2.lockT > 0), 4); behindStrike(sh, 2.0); }
+    const g = K().golems[0]; if (g.alive) behindStrike(g, 2.0);
+    return goExit(15, 4);
+  },
+  't2-sapper-yard'() {
+    const sp = foe('t2-sapper'), g = K().golems[0];
+    ensureEra('past'); goXZ(g.x - 0.4, g.z - 0.4);
+    P.waitUntil(() => sp.state === 'alert' && sp.throwT > 2.3, 6); Y().step(0.65); // 폭탄이 떨어질 때까지
+    P.moveTo(st().x + 1.0, st().z - 3.2, { exact: true, max: 1.2 }); P.waitUntil(() => !g.alive, 3.5); // 북쪽(오늘에도 바닥인 줄)으로 비킨다
+    nearStrike(sp);
+    if (sp.alive) nearStrike(sp);
+    return goExit(15, 4);
+  },
+  't2-duelist-ring'() { nearStrike(foe('t2-duelist')); return goExit(13, 4); },
+  't2-watch-hound'() {
+    const h = foe('t2-hound'), w = foe('t2-watcher');
+    ensureEra('past'); P.goCell(4, 4); P.waitUntil(() => h.state === 'alert', 3);
+    // 띠 동쪽, 눈의 시선 밖(남쪽 구석)에서 기다린다
+    P.goCell(11, 7, { until: s => s.x > 20.5 && onBand(h, 14.2, 20) });
+    P.waitUntil(() => onBand(h, 14.2, 20), 4); P.waitUntil(() => !(Y().ext.t2.T2.lockT > 0), 3);
+    shiftNow(); P.waitUntil(() => !h.alive, 2.5);
+    return goExit(15, 7, 'now');
+  },
+  't2-sapper-golems'() {
+    const sp = foe('t2-sapper');
+    for (const g of K().golems) {
+      if (!g.alive) continue;
+      ensureEra('past'); goXZ(g.x + 0.3, g.z);
+      P.waitUntil(() => sp.state === 'alert' && sp.throwT > 2.3, 6); Y().step(0.65);
+      P.moveTo(st().x + 3.4, st().z, { exact: true, max: 1.2 }); P.waitUntil(() => !g.alive, 3.5);
+    }
+    nearStrike(sp); if (sp.alive) nearStrike(sp);
+    return goExit(15, 4, 'now');
+  },
+  't2-duel-shield'() { behindStrike(foe('t2-shield'), 2.0); nearStrike(foe('t2-duelist')); return goExit(15, 4); },
+  't2-prefix-court'() {
+    const a = foe('t2-shield'), b = K().guards[0];
+    for (let k = 0; k < 4 && a.alive; k++) { behindStrike(a, 2.0); if (a.alive) { ensureEra('now'); Y().step(0.3); } }
+    nearStrike(foe('t2-xbow'));
+    for (let k = 0; k < 3 && b.alive; k++) behindStrike(b, 2.0);
+    return goExit(15, 4);
+  },
 };
+/** 같은 시대에서 받아치기: 앞 2m에서 공격을 끌어내고, 예비동작 끝 무렵 옆으로 구른 뒤 회복 중 등 뒤에서 찌른다 */
+function punish(f, kinds, era) {
+  ensureEra(era);
+  const fx = () => Math.sin(f.yaw), fz = () => Math.cos(f.yaw);
+  P.moveTo(f.x + fx() * 2.0, f.z + fz() * 2.0, { exact: true, max: 2.5, tol: 0.5, until: () => !!f.act });
+  P.waitUntil(() => !f.alive || (f.act && (f.act.k === 'spin' || f.act.k === 'quake' || (kinds.includes(f.act.k) && f.act.t > f.act.w * 0.62))), 4);
+  if (!f.alive || !f.act) return;
+  if (f.act.k === 'spin' || f.act.k === 'quake') { retreat(f); retreat(f); P.waitUntil(() => !f.act, 2.5); return; }
+  const a = f.yaw + Math.PI / 2; dodge(Math.sin(a), Math.cos(a));
+  P.waitUntil(() => !f.act || f.act.ph === 'rec', 1);
+  P.moveTo(f.x - fx() * 1.4, f.z - fz() * 1.4, { exact: true, max: 0.7, tol: 0.35 });
+  P.stab(); note('stab'); Y().step(0.45);
+  if (f.alive && f.stagger > 0) { retreat(f); retreat(f); }
+}
+/** 적 f에게서 4m쯤 물러선다 (휘두르기 피하기) */
+function retreat(f) { const s = st(), dx = s.x - f.x, dz = s.z - f.z, d = Math.max(Math.hypot(dx, dz), 0.01); P.moveTo(s.x + dx / d * 3.5, s.z + dz / d * 3.5, { exact: true, max: 1.0, tol: 0.5 }); }
+/** (dx, dz) 쪽으로 구르기 */
+function dodge(dx, dz) { const keys = []; if (dx > 0.3) keys.push('KeyD'); else if (dx < -0.3) keys.push('KeyA'); if (dz > 0.3) keys.push('KeyS'); else if (dz < -0.3) keys.push('KeyW'); for (const k of keys) ev('keydown', k); P.tap('Space'); Y().step(0.35); for (const k of keys) ev('keyup', k); }
 
 /* ───────── 게으른 풀이 ───────── */
 function exitOf(room) { for (const E of ['now', 'past']) for (let j = 0; j < room[E].length; j++) { const i = room[E][j].indexOf('>'); if (i >= 0) return [i, j]; } return null; }
@@ -211,9 +319,9 @@ const B = {
     this.open(id);
     const t0 = S().time; this.hurt0 = S().hurts; this.fall0 = S().falls; this.deaths = 0;
     // 하트를 다 잃으면 방이 다시 시작된다 → 세어 둔다
-    const hk = Y().ext.on('hurt', () => { if (S().hearts <= 0) this.deaths++; });
+    const hk = Y().ext.on('roomLoad', () => { this.deaths++; }); // 하트를 다 잃으면 방을 다시 불러온다(맞아서든 떨어져서든)
     try { fn(); } catch (e) { note('error', String(e).slice(0, 200)); }
-    const hs = Y().ext.hooks.hurt; hs.splice(hs.indexOf(hk), 1);
+    const hs = Y().ext.hooks.roomLoad; hs.splice(hs.indexOf(hk), 1);
     return this.report(id, fn.botName || 'solve', t0);
   },
   solve(id) { const f = SOLVE[id]; if (!f) return { id, error: 'no solve' }; f.botName = 'solve'; return this.run(id, f); },

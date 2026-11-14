@@ -226,8 +226,8 @@ T2.PREP = 1.0; // 0.6초로는 Shift 재사용 대기(0.5초) 때문에 봇의 �
 T2.enteredAt = -1e9; T2.lastStay = 1e9;
 export const prepared = () => T2.lastStay >= T2.PREP;
 export const stayHere = () => T2.K.S.time - T2.enteredAt; // 지금 시대에 머문 시간
-EXT.on('shift', (from, to, K) => { T2.shiftAt = { x: K.S.p.x, z: K.S.p.z }; T2.lastStay = K.S.time - T2.enteredAt; T2.enteredAt = K.S.time; });
-EXT.on('roomLoad', (room, K) => { T2.enteredAt = K.S.time - 10; T2.lastStay = 1e9; });
+EXT.on('shift', (from, to, K) => { T2.shiftAt = { x: K.S.p.x, z: K.S.p.z }; T2.lastStay = K.S.time - T2.enteredAt; T2.enteredAt = K.S.time; T2.arrive = { era: to, t: K.S.time, prep: T2.lastStay >= T2.PREP }; });
+EXT.on('roomLoad', (room, K) => { T2.enteredAt = K.S.time - 10; T2.lastStay = 1e9; T2.arrive = null; T2.lockT = 0; });
 
 // ───────── 머티리얼 ─────────
 export function mat(color, o = {}) { return new (THREE_().MeshStandardMaterial)(Object.assign({ color, roughness: 0.75, metalness: 0.1 }, o)); }
@@ -237,7 +237,7 @@ export function glowMat(color, o = {}) { return new (THREE_().MeshBasicMaterial)
 /** 막힘: 플레이어를 적 반대쪽으로 밀고 쇳소리 + 불꽃 + 한 줄 */
 export function blocked(f, info, msg, push = 1.0) {
   const K = T2.K, S = K.S;
-  S.p.x += info.tx / info.td * push; S.p.z += info.tz / info.td * push; K.resolve();
+  if (!info.thrown) { S.p.x += info.tx / info.td * push; S.p.z += info.tz / info.td * push; K.resolve(); } // 던진 것이 튕길 땐 플레이어를 안 민다
   K.sfx.clang({ x: f.x, z: f.z }); S.shake = Math.max(S.shake, 0.15); K.clangFx(f.x, f.z);
   if (msg) K.toast(msg, 1.4);
   return 'blocked';
@@ -249,6 +249,66 @@ export function killFx(f, how, { msg, color, big = 1 } = {}) {
   K.FX.sparks(f.x, 1.1, f.z, { n: 14, color: color || K.FXC[E].spark }); K.FX.dust(f.x, 0.2, f.z, { n: 8, color: K.FXC[E].dust }); K.FX.punch(0.25 * big);
   if (msg) K.toast(msg, 1.3);
 }
+/**
+ * T2 적이 스스로 쓰러질 때는 꼭 이걸로 (K.killed 직전에 표시). 2차(11/15): T4 유물(던진 단검·두 시대 동시 처치)이 K.killFoe로
+ * 바로 쓰러뜨리면 쓰러지는 모습 없이 선 채로 남고, 미니 보스는 한 방에 끝났다 → 'kill' 훅에서 표시가 없는 처치를 따로 다룬다
+ */
+export function kill(K, f, how) {
+  if (armorBlock(f, how)) return false; // 정예 접두어(단단한·되감는)가 한 번 막음
+  f._own = true; f.alive = false; f._dying = true;
+  K.killed(f, how);
+  f._own = false;
+  return true;
+}
+EXT.on('kill', (f, how, K) => {
+  if (!f || !f.t2 || f._own) return;
+  // 다른 길(유물 등)로 쓰러짐: 미니 보스는 한 칸 피해로 바꾸고 살려 둔다(main.js는 이 훅 뒤에 '방을 다 잡았나'를 본다)
+  if (f.bossHp != null) {
+    f.alive = true; f.counted = false; K.S.kills = Math.max(0, K.S.kills - 1);
+    if (f.hurtBoss) f.hurtBoss(how, { relic: true });
+    return;
+  }
+  if (armorBlock(f, how)) { f.alive = true; f.counted = false; K.S.kills = Math.max(0, K.S.kills - 1); return; }
+  f._dying = true;
+  if (f.onExternalKill) { try { f.onExternalKill(how); } catch (e) { console.error('[T2 externalKill]', f.kind, e); } }
+});
+/** 정예 '단단한'(갑옷 한 겹)·'되감는'(한 번 되돌아옴): 쓰러질 일을 한 번 막는다. 막았으면 true */
+export function armorBlock(f, how) {
+  const K = T2.K;
+  if (['fall', 'sunk', 'crushed', 'sealed', 'gone'].includes(how)) return false; // 구덩이·막기 같은 시대의 결과는 갑옷으로 못 막는다
+  if (f.armor > 0) {
+    f.armor--; f.stun = Math.max(f.stun || 0, 0.8); f.wind = 0;
+    K.sfx.clang({ x: f.x, z: f.z }); K.clangFx(f.x, f.z);
+    K.FX.debris(f.x, 1.2, f.z, { n: 8, color: ['#9aa6b8', '#5d6878'], speed: 3, up: 3, size: 0.1 });
+    K.toast(K.$t('갑옷이 깨졌어요 — 한 번 더!'), 1.4);
+    if (f.onArmorBreak) f.onArmorBreak();
+    return true;
+  }
+  if (f.rewindOnce && f.hist && f.hist.length) {
+    f.rewindOnce = false;
+    const back = f.hist[0];
+    K.FX.motes(f.x, 1, f.z, { n: 30, color: ['#b98cff', '#ffffff'], speed: 3, up: 2, life: 0.8 });
+    f.x = back.x; f.z = back.z; f.stun = Math.max(f.stun || 0, 0.7); f.wind = 0;
+    K.FX.motes(f.x, 1, f.z, { n: 30, color: ['#b98cff', '#ffffff'], speed: 2, up: 2, life: 0.8 });
+    K.sfx.rewind && K.sfx.rewind();
+    K.toast(K.$t('2초 전으로 되감겼어요 — 다시 한 번!'), 1.6);
+    return true;
+  }
+  return false;
+}
+/** T4 던진 단검 약속(onThrown) → 우리 찌르기 판정으로. 쓰러지면(관통 유물이면) 'pierce' */
+export function thrownToStab(f, t) {
+  const K = T2.K, S = K.S;
+  if (!f.onStab) return undefined;
+  // 날아온 쪽 = 던진 쪽: 적 → 날아온 쪽 벡터를 플레이어 위치처럼 넘긴다
+  const tx = -t.dx, tz = -t.dz;
+  const info = { behind: t.behind, shift: false, tx, tz, td: 1, thrown: true };
+  f.onStab(info);
+  return undefined; // 관통 여부는 T4가 정한다(우리 쪽에선 늘 멈춤)
+}
+
 // 보는 사람(시험 도구·T1·T4)이 쓸 수 있게
 EXT.t2 = EXT.t2 || {};
 EXT.t2.foes = t2Foes;
+EXT.t2.stay = () => stayHere(); // 지금 시대에 머문 초 (시험 봇이 '준비된 전환'을 기다릴 때)
+EXT.t2.T2 = T2;
