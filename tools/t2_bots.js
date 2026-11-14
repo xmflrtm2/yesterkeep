@@ -32,7 +32,8 @@ function goXZ(x, z, o = {}) {
 }
 /** 적 f의 다른 시대에서 그 등 뒤 d m로 가서 넘어와 찌르기 */
 // 2차: T2 적의 넘어오며 치기는 '준비된 전환'(다른 시대에 1초 이상)만 통한다 → 짧게 걸었으면 기다린다
-function waitPrep() { const t2 = Y().ext.t2; if (t2 && t2.stay) P.waitUntil(() => t2.stay() >= 1.05, 2); }
+// 11/15 '흔들림': 사람처럼 발밑 고리가 하얘질 때까지(경계가 풀릴 때까지) 기다린다
+function waitPrep() { const t2 = Y().ext.t2; if (t2 && t2.ready) P.waitUntil(() => t2.ready() && t2.stay() >= 1.05, 6); else if (t2 && t2.stay) P.waitUntil(() => t2.stay() >= 1.05, 2); }
 function behindStrike(f, d = 2.0, rt) {
   ensureEra(OTHER[f.era]);
   const fx = Math.sin(f.yaw), fz = Math.cos(f.yaw);
@@ -150,14 +151,35 @@ const SOLVE = {
   },
   't2-elite-pack'() {
     const hs = foes('t2-hound');
+    // 11/15 '흔들림': 사냥개는 경계 3초 동안 안 따라온다 → 사람처럼: 개가 있는 쪽의 반대편으로 가서 띠를 사이에 두고 꾀고,
+    // 발밑 고리가 하얄 때 바꾼다. 경계 중에 개가 붙으면 다른 시대로 피해(개는 안 따라옴) 고리가 하얘질 때까지 쉰다
+    const calm = () => { const t2 = Y().ext.t2; return !t2 || !t2.ready || t2.ready(); };
+    const live = () => hs.filter(h => h.alive && !h.fall);
+    const dist = h => Math.hypot(h.x - st().x, h.z - st().z);
+    const rest = () => { // 경계가 풀릴 때까지: 붙으면 다른 시대로 피했다가 쉰다
+      for (let k = 0; k < 40 && !calm(); k++) {
+        const near = live().filter(h => h.era === st().era && dist(h) < 3.2);
+        if (near.length && S().shiftCd <= 0) { P.shift(); Y().step(0.2); continue; }
+        if (near.length) retreat(near[0]); else Y().step(0.15);
+      }
+    };
     ensureEra('past'); P.goCell(4, 4); P.waitUntil(() => hs.every(h => h.state === 'alert'), 3);
-    for (let round = 0; round < 6 && hs.some(h => h.alive); round++) {
-      ensureEra('past');
-      P.goCell(12, 4, { until: s => s.x > 20 && hs.some(h => onBand(h, 14.4, 20)) });
-      P.waitUntil(() => hs.some(h => onBand(h, 14.4, 20)), 5);
+    for (let round = 0; round < 12 && live().length; round++) {
+      const h = live().sort((a, b) => dist(a) - dist(b))[0];
+      if (h.era === 'now') { // 띠가 바닥인 어제로 데려간다: 오늘로 가서(같이 있어야 따라옴) 고리가 하얄 때 어제로
+        if (st().era !== 'now') { rest(); ensureEra('now'); Y().step(0.3); }
+        rest(); if (dist(h) < 3) retreat(h);
+        ensureEra('past'); Y().step(0.9);
+        continue;
+      }
+      if (st().era !== 'past') { rest(); ensureEra('past'); Y().step(0.3); }
+      const side = h.x > 17 ? 4 : 12; // 개 반대편 칸 (띠는 7~9칸) — 띠를 사이에 두고 꾄다
+      P.goCell(side, 4, { until: () => onBand(h, 14.6, 19.6) });
+      P.waitUntil(() => onBand(h, 14.6, 19.6) || !h.alive, 5);
+      if (!h.alive) continue;
+      if (!calm()) { rest(); continue; }
+      if (!onBand(h, 14.6, 19.6)) continue;
       shiftNow(); Y().step(1.2);
-      // 오늘로 따라와 곁에 있으면 다시 어제로 피해 처음부터
-      if (hs.some(h => h.alive && h.era === 'now' && Math.hypot(h.x - st().x, h.z - st().z) < 6)) { P.goCell(14, 1); }
     }
     return goExit(15, 7);
   },
@@ -304,7 +326,44 @@ const LAZY = {
     }
   },
   idle(sec) { Y().step(sec); },
+  // 2차 고칠 것(11/15): T4 t4_balance.py의 spam1(1.1초)·spam(0.5초)·rush와 같은 생각 + 들쭉날쭉 박자. 깨면 '박자만으로 통한다'는 뜻
+  beat11(sec) { beatBot(sec, 1.1, 0); },
+  beat05(sec) { beatBot(sec, 0.5, 0); },
+  beat15(sec) { beatBot(sec, 1.5, 0); },
+  beatJ(sec) { beatBot(sec, 1.1, 0.8); }, // 1.1~1.9초 사이 아무 때나
+  rush(sec) { beatBot(sec, 0, 0, true); },
 };
+/** 지금 시대에서 설 수 있는 칸으로 (ti,tj)를 향한 다음 칸 하나 (너비 우선) */
+function nextCellTo(ti, tj) {
+  const s = st(), era = s.era, si = s.cell[0], sj = s.cell[1], ok = (a, b) => K().stand(era, a, b);
+  const key = (a, b) => a + ',' + b, prev = new Map([[key(si, sj), null]]), q = [[si, sj]];
+  let goal = [si, sj], gd = 1e9;
+  while (q.length) { const [a, b] = q.shift(); const d = Math.abs(a - ti) + Math.abs(b - tj); if (d < gd) { gd = d; goal = [a, b]; } if (!d) break;
+    for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const na = a + da, nb = b + db; if (!prev.has(key(na, nb)) && ok(na, nb)) { prev.set(key(na, nb), [a, b]); q.push([na, nb]); } } }
+  let c = goal, pp = prev.get(key(c[0], c[1])); if (!pp) return goal;
+  while (pp && (pp[0] !== si || pp[1] !== sj)) { c = pp; pp = prev.get(key(c[0], c[1])); }
+  return c;
+}
+/** 박자 봇: 가장 가까운 적(어느 시대든)에게 걸어가며 period(+0~jitter)초마다 Shift, 같은 시대 2.2m면 J. rush = 적의 시대로 한 번 바꾸고 곧장 */
+function beatBot(sec, period, jitter, rush = false) {
+  const t0 = S().time; let next = 0;
+  const T = () => S().time - t0;
+  while (T() < sec && !st().trans && !st().ended) {
+    const a = S().time;
+    if (st().down || S().trans) { Y().step(0.1); continue; }
+    const req = required();
+    if (!req.length) { const [ei, ej] = exitOf(S().room); goExit(ei, ej); break; }
+    const s = st(), f = req.reduce((p, q) => (Math.hypot(p.x - s.x, p.z - s.z) <= Math.hypot(q.x - s.x, q.z - s.z) ? p : q));
+    if (rush) { if (f.era !== s.era && f.era !== 'both' && S().shiftCd <= 0) { P.tap('ShiftLeft'); Y().step(P.RT); } }
+    else if (T() >= next) { P.tap('ShiftLeft'); next = T() + period + Math.random() * jitter; }
+    const fi = Math.floor(f.x / 2), fj = Math.floor(f.z / 2), s2 = st();
+    if (Math.abs(fi - s2.cell[0]) + Math.abs(fj - s2.cell[1]) <= 1) P.moveTo(f.x, f.z, { exact: true, max: 0.25, tol: 1.1 });
+    else { const [ci, cj] = nextCellTo(fi, fj); P.moveTo(C2(ci), C2(cj), { exact: true, max: 0.25, tol: 0.4 }); }
+    const g = K().enemies().find(o => o.alive && !o.optional && (o.era === st().era || o.era === 'both') && Math.hypot(o.x - st().x, o.z - st().z) < 2.2);
+    if (g && S().stabT <= 0) { P.tap('KeyJ'); Y().step(0.15); }
+    if (S().time === a) Y().step(0.05);
+  }
+}
 
 const B = {
   log,
@@ -313,15 +372,17 @@ const B = {
   report(id, bot, t0) {
     const s = st(), all = K().enemies(), req = all.filter(g => !g.optional);
     return { id, bot, cleared: !!(s.trans || s.ended), time: +(S().time - t0).toFixed(1), hurts: S().hurts - this.hurt0, falls: S().falls - this.fall0, deaths: this.deaths,
-      left: req.filter(g => g.alive).map(g => g.kind), alarms: s.alarms, past: s.pastTime, log: log.slice(-14) };
+      left: req.filter(g => g.alive).map(g => g.kind), kills: this.kills, alarms: s.alarms, past: s.pastTime, log: log.slice(-14) };
   },
   run(id, fn) {
     this.open(id);
     const t0 = S().time; this.hurt0 = S().hurts; this.fall0 = S().falls; this.deaths = 0;
     // 하트를 다 잃으면 방이 다시 시작된다 → 세어 둔다
     const hk = Y().ext.on('roomLoad', () => { this.deaths++; }); // 하트를 다 잃으면 방을 다시 불러온다(맞아서든 떨어져서든)
+    this.kills = []; const kk = Y().ext.on('kill', (f, how) => { this.kills.push((f.kind || '?').replace(/^t2-/, '') + ':' + how); }); // 어떻게 쓰러뜨렸나
     try { fn(); } catch (e) { note('error', String(e).slice(0, 200)); }
     const hs = Y().ext.hooks.roomLoad; hs.splice(hs.indexOf(hk), 1);
+    const ks = Y().ext.hooks.kill; ks.splice(ks.indexOf(kk), 1);
     return this.report(id, fn.botName || 'solve', t0);
   },
   solve(id) { const f = SOLVE[id]; if (!f) return { id, error: 'no solve' }; f.botName = 'solve'; return this.run(id, f); },

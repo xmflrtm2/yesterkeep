@@ -93,6 +93,7 @@ export const t2Foes = () => (T2.K ? T2.K.extFoes.filter(f => f.t2) : []);
 // 맞은 뒤 한숨 돌리기: 하트가 줄면 곁(4.5m)의 T2 적은 1.3초 물러선다 (되감기 1.15초 + 무적 1.2초 동안 또 물려 하트가 한꺼번에 빠지지 않게).
 // main.js도 되살아난 자리 3m 안의 적에 stun을 주지만, 시간 충격을 안 먹는 적(사냥개·방패병)은 stun을 지우므로 따로. (11/13 직접 플레이: 사냥개 둘에 2초 만에 하트 4개)
 EXT.on('hurt', (msg, K) => {
+  if (T2.toastQ) T2.toastQ = T2.toastQ.filter(q => !q.say); // 맞으면 앞 안내의 뒷 토막은 버린다 (맞은 글이 먼저)
   for (const f of t2Foes()) {
     if (!f.alive || f.era !== K.S.era || pdist(f) > 4.5) continue;
     f.wind = 0;
@@ -109,7 +110,7 @@ export function fail() {
 /** 방 전체 경보: 처음이면 경보 수·실패·외침. 가까운(7m) 경비·T2 사람 적도 깨운다 */
 export function raiseAlarm(f, msg) {
   const K = T2.K, S = K.S;
-  if (!S.alarmed) { S.alarmed = true; S.alarms++; fail(); K.sfx.alarm({ x: f.x, z: f.z }); if (msg) K.toast(msg); }
+  if (!S.alarmed) { S.alarmed = true; S.alarms++; fail(); K.sfx.alarm({ x: f.x, z: f.z }); if (msg) say(msg); }
   for (const o of K.guards) if (o.alive && o.state !== 'alert' && Math.hypot(o.x - f.x, o.z - f.z) < 7) { o.sus = 0.99; o.state = 'alert'; o.lost = 0; }
   for (const o of t2Foes()) if (o !== f && o.alive && o.hearsAlarm && o.era === f.era && Math.hypot(o.x - f.x, o.z - f.z) < 7) o.hearAlarm(f);
 }
@@ -217,17 +218,110 @@ export function ghostCopy(root) {
   g.visible = false; K.world.add(g);
   return g;
 }
+/**
+ * 손에 든 물건(방패·석궁·자루)의 붉은 윤곽. 윤곽 무리(f.m.ghost)는 월드 기준이라 물건의 손 기준 자리를 그대로 쓰면
+ * 월드 원점 근처에 떠 보였다(11/15 T3 보고: 다른 시대에서 본 방패병의 방패만 원점에 붉은 조각) → 매 프레임 진짜 물건의 월드 자리로 맞춘다
+ */
+export function ghostProp(f, src) {
+  const g = ghostCopy(src); g.visible = true; g.matrixAutoUpdate = false;
+  f.m.ghost.add(g); (f.ghostProps || (f.ghostProps = [])).push([g, src]);
+  return g;
+}
+let _inv = null;
+export function syncGhostProps(f) {
+  const gh = f.m && f.m.ghost;
+  if (!gh || !gh.visible || !f.ghostProps) return;
+  if (!_inv) _inv = new (THREE_().Matrix4)();
+  gh.updateWorldMatrix(true, false); _inv.copy(gh.matrixWorld).invert();
+  for (const [g, src] of f.ghostProps) { src.updateWorldMatrix(true, false); g.matrix.multiplyMatrices(_inv, src.matrixWorld); g.matrixWorldNeedsUpdate = true; }
+}
 /** 시대 전환 물결이 (x, z)를 지나갔는가 — 물결이 지나기 전엔 윤곽을 숨긴다 (main.js ringOk와 같은 뜻) */
 export function ringPassed(x, z) { const S = T2.K.S; return !S.ring || S.ring.r > Math.hypot(x - T2.shiftAt.x, z - T2.shiftAt.z) + 1.0; }
 T2.shiftAt = { x: 0, z: 0 };
 // "준비된 전환": 넘어오기 전에 다른 시대에서 PREP초 이상 머물렀는가. T2 적의 넘어오며 치기(방패병 등 뒤·잠든 미믹·망령 겹치기)는 이때만 통한다
 // → Shift를 0.5초마다 마구 누르는 것으론 안 되고, 다른 시대에서 자리를 잡고 넘어와야 한다 (11/13 게으른 봇: 연타로 방패병·미믹·망령이 깨졌다)
 T2.PREP = 1.0; // 0.6초로는 Shift 재사용 대기(0.5초) 때문에 봇의 연타 간격(0.5~0.6초)이 걸려 망령이 연타로 깨졌다 → 1초
-T2.enteredAt = -1e9; T2.lastStay = 1e9;
-export const prepared = () => T2.lastStay >= T2.PREP;
+T2.enteredAt = -1e9; T2.lastStay = 1e9; T2.prevStay = 1e9; T2.wary = ''; T2.shiftLog = [];
+// 2차 고칠 것(11/15, T4 발견): 1.1초마다 Shift만 누르며 다가가 찌르는 봇이 '1초 머묾'을 저절로 채워 T2 방 8개 중 6개를 깼다.
+// → 적이 '시간의 흔들림'을 알아챈다. 넘어오는 순간 아래 중 하나면 준비 안 된 전환이고, 한 번 걸리면 CALM초 동안 Shift를 안 눌러야 풀린다
+//   흔들림: 직전 7초 안에 Shift를 4번 이상(이번 것 빼고) 했다 = 1.75초보다 촘촘한 박자는 늘 걸림 (5번이면 찌를 때마다 밀린 1.5~1.75초 박자가 빠져나갔다)
+//   같은 박자: 이번에 머문 시간과 그 앞에 머문 시간의 차이가 긴 쪽의 15% 안(둘 다 2.5초 안쪽) — 1.57·1.83초처럼 찌를 때마다 밀린 박자도 잡힘
+//     ('찌르고 0.8초 만에 빠짐 → 1초 자리 잡고 다시'는 25%라 안 걸림)
+//   아직 경계 중: 앞서 걸린 뒤 CALM(3)초가 안 지났다 — Shift를 누를 때마다 다시 3초
+// 고친 순서: 5초에 3번·두 번 비교 0.3초 → 의도 풀이 '찌르고 0.8초 만에 빠짐 → 1초 자리 잡고 다시'(정예 방패병 두 번)가 걸림.
+//   5초에 4번·세 번 비교 → 찌를 때 0.15초씩 밀린 1.1~1.4초 박자와 방에 든 뒤 첫 2~3번이 빠져나가 검사 방이 3.5초에 깨짐.
+//   그래서 '한 번 걸리면 3초 쉬어야 풀림'을 더했다 — 박자·들쭉날쭉 봇은 한 번 걸리면 다시는 못 빠져나오고, 사람은 고리가 하얘질 때까지 쉬면 된다
+T2.WARY = { win: 7.0, n: 4, beat: 0.15, beatMax: 2.5 };
+T2.CALM = 3.0; T2.waryUntil = -1e9;
+/** 지금(now) stay초 머문 뒤 넘어간다면 적이 알아채는가 → '' | 'flicker' | 'beat' | 'calm'(아직 경계 중) */
+export function waryFor(now, stay, prevStay) {
+  const W = T2.WARY;
+  if (now < T2.waryUntil) return 'calm';
+  let n = 0; for (const t of T2.shiftLog) if (now - t < W.win) n++;
+  if (n >= W.n) return 'flicker';
+  if (stay < W.beatMax && prevStay < W.beatMax && Math.abs(stay - prevStay) < W.beat * Math.max(stay, prevStay)) return 'beat';
+  return '';
+}
+export const prepared = () => T2.lastStay >= T2.PREP && !T2.wary;
+/** 같은 시대에서도 아직 '흔들리는 중'인가: 걸린 뒤 경계 3초(CALM)가 안 지났다 (Shift를 누를 때마다 다시 3초) */
+export const flickering = () => T2.K.S.time < T2.waryUntil;
 export const stayHere = () => T2.K.S.time - T2.enteredAt; // 지금 시대에 머문 시간
-EXT.on('shift', (from, to, K) => { T2.shiftAt = { x: K.S.p.x, z: K.S.p.z }; T2.lastStay = K.S.time - T2.enteredAt; T2.enteredAt = K.S.time; T2.arrive = { era: to, t: K.S.time, prep: T2.lastStay >= T2.PREP }; });
-EXT.on('roomLoad', (room, K) => { T2.enteredAt = K.S.time - 10; T2.lastStay = 1e9; T2.arrive = null; T2.lockT = 0; });
+/** 지금 넘어간다면 '준비된 전환'인가 (고리 표시·시험 봇용) → 0~1 차오름, wary = 알아챌 까닭 */
+export function readyNow() {
+  const S = T2.K.S, stay = stayHere();
+  return { arm: Math.min(1, stay / T2.PREP), wary: waryFor(S.time, stay, T2.lastStay) };
+}
+EXT.on('shift', (from, to, K) => {
+  const now = K.S.time, stay = now - T2.enteredAt;
+  T2.wary = waryFor(now, stay, T2.lastStay); // 이번 것을 넣기 전에 센다
+  if (T2.wary) T2.waryUntil = now + T2.CALM; // 걸렸으면(경계 중에 또 눌렀으면) 3초 더
+  T2.shiftAt = { x: K.S.p.x, z: K.S.p.z }; T2.prevStay = T2.lastStay; T2.lastStay = stay; T2.enteredAt = now; T2.seenEra = to;
+  T2.shiftLog.push(now); if (T2.shiftLog.length > 20) T2.shiftLog.shift();
+  T2.arrive = { era: to, t: now, prep: stay >= T2.PREP && !T2.wary, wary: T2.wary };
+  // 알아챘다는 걸 보여 준다: 넘어온 시대에 가까운(4.5m) T2 적이 있을 때만, 방마다 처음 두 번
+  if (T2.wary && stay >= T2.PREP && T2.waryToasts < 2 && t2Foes().some(f => f.alive && f.era === to && pdist(f) < 4.5)) {
+    T2.waryToasts++;
+    say(K.$t(T2.wary === 'beat' ? '같은 박자로 오가면 알아채요 — 3초 쉬었다 넘어오세요' : '자꾸 바꾸면 적이 경계해요 — 3초 쉬었다 넘어오세요'), 2.2);
+  }
+});
+// 차례로 띄우는 한 줄: 토스트는 한 줄(줄바꿈 없음)이라 휴대폰 세로(390px)에선 긴 안내가 양옆으로 잘린다 → 긴 안내는 짧은 두 토막으로
+T2.toastQ = [];
+export function toastLater(msg, delay, sec = 2) { T2.toastQ.push({ t: delay, msg, sec }); T2.toastQ.sort((a, b) => a.t - b.t); }
+/**
+ * T2 안내 한 줄. 공용 토스트는 줄바꿈이 없어 화면보다 길면 양옆이 잘린다(휴대폰 세로 390px에서 T2 문구 61개 중 41개) →
+ * 넘칠 때만 ' — ' 앞뒤를 두 토막으로 차례로 띄운다. 공용 토스트가 줄을 바꾸게 되면 넘치지 않으니 저절로 한 줄 그대로
+ */
+export function say(msg, sec = 1.8) {
+  const K = T2.K;
+  T2.toastQ = T2.toastQ.filter(q => !q.say); // 앞 안내의 뒷 토막이 새 안내 뒤에 나오지 않게
+  K.toast(msg, sec);
+  const el = typeof document !== 'undefined' && document.getElementById('toast'), i = msg ? msg.indexOf(' — ') : -1;
+  if (!el || i < 0 || el.getBoundingClientRect().width <= innerWidth - 16) return;
+  const t1 = Math.max(1.0, sec * 0.55);
+  K.toast(msg.slice(0, i), t1 + 0.15);
+  T2.toastQ.push({ t: t1, msg: msg.slice(i + 3), sec: Math.max(1.5, sec), say: true }); T2.toastQ.sort((x, y) => x.t - y.t);
+}
+EXT.on('update', dt => { for (const q of T2.toastQ) q.t -= dt; while (T2.toastQ.length && T2.toastQ[0].t <= 0) { const q = T2.toastQ.shift(); T2.K.toast(q.msg, q.sec); } });
+// 맞아서 되감기면 Shift 없이 시대가 바뀔 수 있다(main.js setEraInstant) → 그 시대에 온 때를 다시 잡는다
+EXT.on('update', (dt, K) => { if (T2.seenEra !== K.S.era) { if (T2.seenEra) T2.enteredAt = K.S.time; T2.seenEra = K.S.era; } });
+EXT.on('roomLoad', (room, K) => { T2.seenEra = null; T2.toastQ = []; T2.enteredAt = K.S.time - 10; T2.lastStay = 1e9; T2.prevStay = 1e9; T2.wary = ''; T2.waryUntil = -1e9; T2.shiftLog = []; T2.waryToasts = 0; T2.arrive = null; T2.lockT = 0; });
+// 준비 고리: 다른 시대에 멈춘 T2 적(또는 깨어 있는 사냥개)이 가까이(7m) 있을 때만 발밑에 — 1초 동안 차오르면 하양(지금 넘어가면 통함), 적이 알아챌 땐 주황으로 떨림
+EXT.on('frame', (dt, K) => {
+  const S = K.S;
+  if (!T2.readyRing) { T2.readyRing = decal(ringGeo(0.78, 0.9), '#ffffff', { parent: K.world }); T2.readyFill = decal(discGeo(), '#ffffff', { parent: K.world }); }
+  const ring = T2.readyRing, fill = T2.readyFill;
+  if (ring.parent !== K.world) { K.world.add(ring); K.world.add(fill); } // 방을 새로 지으면 world가 비워진다
+  // 깨어 있는 사냥개는 같은 시대여도(바꾸면 따라오니까 — 흔들리는 동안엔 안 따라옴)
+  const near = !S.trans && !S.down && S.falling <= 0 && t2Foes().some(f => f.alive && !f.optional && f.kind !== 't2-nest' && pdist(f) < 7 && ((f.era !== S.era && f.era !== 'both') || (f.kind === 't2-hound' && f.state === 'alert' && !f.fall)));
+  ring.visible = fill.visible = near;
+  if (!near) return;
+  const R = readyNow(), ok = R.arm >= 1 && !R.wary;
+  ring.position.set(S.p.x, 0.06, S.p.z); fill.position.set(S.p.x, 0.055, S.p.z);
+  ring.scale.setScalar(0.55 + 0.45 * R.arm); fill.scale.setScalar(Math.max(0.01, 0.8 * R.arm));
+  ring.material.color.set(R.wary ? '#ff8a3a' : '#ffffff'); fill.material.color.set(R.wary ? '#ff6a2a' : '#ffffff');
+  ring.material.opacity = R.wary ? 0.35 + 0.25 * Math.sin(S.time * 22) : ok ? 0.55 + 0.15 * Math.sin(S.time * 5) : 0.25;
+  fill.material.opacity = R.wary ? 0.06 : ok ? 0.1 : 0.04;
+});
 
 // ───────── 머티리얼 ─────────
 export function mat(color, o = {}) { return new (THREE_().MeshStandardMaterial)(Object.assign({ color, roughness: 0.75, metalness: 0.1 }, o)); }
@@ -239,7 +333,7 @@ export function blocked(f, info, msg, push = 1.0) {
   const K = T2.K, S = K.S;
   if (!info.thrown) { S.p.x += info.tx / info.td * push; S.p.z += info.tz / info.td * push; K.resolve(); } // 던진 것이 튕길 땐 플레이어를 안 민다
   K.sfx.clang({ x: f.x, z: f.z }); S.shake = Math.max(S.shake, 0.15); K.clangFx(f.x, f.z);
-  if (msg) K.toast(msg, 1.4);
+  if (msg) say(msg, 1.4);
   return 'blocked';
 }
 /** 처치 공통: 점수·소리·이펙트·멈칫 → K.killed (방 정리) */
@@ -247,7 +341,7 @@ export function killFx(f, how, { msg, color, big = 1 } = {}) {
   const K = T2.K, S = K.S, E = f.era;
   S.hitstop = Math.max(S.hitstop, 0.1); S.shake = Math.max(S.shake, 0.25 * big);
   K.FX.sparks(f.x, 1.1, f.z, { n: 14, color: color || K.FXC[E].spark }); K.FX.dust(f.x, 0.2, f.z, { n: 8, color: K.FXC[E].dust }); K.FX.punch(0.25 * big);
-  if (msg) K.toast(msg, 1.3);
+  if (msg) say(msg, 1.3);
 }
 /**
  * T2 적이 스스로 쓰러질 때는 꼭 이걸로 (K.killed 직전에 표시). 2차(11/15): T4 유물(던진 단검·두 시대 동시 처치)이 K.killFoe로
@@ -280,7 +374,7 @@ export function armorBlock(f, how) {
     f.armor--; f.stun = Math.max(f.stun || 0, 0.8); f.wind = 0;
     K.sfx.clang({ x: f.x, z: f.z }); K.clangFx(f.x, f.z);
     K.FX.debris(f.x, 1.2, f.z, { n: 8, color: ['#9aa6b8', '#5d6878'], speed: 3, up: 3, size: 0.1 });
-    K.toast(K.$t('갑옷이 깨졌어요 — 한 번 더!'), 1.4);
+    say(K.$t('갑옷이 깨졌어요 — 한 번 더!'), 1.4);
     if (f.onArmorBreak) f.onArmorBreak();
     return true;
   }
@@ -291,7 +385,7 @@ export function armorBlock(f, how) {
     f.x = back.x; f.z = back.z; f.stun = Math.max(f.stun || 0, 0.7); f.wind = 0;
     K.FX.motes(f.x, 1, f.z, { n: 30, color: ['#b98cff', '#ffffff'], speed: 2, up: 2, life: 0.8 });
     K.sfx.rewind && K.sfx.rewind();
-    K.toast(K.$t('2초 전으로 되감겼어요 — 다시 한 번!'), 1.6);
+    say(K.$t('2초 전으로 되감겼어요 — 다시 한 번!'), 1.6);
     return true;
   }
   return false;
@@ -311,4 +405,5 @@ export function thrownToStab(f, t) {
 EXT.t2 = EXT.t2 || {};
 EXT.t2.foes = t2Foes;
 EXT.t2.stay = () => stayHere(); // 지금 시대에 머문 초 (시험 봇이 '준비된 전환'을 기다릴 때)
+EXT.t2.ready = () => { const R = readyNow(); return R.arm >= 1 && !R.wary; }; // 발밑 고리가 하얀가 = 지금 넘어가면 준비된 전환
 EXT.t2.T2 = T2;

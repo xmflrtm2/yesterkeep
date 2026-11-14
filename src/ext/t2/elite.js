@@ -6,7 +6,7 @@
 //   눈 밝은(keen)         — 시야·듣기 1.4배. T2 사람 적만(방패병·석궁병·마법사·폭탄병·검사)
 //   되감는(rewind)        — 처음 쓰러질 때 2초 전 자리로 되감겨 다시 선다(보라 빛). 두 번 잡아야 함
 import { EXT } from '../../ext.js';
-import { T2, fromBehind, decal, ringGeo, t2Foes } from './core.js';
+import { T2, fromBehind, decal, ringGeo, t2Foes, say } from './core.js';
 
 const N = k => k;
 export const PREFIX = {
@@ -91,18 +91,18 @@ EXT.on('stab', (tgt, info) => {
   if (!tgt || tgt.ext || !tgt._mods || tgt.kind === 'boss') return undefined;
   const killing = info.behind || (info.shift && tgt.state !== 'alert');
   if (tgt.defy && info.shift && !info.behind) {
-    K.sfx.clang({ x: tgt.x, z: tgt.z }); K.clangFx(tgt.x, tgt.z); K.toast(K.$t('시간을 거스르는 적 — 기습이 안 통해요, 등 뒤로'), 1.6);
+    K.sfx.clang({ x: tgt.x, z: tgt.z }); K.clangFx(tgt.x, tgt.z); say(K.$t('시간을 거스르는 적 — 기습이 안 통해요, 등 뒤로'), 1.6);
     tgt.state = 'alert'; tgt.sus = 1; return 'blocked-defy';
   }
   if (!killing) return undefined;
   if (tgt.armor > 0 || (tgt.rewindOnce && tgt.hist && tgt.hist.length)) {
     const wasArmor = tgt.armor > 0;
-    if (wasArmor) { tgt.armor--; tgt.stun = Math.max(tgt.stun || 0, 0.8); K.sfx.clang({ x: tgt.x, z: tgt.z }); K.clangFx(tgt.x, tgt.z); K.toast(K.$t('갑옷이 깨졌어요 — 한 번 더!'), 1.4); }
+    if (wasArmor) { tgt.armor--; tgt.stun = Math.max(tgt.stun || 0, 0.8); K.sfx.clang({ x: tgt.x, z: tgt.z }); K.clangFx(tgt.x, tgt.z); say(K.$t('갑옷이 깨졌어요 — 한 번 더!'), 1.4); }
     else {
       tgt.rewindOnce = false; const b = tgt.hist[0];
       K.FX.motes(tgt.x, 1, tgt.z, { n: 30, color: ['#b98cff', '#ffffff'], speed: 3, up: 2, life: 0.8 });
       tgt.x = b.x; tgt.z = b.z; tgt.stun = Math.max(tgt.stun || 0, 0.7);
-      K.toast(K.$t('2초 전으로 되감겼어요 — 다시 한 번!'), 1.6);
+      say(K.$t('2초 전으로 되감겼어요 — 다시 한 번!'), 1.6);
     }
     tgt.state = 'alert'; tgt.sus = 1; tgt.wind = 0;
     return wasArmor ? 'armor' : 'rewind';
