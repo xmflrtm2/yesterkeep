@@ -637,7 +637,8 @@ EXT.run = {
             if (!chk.ok) out.fail.push([room.id, room.name, chk.why]);
             // 오늘에서 시작하는 방: 골렘 순찰이 시작 칸 5m 안에 들어오면 "서서 생각만 해도 맞는" 방
             const s0 = room.now.findIndex(r => r.includes('@')), sx = s0 >= 0 ? room.now[s0].indexOf('@') : -1;
-            if ((room.startEra || 'now') === 'now' && sx >= 0) for (const g of room.golems || []) for (const [i, j] of g.path || []) if (Math.hypot(i - sx, j - s0) * 2 < 5) { (out.nearStart = out.nearStart || []).push([room.name, [i, j]]); break; }
+            // 2차: 어제에서 시작해도 모래가 바닥나면 오늘로 끌려온다(가만히 있던 봇이 가시 창고에서 그렇게 죽음) → 시작 시대와 상관없이 본다
+            if (sx >= 0) for (const g of room.golems || []) for (const [i, j] of g.path || []) if (Math.hypot(i - sx, j - s0) * 2 < 5) { (out.nearStart = out.nearStart || []).push([room.name, [i, j]]); break; }
             if (load) { try { K.loadRoom(room); } catch (e) { out.fail.push([room.id, 'load', String(e)]); } }
           }
         }
