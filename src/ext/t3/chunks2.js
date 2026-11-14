@@ -5,6 +5,7 @@ import { EXT } from '../../ext.js';
 
 const N = k => k;
 export const CHUNKS2 = [
+
   {
     id: 't3-m-houndflood', track: 't3', tier: 2, tags: ['puzzle', 'combat', 'water'], mech: 'sluice', name: N('물웅덩이 사냥개'),
     hint: N('사냥개는 시대를 건너뛸 때 발밑을 보지 않아요'),
@@ -40,7 +41,7 @@ export const CHUNKS2 = [
     id: 't3-m-echoplate', track: 't3', tier: 2, tags: ['puzzle', 'weight'], mech: 'weight', name: N('메아리의 무게'),
     hint: N('판은 무게가 떠나면 곧 잊어요. 당신을 따라 걷는 무게도 있어요'),
     tip: N('메아리는 2.4초 늦게 내 길을 그대로 밟아요. 판 위에 잠깐 서 있다가 문 앞으로 가면, 메아리가 판을 누를 때 문이 열려요'),
-    startEra: 'past', start: [2, 2], exit: [12, 7],
+    startEra: 'now', start: [2, 2], exit: [12, 7],
     past: [
       '###############',
       '#.............#',
@@ -64,7 +65,7 @@ export const CHUNKS2 = [
       '###############',
     ],
     foes: [{ kind: 't2-echo', era: 'past', optional: true }],
-    solve: [['go', 6, 2], ['wait', 0.8], ['go', 11, 3], ['waitJs', 'C.d.weight.doors[0].open', 6], ['go', 11, 5], ['go', 12, 7]],
+    solve: [['go', 6, 2], ['shift'], ['wait', 0.8], ['go', 11, 3], ['waitJs', 'C.d.weight.doors[0].open', 6], ['go', 11, 5], ['go', 12, 7]],
   },
 
   {
@@ -94,7 +95,7 @@ export const CHUNKS2 = [
       '#.............#',
       '###############',
     ],
-    guards: [{ path: [[3, 2], [12, 2]], wait: 1.2 }],
+    guards: [{ path: [[7, 2], [12, 2]], wait: 1.2 }],
     solve: [['shift'], ['waitFoe', 'guard', 0, 'cell=11,2', 14], ['shift'], ['near', 'guard', 0, 2.0], ['go', 7, 3], ['go', 7, 5], ['go', 12, 7]],
   },
 
@@ -194,7 +195,7 @@ export const CHUNKS2 = [
   {
     id: 't3-m-xbowclock', track: 't3', tier: 3, tags: ['puzzle', 'combat', 'clock', 'crate'], mech: 'clock', name: N('석궁 아래의 태엽'), flip: false,
     hint: N('태엽을 감는 동안 누군가 지켜봐요. 시선은 가릴 수 있어요'),
-    tip: N('어제 상자를 남쪽으로 한 칸 밀어 석궁병과 손잡이 사이를 가리세요. 태엽을 4초 감고, 어제로 복도 입구까지 간 뒤 오늘로 달리기'),
+    tip: N('어제 상자를 남쪽으로 한 칸 밀어 석궁병과 손잡이 사이를 가리세요. 태엽을 3초 감고, 어제로 복도 입구까지 간 뒤 오늘로 달리기'),
     startEra: 'now', start: [2, 5], exit: [12, 8],
     past: [
       '###############',
@@ -217,11 +218,11 @@ export const CHUNKS2 = [
       '#...._________#',
       '#...._________#',
       '##.############',
-      '##.....H.....##',
+      '##...H.......##',
       '###############',
     ],
     foes: [{ kind: 't2-xbow', era: 'past', at: [6, 3], face: -90, optional: true }],
-    solve: [['shift'], ['push', 4, 2, 0, 1], ['go', 2, 3], ['holdE', 4.4], ['go', 2, 6], ['shift'], ['go', 12, 8]],
+    solve: [['shift'], ['push', 4, 2, 0, 1], ['go', 2, 3], ['holdE', 3.0], ['go', 2, 6], ['shift'], ['go', 12, 8]],
     solver: 'crate',
   },
 
@@ -354,14 +355,14 @@ export const CHUNKS2 = [
   {
     id: 't3-m-echoclock', track: 't3', tier: 3, tags: ['puzzle', 'combat', 'clock'], mech: 'clock', name: N('따라오는 그림자와 태엽'),
     hint: N('오래 서 있으면 지나온 길이 당신을 따라잡아요'),
-    tip: N('메아리는 내 길을 2.4초 늦게 걸어요. 손잡이에 2초 넘게 서 있으면 닿아요 — 크게 한 바퀴 돌아와 나눠 감으세요(태엽은 어제에선 안 풀려요)'),
-    startEra: 'past', start: [5, 5], exit: [13, 7],
+    tip: N('메아리는 내 길을 2.4초 늦게 걸어요. 손잡이 앞에 2초 넘게 서 있으면 닿아요 — 손잡이와 기둥 둘레를 돌아(반대편에서 감아도 돼요) 나눠 감으세요. 태엽은 어제에선 안 풀려요'),
+    startEra: 'now', start: [2, 6], exit: [13, 7],
     past: [
       '###############',
       '#.......#######',
-      '#F......#######',
       '#.......#######',
       '#.......#######',
+      '#...F#..#######',
       '#.......#######',
       '#.......#######',
       '#############.#',
@@ -370,16 +371,16 @@ export const CHUNKS2 = [
     now: [
       '###############',
       '#.......#######',
-      '#F......#######',
       '#.......#######',
       '#.......#######',
+      '#...F#..#######',
       '#.......#######',
       '#.......#######',
-      '####........H.#',
+      '####.......H..#',
       '###############',
     ],
     foes: [{ kind: 't2-echo', era: 'past', optional: true }],
-    solve: [['go', 2, 2], ['holdE', 2.1], ['go', 6, 2], ['go', 6, 5], ['go', 2, 5], ['go', 2, 2], ['holdE', 2.1], ['go', 4, 6], ['shift'], ['go', 13, 7]],
+    solve: [['go', 4, 5], ['shift'], ['holdE', 2.0], ['go', 6, 5], ['go', 6, 3], ['go', 3, 3], ['go', 3, 5], ['go', 4, 5], ['holdE', 2.0], ['go', 4, 6], ['shift'], ['go', 13, 7]],
   },
 
   {
@@ -412,5 +413,5 @@ export const CHUNKS2 = [
     foes: [{ kind: 't2-hound', era: 'past', at: [12, 5], face: -90, awake: true }],
     solve: [['go', 2, 2], ['shift'], ['E'], ['go', 3, 4], ['waitFoe', 't2-hound', 0, 'box=10,20,4,14', 8], ['shift'], ['waitFoe', 't2-hound', 0, 'dead', 3], ['shift'], ['push', 8, 4, 0, -1], ['push', 8, 3, 0, -1], ['go', 9, 3], ['go', 12, 2], ['go', 15, 4]],
     solver: 'crate',
-  }
+  },
 ];

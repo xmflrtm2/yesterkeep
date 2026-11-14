@@ -486,6 +486,17 @@ export const LAB = {
   ],
 };
 
+// 2차(11/15): 풀이 봇이 어제에 '연달아' 머문 가장 긴 시간(초, dev.js timedBot().run).
+// 런의 모래가 바닥이면 오늘에서 3초까지만 차오르므로, 이보다 긴 조각은 모래가 모자라면 풀 수 없다 → core.js가 방에 들어올 때 채워 준다
+const PAST_RUN = {
+  't3-crumble1': 1.8, 't3-clock1': 4, 't3-turn1': 2.3, 't3-mirror2': 3.9, 't3-seedkey': 5, 't3-float': 10.5, 't3-turnkey': 4.6,
+  't3-sunkkey': 6.8, 't3-clockcrumble': 3.8, 't3-grand': 7.1,
+  't3-m-houndflood': 6.3, 't3-m-echoplate': 5.5, 't3-m-guardplate': 5.5, 't3-m-shieldroots': 2.4, 't3-m-wraithmirror': 3.6,
+  't3-m-mimiccrumble': 4.5, 't3-m-xbowclock': 8.8, 't3-m-houndturn': 6.3, 't3-m-houndroots': 1.7, 't3-m-mageseal': 5.8,
+  't3-m-echoclock': 8.4, 't3-m-tide': 7.9,
+};
+for (const c of [...CHUNKS1, ...CHUNKS2]) if (PAST_RUN[c.id]) c.pastRun = PAST_RUN[c.id];
+
 const tierMark = t => '◆'.repeat(t) + '◇'.repeat(4 - t);
 function register() {
   // 1차 16 + 2차(적+장치) — 시험 순서는 단계 순서 (t3-tour)

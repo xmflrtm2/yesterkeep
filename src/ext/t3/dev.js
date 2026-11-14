@@ -14,8 +14,11 @@ if (!window.__t3errHook) {
   const oe = console.error; console.error = (...a) => { errs.push(a.map(String).join(' ').slice(0, 300)); oe(...a); };
   addEventListener('error', e => errs.push('ERR ' + e.message));
 }
-let lastExit = null;
-EXT.on('exit', r => { lastExit = r.id; });
+let lastExit = null, lastPast = null;
+let runIn = null, runMax = 0, lastRun = null; // 어제에 '연달아' 머문 가장 긴 시간 (모래가 바닥이면 오늘에서 3초까지만 차오른다)
+EXT.on('roomLoad', () => { runIn = null; runMax = 0; });
+EXT.on('update', () => { const S = EXT.K.S; if (S.era === 'past') { if (runIn === null) runIn = S.pastTime; runMax = Math.max(runMax, S.pastTime - runIn); } else runIn = null; });
+EXT.on('exit', r => { lastExit = r.id; lastPast = +EXT.K.S.pastTime.toFixed(1); lastRun = +runMax.toFixed(1); });
 function rng(seed) { let s = seed >>> 0; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 const st = () => Y().state();
 const KK = () => Y().ext.K;
@@ -162,7 +165,7 @@ const D = {
     // 출구까지 마저 (마지막 go가 출구 칸이면 이미 나감)
     P.waitUntil(() => !!lastExit, 2, 1 / 30);
     const s = st();
-    return { id, ok: !!lastExit, fail, hearts: -(s.falls + s.hurts), falls: s.falls, hurts: s.hurts, past: +Y().S.runPastT || null, log }; void h0;
+    return { id, ok: !!lastExit, fail, hearts: -(s.falls + s.hurts), falls: s.falls, hurts: s.hurts, past: lastPast, run: lastRun, log }; void h0;
   },
   /** 시간 재기용: 봇 풀이 동안 흐른 게임 시간 */
   timedBot(id) { const t0 = Y().S.time; const r = this.bot(id); r.sec = +(Y().S.time - t0).toFixed(1); return r; },

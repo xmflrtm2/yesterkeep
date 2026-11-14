@@ -50,7 +50,12 @@ async def main():
                         break
                 except Exception:
                     pass
-            rows = json.loads(await asyncio.wait_for(c.eval(JS.replace('IDS', json.dumps(ids))), 1800))
+            all_ids = ids or json.loads(await c.eval("import('/src/ext/t3/dev.js').then(async m => { await m.default.ready(); return JSON.stringify(m.default.ids()); })"))
+            rows = []
+            for cid in all_ids:  # 조각마다 따로 (한 번에 다 하면 호출 하나가 30분을 넘는다)
+                rows += json.loads(await asyncio.wait_for(c.eval(JS.replace('IDS', json.dumps([cid]))), 900))
+                print('.', end='', flush=True)
+            print()
             pump.cancel()
     finally:
         subprocess.run(['taskkill', '/T', '/F', '/PID', str(ch.pid)], capture_output=True); httpd.shutdown()

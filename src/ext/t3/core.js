@@ -174,6 +174,19 @@ EXT.on('roomLoad', (room, k) => {
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
   drawUi();
 });
+// 2차(11/15) 런의 모래 바닥: 이 조각을 풀려면 어제에 연달아 pastRun초쯤 있어야 한다(조각마다 chunks.js PAST_RUN).
+// 모래가 바닥이면 오늘에서 3초까지만 차오르므로, 모자란 채로 들어오거나 R로 다시 하면 '풀 만큼'까지만 채운다(그 이상은 안 줌)
+export const SANDFLOOR = { on: true, mul: 1.25, add: 1, cap: 12 };
+export const sandNeed = room => room && room.pastRun ? Math.min(SANDFLOOR.cap, Math.ceil(room.pastRun * SANDFLOOR.mul + SANDFLOOR.add)) : 0;
+EXT.on('roomEnter', room => {
+  const run = EXT.run, need = sandNeed(room);
+  if (!SANDFLOOR.on || need <= 3 || !run || !run.active || !run.active() || !run.addSand) return;
+  const have = run.sand();
+  if (have + 0.05 < need && run.addSand(need - have, 't3-puzzle') > 0.05) {
+    // R로 다시 하면 main.js의 "방을 처음부터"가 곧바로 덮으므로 조금 뒤에 띄운다
+    const r = EXT.K.S.room; setTimeout(() => { if (EXT.K.S.room === r) EXT.K.toast($t('어제에 오래 머물러야 하는 방 — 모래를 {0}초까지 채웠어요', need), 2.6); }, 900);
+  }
+});
 EXT.on('update', (dt, k) => {
   if (!live() || !C.has) return;
   C.t += dt;
