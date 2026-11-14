@@ -278,16 +278,16 @@ function primsOf(g) {
 }
 async function loadPieces() {
   const names = Object.keys(PIECES);
-  const total = names.length + LOOKS[HERO_LOOK].parts.length + LOOKS[GUARD_LOOK].parts.length + 3;
+  const total = names.length + LOOKS[HERO_LOOK].parts.length + 3; // 경비 모델(약 1.2MB)은 첫 방 뒤에 받는다 (아래 시작 부분)
   let done = 0;
   const tick = () => { done++; hud.loadBar.style.width = Math.round(done / total * 100) + '%'; };
   const heroP = (async () => {
     try {
       const [rig, extra, dagger] = await Promise.all([RIG_URL, EXTRA_ANIMS_URL, DAGGER_URL].map(u => loader.loadAsync(u).then(g => { tick(); return g; })));
       CHAR.rig = rig.scene; CHAR.clips = prepClips(rig, extra); CHAR.dagger = dagger.scene;
-      const [hp, gp] = await Promise.all([loadLook(loader, HERO_LOOK), loadLook(loader, GUARD_LOOK)]);
-      CHAR.hero = hp; CHAR.guard = gp;
-      LOOKS[HERO_LOOK].parts.forEach(tick); LOOKS[GUARD_LOOK].parts.forEach(tick);
+      const hp = await loadLook(loader, HERO_LOOK);
+      CHAR.hero = hp;
+      LOOKS[HERO_LOOK].parts.forEach(tick);
       return assemble(hp, CHAR.rig, CHAR.dagger);
     } catch (e) { console.warn('character load failed, using capsule', e); return null; }
   })();
@@ -1822,8 +1822,9 @@ function nextStep(g, ti, tj) {
   return [ci * T + 1, ((c - ci) / W) * T + 1];
 }
 function spawnGuards(room) {
-  guards = [];
-  if (!room.guards || !CHAR.guard) return;
+  guards = []; S.guardPending = false;
+  if (!room.guards) return;
+  if (!CHAR.guard) { S.guardPending = true; return; } // 경비 모델을 아직 받는 중이면 받는 대로 세운다 (출구는 그때까지 닫힘)
   for (const def of room.guards) {
     const path = def.path.map(([i, j]) => [i * T + 1, j * T + 1]);
     const { rig, meshes } = assemble(CHAR.guard, CHAR.rig, CHAR.dagger);
@@ -2875,7 +2876,7 @@ function roomStars() {
 function updateExit() {
   if (S.trans || S.falling > 0) return;
   if (ch(S.era, cellOf(S.p.x), cellOf(S.p.z)) === '>') {
-    if (S.bossPending || enemies().some(g => g.alive && !g.optional)) { if (toastT <= 0) toast($t('적이 남아 있어요')); return; }
+    if (S.bossPending || S.guardPending || enemies().some(g => g.alive && !g.optional)) { if (toastT <= 0) toast($t('적이 남아 있어요')); return; }
     if (EXT.ask('canExit', S.room) === false) return; // 확장 퍼즐이 아직 안 풀림 (안내는 그 슬롯이)
     sfx.exit();
     // 기록: 이 방에서 어제에 머문 시간과 별
@@ -3104,4 +3105,6 @@ window.__yk = {
   if (!want) setHold('start');
   // 골렘 모델(약 1.9MB)은 첫 방(골렘 없음)이 뜬 뒤에 받는다. 골렘 방까지 못 받았으면 코드 몸으로 대신
   loadGolem(loader).then(gm => { CHAR.golem = gm; }).catch(e => console.warn('golem model load failed, using stone blocks', e));
+  // 경비 모델(약 1.2MB)도 첫 방(경비 없음) 뒤에 받는다 — 첫 로딩 6MB 목표 (11/15 T4). 그 전에 경비 방에 들어왔으면 받는 대로 세운다
+  loadLook(loader, GUARD_LOOK).then(gp => { CHAR.guard = gp; if (S.guardPending && S.room) spawnGuards(S.room); }).catch(e => console.warn('guard model load failed', e));
 })();
