@@ -59,7 +59,7 @@ export default mech({
   shift(d, from, to, k) {
     if (to !== 'now') return;
     // 다리 곁(8m)에서 떠났을 때만 (11/13 직접 플레이: 장치 모음 방 반대편에서 바꿔도 떠서 헷갈렸다)
-    for (const tb of d.tables) { const p = cpos(tb.i, tb.j); if (!tb.st.ori && Math.hypot(p.x - k.S.p.x, p.z - k.S.p.z) < 8) toastOnce('turn-diag', $t('다리가 도는 중에 떠나서 비스듬히 멈췄어요'), 2.2); }
+    for (const tb of d.tables) { const p = cpos(tb.i, tb.j); if (!tb.st.ori && Math.hypot(p.x - k.S.p.x, p.z - k.S.p.z) < 8) toastOnce('turn-diag', $t('돌던 다리가 비스듬히 멈췄어요'), 2.2); }
   },
 });
 

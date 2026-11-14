@@ -87,7 +87,7 @@ export default mech({
     for (const m of d.mirrors) {
       const p = cpos(m.i, m.j);
       if (k.S.era === 'past') out.push({ x: p.x, z: p.z, label: () => $t('E 거울 돌리기'), act: () => turn(m, d, k) });
-      else out.push({ x: p.x, z: p.z, label: () => $t('E 거울 (녹슮)'), act: () => { S3.locked(p); k.toast($t('녹슨 거울 — 어제 돌려 둔 방향 그대로예요'), 2.6); return 'rusted'; } });
+      else out.push({ x: p.x, z: p.z, label: () => $t('E 거울 (녹슮)'), act: () => { S3.locked(p); k.toast($t('녹슨 거울 — 어제 돌려야 해요'), 2.6); return 'rusted'; } });
     }
     return out;
   },

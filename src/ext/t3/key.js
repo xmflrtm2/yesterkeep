@@ -46,7 +46,7 @@ export default mech({
       if (l.open) continue;
       const p = cpos(l.i, l.j);
       if (k.S.era === 'past') out.push({ x: p.x, z: p.z, label: () => C.inv.key > 0 ? $t('E 자물쇠 열기') : $t('잠긴 문 — 열쇠가 필요해요'), act: () => unlock(l, k) });
-      else out.push({ x: p.x, z: p.z, label: () => $t('E 잠긴 문 (녹슮)'), act: () => { S3.locked(p); k.toast(C.inv.key > 0 ? $t('녹슨 자물쇠 — 어제의 자물쇠에 꽂아 보세요') : $t('오늘의 자물쇠는 녹슬었어요'), 2.8); return 'rusted'; } });
+      else out.push({ x: p.x, z: p.z, label: () => $t('E 잠긴 문 (녹슮)'), act: () => { S3.locked(p); k.toast(C.inv.key > 0 ? $t('녹슨 자물쇠 — 어제 꽂아 보세요') : $t('오늘의 자물쇠는 녹슬었어요'), 2.8); return 'rusted'; } });
     }
     return out;
   },
@@ -59,7 +59,7 @@ function unlock(l, k) {
   S3.unlock(p);
   k.FX.sparks(p.x, 1.1, p.z, { n: 10, color: ['#ffe9a8', '#ffc65a'], speed: 2.5, up: 2, size: 0.12 });
   setTimeout(() => k.FX.dust(p.x, 2.4, p.z, { n: 12, color: k.FXC.past.dust, speed: 0.8, up: -0.4, size: 0.5, g: 3, life: 1.2 }), 200);
-  toastOnce('unlock', $t('문이 열렸어요 — 오늘까지 열린 채로 남아요'), 2.4);
+  toastOnce('unlock', $t('문이 열렸어요 — 오늘도 열려 있어요'), 2.4);
   return 'unlocked';
 }
 

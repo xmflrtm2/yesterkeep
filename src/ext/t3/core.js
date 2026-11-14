@@ -184,7 +184,7 @@ EXT.on('roomEnter', room => {
   const have = run.sand();
   if (have + 0.05 < need && run.addSand(need - have, 't3-puzzle') > 0.05) {
     // R로 다시 하면 main.js의 "방을 처음부터"가 곧바로 덮으므로 조금 뒤에 띄운다
-    const r = EXT.K.S.room; setTimeout(() => { if (EXT.K.S.room === r) EXT.K.toast($t('어제에 오래 머물러야 하는 방 — 모래를 {0}초까지 채웠어요', need), 2.6); }, 900);
+    const r = EXT.K.S.room; setTimeout(() => { if (EXT.K.S.room === r) EXT.K.toast($t('풀 만큼 모래를 채웠어요 ({0}초)', need), 2.6); }, 900);
   }
 });
 EXT.on('update', (dt, k) => {

@@ -83,7 +83,7 @@ function turnWheel(wh, d, k) {
   S3.wheel(p, wh.open);
   k.FX.sparks(p.x, 1.0, p.z, { n: 6, color: ['#ffd27a', '#fff2c0'], speed: 2, up: 2, size: 0.1 });
   for (const w of d.water) if (w.wheel === wh && w.era === 'past') { const q = cpos(w.i, w.j); k.FX.dust(q.x, 0.1, q.z, { n: 4, color: wh.open ? ['#bfe8ff', '#8fd0f0'] : ['#8a7a60'], speed: 1.4, up: 1.2, size: 0.4, alpha: 0.5 }); }
-  k.toast(wh.open ? $t('수문 열림 — 어제 물길은 차고, 오늘 저수지는 말라요') : $t('수문 닫힘 — 어제 물길은 마르고, 오늘 저수지는 차요'), 3.0);
+  k.toast(wh.open ? $t('수문 열림 — 오늘 저수지가 말라요') : $t('수문 닫힘 — 오늘 저수지가 차요'), 3.0);
   return wh.open ? 'open' : 'closed';
 }
 
