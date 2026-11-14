@@ -191,7 +191,8 @@ EXT.on('update', (dt, k) => {
   wasFalling = f;
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
   // 막다른 길 알아채기 (보이는 상태에서 출구까지 갈 길이 하나도 없으면 R 안내)
-  if (solverMod && !busy()) {
+  // 발밑이 막 꺼진 프레임(떨어지기 직전)에는 계산을 시작하지 않는다 — 그 자리에서 "어제로 건널 수 있다"고 기억해 버려 되감긴 뒤에도 막힘을 못 알렸다(11/15)
+  if (solverMod && !busy() && k.stand(k.S.era, Math.floor(k.S.p.x / 2), Math.floor(k.S.p.z / 2))) {
     const v = solverMod.stuckTick(3); // 세상이 바뀌었을 때만 다시 풀고, 한 프레임에 3ms씩만
     if (v === true && !C.stuck) { C.stuck = true; k.toast($t('길이 막혔어요 — R로 다시 시작'), 3.2); addFail(); }
     else if (v === false) C.stuck = false;

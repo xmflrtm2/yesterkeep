@@ -5,7 +5,7 @@
 //     문 칸에 몸이 걸쳐 있으면 안 닫힌다(밀려 갇히지 않게)
 // "떠난 시대는 멈춘다": 경비·메아리가 누름판 위에 있을 때 그 시대를 떠나면, 판은 눌린 채 멈추고 문도 열린 채 멈춘다.
 // 경비를 누름판 위에서 쓰러뜨리면 그 몸이 판을 계속 누른다.
-import { mech, put, mat, mesh, group, cpos, nearest, markDirty, toastOnce } from './core.js';
+import { mech, put, mat, gmat, mesh, group, ghostObj, cpos, nearest, markDirty, toastOnce } from './core.js';
 import { EXT } from '../../ext.js';
 import { S3 } from './sfx3.js';
 
@@ -84,6 +84,10 @@ function buildPlate(p, k) {
   g.add(top); g.position.set(q.x, 0, q.z);
   k.groups[E].add(g);
   p.top = top; p.glyph = glyph;
+  // 다른 시대에서 보이는 누름판 윤곽: 눌려 있으면 금빛, 아니면 옅게 (어제의 판은 오늘엔 없으니 어디 있는지 알려 준다)
+  const ring = (c, op) => { const m = mesh(new THREE.RingGeometry(0.55, 0.8, 6).rotateX(-Math.PI / 2), gmat(c, op), q.x, 0.09, q.z); return m; };
+  ghostObj(ring('#ffd27a', 0.6), E, () => !!p.on);
+  ghostObj(ring('#c8b48a', 0.25), E, () => !p.on);
 }
 function buildDoor(o, k) {
   const E = o.era, i = o.i, j = o.j, cx = i * T + 1, z0 = j * T;

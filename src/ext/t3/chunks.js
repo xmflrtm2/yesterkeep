@@ -12,7 +12,7 @@ const CHUNKS1 = [
   // ───────── tier 1: 장치 하나씩 (두 단계) ─────────
   {
     id: 't3-seed1', track: 't3', tier: 1, tags: ['puzzle', 'seed'], mech: 'seed', name: N('씨앗 다리'),
-    hint: N('오늘의 마른 씨앗을 주워 어제의 흙에 심어 보세요'),
+    hint: N('오늘의 뿌리는 어제의 씨앗에서 자라요'),
     tip: N('씨앗을 들고 Shift → 어제의 흙 옆에서 E. 오늘로 돌아오면 뿌리가 구덩이를 건너 있어요'),
     startEra: 'now', start: [1, 3], exit: [11, 3],
     past: [
@@ -37,7 +37,7 @@ const CHUNKS1 = [
   },
   {
     id: 't3-sluice1', track: 't3', tier: 1, tags: ['puzzle', 'water'], mech: 'sluice', name: N('마른 저수지'),
-    hint: N('오늘의 저수지는 물이 가득해요. 어제의 수문은 어떨까요?'),
+    hint: N('어제 닫힌 것이 오늘의 물을 가둬요'),
     tip: N('어제로 가서 수문 바퀴 옆에서 E — 물이 빠져나가 오늘의 저수지가 말라요'),
     startEra: 'now', start: [1, 4], exit: [11, 3],
     past: [
@@ -63,7 +63,7 @@ const CHUNKS1 = [
   {
     id: 't3-mirror1', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
     tier: 1, tags: ['puzzle', 'mirror'], mech: 'mirror', name: N('달빛 봉인'),
-    hint: N('달빛이 봉인 수정에 닿으면 문이 열려요. 거울은 어제만 돌아가요'),
+    hint: N('달빛은 오늘에만, 거울은 어제에만 움직여요'),
     tip: N('어제로 가서 거울 옆에서 E. 옅은 빛줄기가 오늘의 달빛 길 — 수정까지 이어지게 하세요'),
     startEra: 'now', start: [2, 5], exit: [12, 3],
     past: [
@@ -88,7 +88,7 @@ const CHUNKS1 = [
   },
   {
     id: 't3-key1', track: 't3', tier: 1, tags: ['puzzle', 'key'], mech: 'key', name: N('잃어버린 열쇠'),
-    hint: N('오늘의 폐허에 떨어진 열쇠는 어제의 자물쇠에 맞아요'),
+    hint: N('잃어버린 것은 오늘에, 잠긴 것은 어제에'),
     tip: N('열쇠를 줍고 어제로 가서 문 옆에서 E. 문 너머는 어제에만 바닥이 있어요'),
     startEra: 'now', start: [2, 4], exit: [11, 3],
     past: [
@@ -114,14 +114,15 @@ const CHUNKS1 = [
   {
     id: 't3-crumble1', track: 't3', timing: true, // 장치를 쓰지 않고 박자·멈추기로 푸는 방 (풀이기 최소 행동 0이 정상)
     tier: 1, tags: ['puzzle', 'crumble'], mech: 'crumble', name: N('금 간 다리'),
-    hint: N('오늘의 금 간 바닥은 밟으면 곧 무너져요. 멈추지 말고 건너세요'),
-    tip: N('무너졌다면 어제의 다리로 걸어가, 아직 멀쩡한 칸 위에서 오늘로 바꾸세요'),
+    hint: N('멈추면 무너져요. 멈출 곳은 어제에 있어요'),
+    tip: N('다리 끝은 오늘 무너진 벽에 막혀 있어요. 벽 바로 앞 금 간 칸만 어제에도 바닥(청록) — 거기서 멈추자마자 Shift'),
+    // 2차(11/15): 1차는 곧장 뛰면 끝났다(처음 세션 메모) → 다리 끝을 오늘의 벽으로 막고, 그 앞 칸에서만 어제로 건너게
     startEra: 'now', start: [2, 3], exit: [12, 3],
     past: [
       '##############',
       '#...______...#',
       '#...______...#',
-      '#.........|..#',
+      '#...___......#',
       '#...______...#',
       '#...______...#',
       '##############',
@@ -130,16 +131,16 @@ const CHUNKS1 = [
       '##############',
       '#...______...#',
       '#...______...#',
-      '#...xxxxxx...#',
+      '#...xxxx#....#',
       '#...______...#',
       '#...______...#',
       '##############',
     ],
-    solve: [['go', 3, 3], ['go', 12, 3]],
+    solve: [['go', 3, 3], ['go', 7, 3], ['shift'], ['go', 12, 3]],
   },
   {
     id: 't3-clock1', track: 't3', tier: 1, tags: ['puzzle', 'clock'], mech: 'clock', name: N('태엽 문'),
-    hint: N('어제 태엽을 감은 만큼 오늘의 문이 열려요. 오늘에 있을 때만 풀려요'),
+    hint: N('어제의 시간이 오늘의 문을 감아요'),
     tip: N('어제 손잡이 옆에서 E를 3초쯤 누르고, 어제로 복도 입구까지 걸어간 뒤 오늘로 바꿔 달리세요'),
     startEra: 'now', start: [2, 4], exit: [12, 3],
     past: [
@@ -165,7 +166,7 @@ const CHUNKS1 = [
   {
     id: 't3-turn1', track: 't3', timing: true, // 장치를 쓰지 않고 박자·멈추기로 푸는 방 (풀이기 최소 행동 0이 정상)
     tier: 1, tags: ['puzzle', 'turn'], mech: 'turn', name: N('멈춘 회전 다리'),
-    hint: N('어제의 다리는 돌고, 오늘의 다리는 어제 떠난 순간 그대로 녹슬어 있어요'),
+    hint: N('녹슨 다리는 어제 마지막으로 본 모습을 기억해요'),
     tip: N('어제 다리가 동서로 놓였을 때 Shift — 오늘의 녹슨 다리도 동서로 멈춰 있어요'),
     startEra: 'past', start: [2, 3], exit: [11, 3],
     past: [
@@ -192,7 +193,7 @@ const CHUNKS1 = [
   {
     id: 't3-mirror2', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
     tier: 2, tags: ['puzzle', 'mirror', 'crate'], mech: 'mirror', name: N('두 거울과 상자'),
-    hint: N('달빛이 수정까지 가려면 거울 둘이 맞아야 해요. 오늘 길을 막는 썩은 상자는 어제의 상자예요'),
+    hint: N('빛을 막는 썩은 상자도 어제는 새것이었어요'),
     tip: N('어제 첫 거울을 돌리고, 상자를 빛줄기 밖(위나 아래)으로 밀고, 둘째 거울을 돌리세요'),
     startEra: 'now', start: [2, 7], exit: [13, 1],
     past: [
@@ -222,7 +223,7 @@ const CHUNKS1 = [
   },
   {
     id: 't3-seedkey', track: 't3', tier: 2, tags: ['puzzle', 'seed', 'key'], mech: 'seed', name: N('뿌리 끝의 열쇠'),
-    hint: N('열쇠는 오늘의 작은 섬에 있어요. 섬까지 가는 길은 아직 자라지 않았어요'),
+    hint: N('섬으로 가는 길은 어제 심어야 자라요'),
     tip: N('씨앗을 어제 구석 흙에 심으면 오늘 뿌리가 섬까지 뻗어요. 열쇠를 들고 어제의 문으로'),
     startEra: 'now', start: [3, 2], exit: [12, 4],
     past: [
@@ -251,7 +252,7 @@ const CHUNKS1 = [
   },
   {
     id: 't3-float', track: 't3', tier: 2, tags: ['puzzle', 'water', 'crate'], mech: 'sluice', name: N('떠다니는 상자'),
-    hint: N('어제의 마당은 오늘 저수지가 됐어요. 물에 잠긴 썩은 상자는 떠 있어요'),
+    hint: N('어제의 마당은 오늘의 물속이에요. 썩은 나무는 떠요'),
     tip: N('어제 상자 둘을 같은 줄에서 창살 쪽 끝까지 밀어 두면, 오늘 그 줄에 상자가 떠 있어요'),
     startEra: 'now', start: [2, 5], exit: [11, 3],
     // 11/13 직접 플레이: 처음엔 창살이 저수지 바로 옆이라 상자를 길게 밀면 창살 줄에 붙어 막혔다 → 저수지를 창살 앞 두 줄로 (같은 줄로 끝까지 밀면 그게 답)
@@ -281,7 +282,7 @@ const CHUNKS1 = [
   {
     id: 't3-crumble2', track: 't3', timing: true, // 장치를 쓰지 않고 박자·멈추기로 푸는 방 (풀이기 최소 행동 0이 정상)
     tier: 2, tags: ['puzzle', 'crumble'], mech: 'crumble', name: N('멈춘 균열'),
-    hint: N('어제는 가운데에만 바닥이 있어요. 오늘의 금 간 바닥은 어제에 있는 동안 멈춰요'),
+    hint: N('금이 가는 시간은 오늘의 것이에요'),
     tip: N('금 간 바닥 셋째 칸에서 바로 Shift → 어제로 벽을 돌아가 → 다음 금 간 칸 위에서 오늘로'),
     startEra: 'now', start: [2, 3], exit: [11, 3],
     past: [
@@ -306,7 +307,7 @@ const CHUNKS1 = [
   },
   {
     id: 't3-turnkey', track: 't3', tier: 2, tags: ['puzzle', 'turn', 'key'], mech: 'turn', name: N('돌다리 위의 열쇠'),
-    hint: N('열쇠는 북쪽 섬, 문은 동쪽이에요. 다리는 어제에만 돌아요'),
+    hint: N('다리의 가운데는 어느 시대에도 서 있어요'),
     tip: N('축(가운데)은 늘 안전해요. 축에서 기다렸다가 원하는 방향일 때 오늘로 바꾸세요'),
     startEra: 'past', start: [2, 4], exit: [11, 4],
     past: [
@@ -334,7 +335,7 @@ const CHUNKS1 = [
   // ───────── tier 3: 세 고리 ─────────
   {
     id: 't3-sunkkey', track: 't3', tier: 3, tags: ['puzzle', 'water', 'key'], mech: 'sluice', name: N('가라앉은 열쇠'),
-    hint: N('열쇠는 오늘의 저수지 바닥에 있어요. 수문을 열면 어제의 물길이 차올라요'),
+    hint: N('열어야 보이고, 닫아야 건너요'),
     tip: N('수문을 열고 → 오늘 열쇠를 줍고 → 어제 수문을 다시 닫으면 물길이 말라 돌아갈 수 있어요'),
     startEra: 'past', start: [3, 4], exit: [1, 1],
     past: [
@@ -362,7 +363,7 @@ const CHUNKS1 = [
   {
     id: 't3-garden', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
     tier: 3, tags: ['puzzle', 'seed', 'mirror'], mech: 'seed', name: N('달빛 정원'),
-    hint: N('거울은 섬 위에 있어요. 달빛이 수정에 닿으면 문이 열려요'),
+    hint: N('당신이 심은 것이 당신을 가로막을지도 몰라요'),
     tip: N('나무가 달빛을 가린다면? 어제 심은 씨앗은 어제 다시 캘 수 있어요'),
     startEra: 'now', start: [2, 1], exit: [13, 7],
     past: [
@@ -391,7 +392,7 @@ const CHUNKS1 = [
   },
   {
     id: 't3-clockcrumble', track: 't3', tier: 3, tags: ['puzzle', 'clock', 'crumble'], mech: 'clock', name: N('태엽과 균열'),
-    hint: N('태엽도 금 간 바닥도 오늘에 있을 때만 시간이 가요'),
+    hint: N('오늘에서만 흐르는 시간이 둘이에요'),
     tip: N('태엽을 3초 감고 → 금 간 둘째 칸에서 어제로 → 벽을 돌아 오늘로 → 문까지 달리기'),
     startEra: 'now', start: [3, 4], exit: [13, 4],
     past: [
@@ -418,7 +419,7 @@ const CHUNKS1 = [
   {
     id: 't3-grand', track: 't3', flip: false, // 거울: T1 flip()이 '/'·'\'를 안 바꿔서 뒤집으면 풀이가 깨진다
     tier: 4, tags: ['puzzle', 'water', 'key', 'mirror'], mech: 'mirror', name: N('달과 물의 방'),
-    hint: N('달빛이 봉인에 닿아야 출구가 열려요. 거울은 잠긴 문 안쪽에, 열쇠는 오늘의 저수지에'),
+    hint: N('물, 열쇠, 달빛 — 순서가 답이에요'),
     tip: N('열고 → 줍고 → 닫고: 어제 수문을 열어야 열쇠가 드러나지만, 그러면 어제의 물길을 못 건너요'),
     startEra: 'past', start: [3, 4], exit: [1, 1],
     past: [

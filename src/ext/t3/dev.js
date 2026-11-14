@@ -172,12 +172,35 @@ const D = {
     const R = rng(seed), dirs = [[], ['KeyW'], ['KeyS'], ['KeyA'], ['KeyD'], ['KeyW', 'KeyD'], ['KeyW', 'KeyA'], ['KeyS', 'KeyD'], ['KeyS', 'KeyA']];
     let held = [], t = 0, nextDir = 0, nextAct = 0, shifts = 0, es = 0;
     const setKeys = ks => { for (const k of held) if (!ks.includes(k)) ev('keyup', k); for (const k of ks) if (!held.includes(k)) ev('keydown', k); held = ks; };
+    const k = KK(), exitCell = (() => { for (let j = 0; j < k.S.H; j++) for (let i = 0; i < k.S.W; i++) if (k.ch('now', i, j) === '>') return [i, j]; return null; })();
+    const stepToward = (ti, tj) => { // 지금 시대의 칸 길 다음 칸으로 방향키 (돌진)
+      const s0 = st(), E = s0.era, key = (a, b) => a + ',' + b, prev = new Map([[key(s0.cell[0], s0.cell[1]), null]]), q = [s0.cell];
+      while (q.length) { const [a, b] = q.shift(); if (a === ti && b === tj) break; for (const [da, db] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const na = a + da, nb = b + db; if (!prev.has(key(na, nb)) && k.stand(E, na, nb)) { prev.set(key(na, nb), [a, b]); q.push([na, nb]); } } }
+      if (!prev.has(key(ti, tj))) return false;
+      let c = [ti, tj]; while (prev.get(key(c[0], c[1])) && (prev.get(key(c[0], c[1]))[0] !== s0.cell[0] || prev.get(key(c[0], c[1]))[1] !== s0.cell[1])) c = prev.get(key(c[0], c[1]));
+      const dx = c[0] * 2 + 1 - s0.x, dz = c[1] * 2 + 1 - s0.z, ks = [];
+      if (dx > 0.2) ks.push('KeyD'); else if (dx < -0.2) ks.push('KeyA'); if (dz > 0.2) ks.push('KeyS'); else if (dz < -0.2) ks.push('KeyW');
+      setKeys(ks); return true;
+    };
     while (t < sec && !lastExit) {
-      if (kind !== 'still' && t >= nextDir) { setKeys(dirs[1 + Math.floor(R() * 8)]); nextDir = t + 0.4 + R() * 0.8; }
+      const near = k.enemies().filter(g => g.alive && g.era === st().era).sort((a, b) => Math.hypot(a.x - st().x, a.z - st().z) - Math.hypot(b.x - st().x, b.z - st().z))[0];
+      if (kind === 'rush') { // 출구로 곧장, 적이 1.8m 안이면 찌르기, 길이 없으면 Shift
+        if (t >= nextDir) { nextDir = t + 0.15; if (!exitCell || !stepToward(exitCell[0], exitCell[1])) { setKeys([]); if (t >= nextAct) { P.tap('ShiftLeft'); shifts++; nextAct = t + 0.7; } } }
+        if (near && Math.hypot(near.x - st().x, near.z - st().z) < 1.8 && t >= nextAct) { P.stab(); nextAct = t + 0.5; }
+      } else if (kind === 'circle') { // Shift 없이 가장 가까운 적 둘레를 돌며 등 쪽이면 찌르기 (그 시대에 적이 없으면 바꿈)
+        if (!near) { if (t >= nextAct) { P.tap('ShiftLeft'); shifts++; nextAct = t + 1; } }
+        else if (t >= nextDir) {
+          nextDir = t + 0.15; const s0 = st(), an = Math.atan2(s0.x - near.x, s0.z - near.z) + 0.5, tx = near.x + Math.sin(an) * 2, tz = near.z + Math.cos(an) * 2, ks = [];
+          if (tx - s0.x > 0.2) ks.push('KeyD'); else if (tx - s0.x < -0.2) ks.push('KeyA'); if (tz - s0.z > 0.2) ks.push('KeyS'); else if (tz - s0.z < -0.2) ks.push('KeyW'); setKeys(ks);
+          const back = Math.cos(Math.atan2(s0.x - near.x, s0.z - near.z) - near.yaw) < -0.3;
+          if (back && Math.hypot(near.x - s0.x, near.z - s0.z) < 2.2 && t >= nextAct) { Y().S.face = Math.atan2(near.x - s0.x, near.z - s0.z); P.stab(); nextAct = t + 0.6; }
+        }
+      }
+      if ((kind === 'spam' || kind === 'random') && t >= nextDir) { setKeys(dirs[1 + Math.floor(R() * 8)]); nextDir = t + 0.4 + R() * 0.8; }
       if (t >= nextAct) {
         if (kind === 'spam') { P.tap('ShiftLeft'); shifts++; nextAct = t + 0.5; }
         else if (kind === 'random') { const r = R(); if (r < 0.25) { P.tap('ShiftLeft'); shifts++; } else if (r < 0.5) { P.tap('KeyE'); es++; } nextAct = t + 0.4; }
-        else nextAct = t + 1;
+        else if (kind === 'still') nextAct = t + 1;
       }
       Y().step(1 / 20); t += 1 / 20;
     }
@@ -188,7 +211,7 @@ const D = {
   /** 한 조각 전부 */
   check(id) {
     const v = this.validate(id), b = this.timedBot(id);
-    const lz = ['still', 'spam', 'random'].map(k => this.lazy(id, k));
+    const lz = ['still', 'spam', 'random', 'rush', 'circle'].map(k => this.lazy(id, k));
     return { id, solver: v, bot: b, lazy: lz, errs: errs.splice(0) };
   },
   all() { return CHUNKS.map(c => this.check(c.id)); },
