@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>T5 아이콘 시트</title>
+<!-- T5 아이콘 한 벌을 어제(금빛 바닥)·오늘(청록 바닥) 실제 게임 화면 위에 늘어놓고 본다.
+     py -I tools\play_server.py 8155 <폴더> 로 띄운 뒤 /tools/t5_sheet.html  (?big=1 크게, ?only=t4 유물만) -->
+<style>
+  body { margin: 0; background: #000; color: #f4ead8; font: 12px 'Segoe UI', 'Malgun Gothic', sans-serif; }
+  .band { padding: 10px 14px 12px; background-size: cover; background-position: center; position: relative; }
+  .band::before { content: ''; position: absolute; inset: 0; background: #0003; pointer-events: none; }
+  .band.past { background-image: url(../devlog/shots/2026-11-15-t5/before-b03-hud-past.jpg); background-position: 50% 62%; }
+  .band.now { background-image: url(../devlog/shots/2026-11-15-t5/before-b02-hud-now.jpg); background-position: 50% 62%; }
+  h2 { position: relative; margin: 0 0 6px; font-size: 14px; text-shadow: 0 1px 3px #000; }
+  .grid { position: relative; display: grid; grid-template-columns: repeat(auto-fill, 74px); gap: 4px 2px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+  .cell .yi { width: 40px; height: 40px; filter: drop-shadow(0 2px 2px #000a); }
+  .cell span { font-size: 9px; opacity: .85; text-shadow: 0 1px 2px #000; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .strip { position: relative; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .strip .yi { width: 18px; height: 18px; filter: drop-shadow(0 1px 1px #000c); }
+  .strip.s24 .yi { width: 24px; height: 24px; }
+  .yi { display: inline-block; overflow: visible; }
+  body.big .grid { grid-template-columns: repeat(auto-fill, 104px); }
+  body.big .cell .yi { width: 92px; height: 92px; }
+  body.big .strip { display: none; }
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script type="module">
+import { icon, ICON_IDS } from '../src/ext/t5/icons.js';
+const q = new URLSearchParams(location.search);
+if (q.get('big')) document.body.classList.add('big');
+let ids = ICON_IDS();
+if (q.get('era')) document.body.dataset.era = q.get('era');
+if (q.get('only')) ids = ids.filter(id => id.startsWith(q.get('only')));
+const short = id => id.replace(/^t4-(curse-)?/, (m, c) => (c ? '☓' : ''));
+let h = '';
+for (const era of q.get('era') ? [q.get('era')] : ['past', 'now']) {
+  h += `<div class="band ${era}"><h2>${era === 'past' ? '어제 (금빛 바닥)' : '오늘 (청록 바닥)'} · ${ids.length}개</h2><div class="grid">`;
+  for (const id of ids) h += `<div class="cell">${icon(id)}<span>${short(id)}</span></div>`;
+  h += `</div><div class="strip">${ids.map(id => icon(id)).join('')}</div><div class="strip s24">${ids.map(id => icon(id)).join('')}</div></div>`;
+}
+document.getElementById('out').innerHTML = h;
+window.__sheetReady = true;
+</script>
+</body>
+</html>
