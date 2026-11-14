@@ -8,6 +8,9 @@ const MSG = { // main.js가 hurt()에 넘기는 글자 (비교용, 그때 언어
   arrow: () => $t('화살에 맞았어요'), spike: () => $t('가시에 찔렸어요'), blade: () => $t('칼날에 베였어요'),
 };
 const DEG = Math.PI / 180;
+// T2 적의 피해 글자 (짐승 가죽·혼령 부적이 알아보는 것)
+const T2MSG = [['beast', () => $t('사냥개에게 물렸어요')], ['beast', () => $t('미믹에게 물렸어요')], ['beast', () => $t('쥐 떼에 물렸어요')],
+  ['spirit', () => $t('메아리에 닿았어요 — 내가 지나온 길을 따라와요')], ['spirit', () => $t('망령에 닿았어요 — 다른 시대에서 보고, 겹쳐 넘어오세요')]];
 
 export const T4 = {
   K: null,
@@ -34,6 +37,10 @@ function freshStats() {
     strike: 0.6, shockStun: 0.6, backDeg: 110, shield: 0, shieldStun: 0, boots: 0, spring: 0, catch: 0, ammoMax: 3, knives: 0,
     killCoins: 0, price: 1, gate: 0, chain: 0, ripple: 0, breath: 0, double: 0, phoenix: 0, decoy: 0, decoyCd: 8, harvest: -1,
     lastGrain: 0, shadow: 0, glass: 0, sandKill: 0, moon: 1, pierce: 0, decoyBoth: 0,
+    // 2차: T2 적·T3 장치·저주 (r2.js)
+    follow: 0, shieldReact: 0, shieldHear: 0, aimMul: 1, revDelay: 0, beast: 0, beastStun: 0, spirit: 0, springRate: 1, springMax: 0,
+    feather: 0, eliteHunt: 0, moonEdge: 0, houndCoins: 0, mageSand: 0,
+    coinMul: 1, thinNow: 1, thinPast: 1, foeSpeed: 1, pickPlus: 0, glassHeart: 0,
   };
 }
 export const has = id => T4.inv.some(e => e.id === id);
@@ -41,7 +48,7 @@ export const lvOf = id => (T4.inv.find(e => e.id === id) || {}).lv || 0;
 const owned = () => T4.inv.map(e => ({ it: byId(e.id), lv: e.lv })).filter(o => o.it);
 
 // 값 하나를 기본값 × 배수 + 더하기로. 배수 1·더하기 0이면 원래 값으로 되돌리고 손을 뗀다 (다른 트랙이 바꾼 값을 덮지 않게)
-function put(obj, key, tag, mul, add = 0) {
+export function put(obj, key, tag, mul, add = 0) {
   if (!obj) return;
   const id = tag + '.' + key;
   const ident = mul === 1 && add === 0;
@@ -71,6 +78,7 @@ export function apply() {
   put(K.GOLEM, 'sense', 'GOLEM', st.mul.sense);
   put(K.GOLEM, 'susNear', 'GOLEM', st.mul.sus);
   put(K.GOLEM, 'susFar', 'GOLEM', st.mul.sus);
+  for (const key of ['walk', 'run']) { put(K.GUARD, key, 'GUARD', st.foeSpeed); put(K.GOLEM, key, 'GOLEM', st.foeSpeed); } // 저주: 무거운 왕관
   // T1이 읽는 모래 배수 (T1이 없으면 아무도 안 읽음)
   if (st.mul.sandMul !== 1 || 'STAT.sandMul' in T4.base) { if (STAT.sandMul == null) STAT.sandMul = 1; put(STAT, 'sandMul', 'STAT', st.mul.sandMul); }
   dynStats();
@@ -90,8 +98,8 @@ const graining = () => T4.st && T4.st.lastGrain && T4.K && T4.K.S.hearts <= T4.s
 const bossAwake = () => { const K = T4.K; return !!(K && K.bosses && K.bosses.some(b => b.alive && b.state !== 'dormant')); };
 function dynStats() {
   const K = T4.K, st = T4.st; if (!K || !st) return;
-  const calm = !bossAwake(), moon = calm && K.S.era === 'now' ? st.moon : 1, g = graining();
-  put(K.STAT, 'speed', 'STAT', st.mul.speed * moon * (g && calm ? 1.15 : 1));
+  const calm = !bossAwake(), now = K.S.era === 'now', moon = calm && now ? st.moon * st.thinNow : 1, g = graining();
+  put(K.STAT, 'speed', 'STAT', st.mul.speed * moon * (now ? 1 : st.thinPast) * (g && calm ? 1.15 : 1)); // 저주 '얇은 오늘'의 대가(어제 −20%)는 보스 앞에서도 그대로
   put(K.STAT, 'rollCd', 'STAT', st.mul.rollCd * (g ? 0.5 : 1));
 }
 // 창살 쐐기: 방 데이터의 gateHold를 잠깐 늘렸다가, 방을 떠나거나 유물이 없어지면 되돌린다
@@ -108,7 +116,7 @@ export function changed(why) { for (const f of T4.listeners) { try { f(why); } c
 export function give(id, { lv = 1, silent = false } = {}) {
   const it = byId(id); if (!it) { console.warn('[t4] unknown item', id); return false; }
   const e = T4.inv.find(x => x.id === id);
-  if (e) e.lv = Math.max(e.lv, lv); else T4.inv.push({ id, lv });
+  if (e) e.lv = Math.max(e.lv, lv); else { T4.inv.push({ id, lv: it.kind === 'curse' ? 1 : lv }); if (it.onGive) it.onGive(T4); }
   T4.run.seen.add(id);
   apply();
   refill(it);
@@ -128,7 +136,7 @@ export function upgrade(id) {
   changed('upgrade');
   return true;
 }
-export function canUpgrade(id) { const e = T4.inv.find(x => x.id === id); return !!e && e.lv < 2; }
+export function canUpgrade(id) { const e = T4.inv.find(x => x.id === id), it = byId(id); return !!e && e.lv < 2 && !!it && it.kind !== 'curse'; }
 // 새로 얻거나 강화한 유물의 방마다 차는 것을 바로 채운다
 function refill(it) {
   if (!it || !T4.st) return;
@@ -136,6 +144,7 @@ function refill(it) {
   T4.room.spring = Math.max(T4.room.spring || 0, T4.st.spring);
   T4.room.boots = Math.max(T4.room.boots || 0, T4.st.boots);
   T4.room.catch = Math.max(T4.room.catch || 0, T4.st.catch);
+  for (const k of ['beast', 'spirit', 'feather']) T4.room[k] = Math.max(T4.room[k] || 0, T4.st[k]);
   if (it.id === 't4-throw-knife') T4.ammo.knife = Math.max(T4.ammo.knife, T4.st.knives - T4.drops.length - T4.proj.filter(p => p.kind === 'knife').length);
 }
 function clampAmmo() { T4.ammo.knife = Math.min(T4.ammo.knife, T4.st.knives); T4.ammo.arrows = Math.min(T4.ammo.arrows, T4.st.catch ? T4.st.ammoMax : T4.ammo.arrows); }
@@ -151,9 +160,10 @@ export function available(it, meta) {
   return true;
 }
 // 고르기에 낼 n개: 안 가진 것 중 희귀도 가중치로 (tier가 높을수록 드묾·전설이 잘 나옴)
-export function roll(n = 3, { tier = 1, kinds = null, meta = null, rar = null, exclude = [] } = {}) {
-  const pool = ITEMS.filter(it => !has(it.id) && !exclude.includes(it.id) && available(it, meta) && (!kinds || kinds.includes(it.kind)) && (!rar || rar.includes(it.rar)));
-  const w = it => RAR[it.rar].w * (it.rar === 'common' ? Math.max(0.4, 1.15 - 0.15 * tier) : it.rar === 'legend' ? 0.7 + 0.4 * tier : 0.9 + 0.12 * tier) * (T4.run.seen.has(it.id) ? 0.5 : 1);
+export function roll(n = 3, { tier = 1, kinds = null, meta = null, rar = null, exclude = [], curse = false } = {}) {
+  // 저주는 따로 부를 때만(curse: true) — 보통 고르기·상점에는 안 섞인다 (ui.js가 보물 고르기에 한 장을 섞는다)
+  const pool = ITEMS.filter(it => !has(it.id) && !exclude.includes(it.id) && available(it, meta) && (curse ? it.kind === 'curse' : it.kind !== 'curse') && (!kinds || kinds.includes(it.kind)) && (!rar || rar.includes(it.rar)));
+  const w = it => (it.kind === 'curse' ? 1 : RAR[it.rar].w) * (it.rar === 'common' ? Math.max(0.4, 1.15 - 0.15 * tier) : it.rar === 'legend' ? 0.7 + 0.4 * tier : 0.9 + 0.12 * tier) * (T4.run.seen.has(it.id) ? 0.5 : 1);
   const out = [];
   while (out.length < n && pool.length) {
     let sum = 0; for (const it of pool) sum += w(it);
@@ -387,7 +397,10 @@ function heartWatch() {
   const K = T4.K, S = K.S;
   if (T4.lastHearts == null) { T4.lastHearts = S.hearts; return; }
   if (S.hearts < T4.lastHearts && S.down) {
-    if (T4.room.spring > 0) {
+    if (S.down.kind === 'fall' && T4.room.feather > 0) { // 깃털 발목: 떨어짐(구덩이·물·무너진 바닥)만
+      T4.room.feather--; S.hearts = Math.min(K.STAT.maxHearts, S.hearts + 1);
+      K.toast('🪽 ' + $t('깃털 발목이 하트를 지켰어요'), 1.8); snd.spring(); changed('feather');
+    } else if (T4.room.spring > 0) {
       T4.room.spring--; S.hearts++;
       K.toast('⏪ ' + $t('되감기 태엽이 하트를 지켰어요'), 1.8); snd.spring(); changed('spring');
     } else if (S.hearts <= 0 && T4.st.phoenix && !T4.run.phoenixUsed) {
@@ -409,7 +422,7 @@ EXT.on('roomLoad', (room, K) => {
   T4.lastThrowKill = false;
   T4.lastHearts = K.S.hearts;
   const st = T4.st || apply();
-  T4.room = { shield: st.shield, spring: st.spring, boots: st.boots, catch: st.catch, id: room.id };
+  T4.room = { shield: st.shield, spring: st.spring, boots: st.boots, catch: st.catch, beast: st.beast, spirit: st.spirit, feather: st.feather, id: room.id };
   T4.ammo.knife = st.knives; // 방에 들어오면 단검이 손에 돌아온다
   if (live()) { gateApply(); dynStats(); }
   else if (gateRoom) gateApply();
@@ -449,6 +462,14 @@ EXT.on('beforeHurt', msg => {
     K.toast('🧤 ' + $t('화살을 잡았어요 — Q로 던지기'), 1.6); snd.catch(); changed('ammo');
     return false;
   }
+  // 짐승 가죽 · 혼령 부적 (T2 적의 물기·닿기) — 방패보다 먼저 쓴다
+  const kindMsg = T2MSG.find(([k, f]) => msg === f());
+  if (kindMsg && T4.room[kindMsg[0]] > 0) {
+    T4.room[kindMsg[0]]--; S.invuln = Math.max(S.invuln, 1.0);
+    K.toast(kindMsg[0] === 'beast' ? '🐗 ' + $t('짐승 가죽이 막았어요') : '🧿 ' + $t('혼령 부적이 막았어요'), 1.4); snd.block(); changed(kindMsg[0]);
+    if (kindMsg[0] === 'beast' && T4.st.beastStun) for (const f of K.enemies()) if (f.alive && f.era === S.era && Math.hypot(f.x - S.p.x, f.z - S.p.z) < 3) { f.stun = Math.max(f.stun || 0, T4.st.beastStun); f.wind = 0; }
+    return false;
+  }
   // 금 간 방패
   if (T4.room.shield > 0) {
     T4.room.shield--; S.invuln = Math.max(S.invuln, 1.0);
@@ -465,7 +486,7 @@ EXT.on('kill', (foe, how, K) => {
   const S = K.S;
   const thrown = T4.lastThrowKill; T4.lastThrowKill = false;
   if (T4.run.active) T4.run.kills++;
-  if (T4.run.active || live()) addCoins(foe.kind === 'boss' ? 8 : 1 + (T4.st ? T4.st.killCoins : 0));
+  if (T4.run.active || live()) addCoins(Math.round((foe.kind === 'boss' ? 8 : 1 + (T4.st ? T4.st.killCoins : 0)) * (T4.st ? T4.st.coinMul : 1)));
   if (!live()) return;
   const st = T4.st;
   if (st.sandKill && EXT.run && EXT.run.addSand) EXT.run.addSand(st.sandKill);

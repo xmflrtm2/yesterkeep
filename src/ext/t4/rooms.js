@@ -3,7 +3,8 @@
 // (T1이 조각으로 만든 방에도 EXT.t4.decorate(room, 'shop')로 붙일 수 있다).
 // T1이 없을 때: ?room=t4-treasure 로 열면 시험 런(보물 → 보초 → 시험장 → 상점 → 두 경비 → 쉼터 → 초소 → 보물 → 성채지기)이 돈다.
 import { EXT } from '../../ext.js';
-import { T4, give, roll, priceOf, heartPrice, addCoins, resetRun, apply, changed } from './core.js';
+import { T4, give, roll, priceOf, heartPrice, addCoins, resetRun, apply, changed, sandOn } from './core.js';
+import { memMul } from './r2.js';
 import { byId } from './items.js';
 import { openPick, openRest, openMeta, showNear, itemCard, panel, showHud } from './ui.js';
 import { loadMeta, saveMeta, runGain } from './meta.js';
@@ -21,7 +22,7 @@ R['t4-treasure'] = {
 R['t4-shop'] = {
   id: 't4-shop', name: N('떠돌이 상점'), label: 'T4', startEra: 'now',
   hint: N('받침대 앞에서 E로 사요. 금화는 적을 쓰러뜨리면 생겨요'),
-  t4: { type: 'shop', altars: [{ type: 'shop', at: [3, 2] }, { type: 'shop', at: [6, 2] }, { type: 'shop', at: [9, 2] }, { type: 'heart', at: [6, 5] }] },
+  t4: { type: 'shop', altars: [{ type: 'shop', at: [3, 2] }, { type: 'shop', at: [6, 2] }, { type: 'shop', at: [9, 2] }, { type: 'heart', at: [4, 5] }, { type: 'sand', at: [8, 5] }] },
   past: ['#############', '#...........#', '#...........#', '#@.........>#', '#...........#', '#...........#', '#############'],
   now: ['#############', '#..,........#', '#...........#', '#@.........>#', '#.......,...#', '#...........#', '#############'],
 };
@@ -117,10 +118,10 @@ function buildAltar(a) {
       K.lightSpecs[E].push({ x: a.x, y: 1.8, z: a.z, color: '#ff9e45', I: E === 'past' ? 10 : 8, d: 9, flick: true });
     } else {
       g.add(pedestal(E));
-      const icon = a.type === 'treasure' ? '🎁' : a.type === 'meta' ? '📜' : a.type === 'heart' ? '💗' : (byId(a.item) || {}).icon || '❔';
-      const glow = a.type === 'shop' && byId(a.item) ? RCOL[byId(a.item).rar] : a.type === 'heart' ? '#ff6a7a' : a.type === 'meta' ? '#b8a0ff' : '#ffd27a';
+      const icon = a.type === 'treasure' ? '🎁' : a.type === 'meta' ? '📜' : a.type === 'heart' ? '💗' : a.type === 'sand' ? '⌛' : (byId(a.item) || {}).icon || '❔';
+      const glow = a.type === 'shop' && byId(a.item) ? RCOL[byId(a.item).rar] : a.type === 'heart' ? '#ff6a7a' : a.type === 'sand' ? '#ffe2a8' : a.type === 'meta' ? '#b8a0ff' : '#ffd27a';
       const sp = sprite(iconTex(icon, { glow }), 1.05); sp.position.y = 1.55; g.add(sp); a.icon = a.icon || []; a.icon.push(sp);
-      if (a.type === 'shop' || a.type === 'heart') { const tag = sprite(iconTex('🪙' + a.price, { w: 192, h: 64, font: 46, bg: false }), 1.25); tag.position.y = 0.95; tag.position.z = 0.6; g.add(tag); a.tag = a.tag || []; a.tag.push(tag); }
+      if (a.type === 'shop' || a.type === 'heart' || a.type === 'sand') { const tag = sprite(iconTex('🪙' + a.price, { w: 192, h: 64, font: 46, bg: false }), 1.25); tag.position.y = 0.95; tag.position.z = 0.6; g.add(tag); a.tag = a.tag || []; a.tag.push(tag); }
       K.lightSpecs[E].push({ x: a.x, y: 1.6, z: a.z + 0.3, color: glow, I: 4, d: 5 });
     }
     K.groups[E].add(g); a.parts.push(g);
@@ -153,12 +154,14 @@ EXT.on('roomLoad', (room, K) => {
   const tier = room.t4.tier || (EXT.run && EXT.run.floor) || 1;
   const taken = [];
   room.t4.altars.forEach((src, k) => {
+    if (src.type === 'sand' && !sandOn()) return; // 모래는 T1 런에서만
     const a = { ...src, k };
     if (a.type === 'shop') {
       if (!(k in st.items)) { const id = roll(1, { tier, kinds: ['relic'], meta: loadMeta(), exclude: taken })[0] || null; st.items[k] = id; }
       a.item = st.items[k]; if (a.item) taken.push(a.item);
       a.price = priceOf(byId(a.item)); a.sold = !a.item || !!st.used[k];
     } else if (a.type === 'heart') { a.price = heartPrice(); a.sold = !!st.used[k]; }
+    else if (a.type === 'sand') { a.price = sandPrice(); a.sold = !!st.used[k]; }
     else a.used = !!st.used[k];
     a.st = st;
     buildAltar(a);
@@ -187,6 +190,10 @@ function devGive() {
 }
 EXT.on('init', () => { const q = new URLSearchParams(location.search); if (q.get('t4give') || q.get('t4coins')) setTimeout(() => { if (!T4.run.active) { devGive(); showHud(); } }, 0); });
 
+// 상점의 모래: 금화 3으로 +6초 (T1 모래 16초 중, 방 하나 깨면 +1.5~2.5)
+const SAND_BUY = 6;
+const sandPrice = () => Math.max(1, Math.round(3 * (T4.st ? T4.st.price : 1)));
+
 // ───────── E: 제단 쓰기 ─────────
 const nearAltar = () => {
   const K = T4.K; if (!K || !T4.altars || !T4.altars.length) return null;
@@ -201,7 +208,7 @@ EXT.on('interact', () => {
     if (a.used) { K.toast($t('비어 있어요'), 1.2); return 't4-empty'; }
     a.used = true; a.st.used[a.k] = true; refreshAltar(a);
     K.FX.motes(a.x, 1.4, a.z, { n: 30, color: ['#ffe9a8', '#fff'], speed: 2.2, up: 2.2, life: 1.0 });
-    openPick({ tier: (S.room.t4 && S.room.t4.tier) || (EXT.run && EXT.run.floor) || 1 });
+    openPick({ tier: (S.room.t4 && S.room.t4.tier) || (EXT.run && EXT.run.floor) || 1, curseChance: T4.run.active ? 0.3 : 0 });
     return 't4-treasure';
   }
   if (a.type === 'shop') {
@@ -222,6 +229,14 @@ EXT.on('interact', () => {
     S.hearts = Math.min(K.STAT.maxHearts, S.hearts + 1); T4.lastHearts = S.hearts; K.drawHearts(); snd.heal();
     return 't4-heart';
   }
+  if (a.type === 'sand') {
+    if (a.sold) return 't4-sold';
+    a.price = sandPrice();
+    if (T4.coins < a.price) { snd.deny(); K.toast($t('금화가 모자라요 ({0} / {1})', T4.coins, a.price), 1.6); return 't4-poor'; }
+    addCoins(-a.price, 'quiet'); a.sold = true; a.st.used[a.k] = true; refreshAltar(a);
+    EXT.run.addSand(SAND_BUY, 't4-shop'); snd.buy();
+    return 't4-sand';
+  }
   if (a.type === 'rest') {
     if (a.used) { K.toast($t('이미 쉬었어요'), 1.2); return 't4-rested'; }
     openRest().then(r => { if (r) { a.used = true; a.st.used[a.k] = true; refreshAltar(a); } });
@@ -240,6 +255,7 @@ EXT.on('prompt', () => {
   }
   showNear(null);
   if (a.type === 'heart') return a.sold ? '' : $t('E 하트 +1 — 금화 {0}', heartPrice());
+  if (a.type === 'sand') return a.sold ? '' : $t('E 모래 +{0}초 — 금화 {1}', SAND_BUY, sandPrice());
   if (a.type === 'treasure') return a.used ? '' : $t('E 제단 살피기');
   if (a.type === 'rest') return a.used ? '' : $t('E 모닥불 앞에 앉기');
   if (a.type === 'meta') return $t('E 기억의 서고');
@@ -267,7 +283,7 @@ EXT.on('nextRoom', idx => {
 // 런 끝: 기억을 쌓는다 (T1도 부름). 돌려주는 값 = 얻은 기억
 export function endRun({ won = false, floors = 0, rooms = null } = {}) {
   const m = loadMeta();
-  const gain = runGain({ rooms: rooms ?? T4.run.rooms, floors, won, coins: T4.coins });
+  const gain = Math.round(runGain({ rooms: rooms ?? T4.run.rooms, floors, won, coins: T4.coins }) * memMul()); // 저주마다 +25%
   m.memory += gain; m.total += gain; m.runs++; if (won) m.wins++; m.best = Math.max(m.best, rooms ?? T4.run.rooms);
   saveMeta(m);
   T4.run.active = false;
@@ -311,8 +327,8 @@ export function roomFor(type, opts = {}) {
 // T1이 만든 방에 제단을 붙인다. at = 제단 칸들(없으면 방 가운데)
 export function decorate(room, type, { at = null, tier = 1 } = {}) {
   const W = room.past[0].length, H = room.past.length, mid = [Math.floor(W / 2), Math.floor(H / 2)];
-  const spots = at || (type === 'shop' ? [[mid[0] - 3, mid[1] - 1], [mid[0], mid[1] - 1], [mid[0] + 3, mid[1] - 1], [mid[0], mid[1] + 2]] : [mid]);
-  const kinds = type === 'shop' ? ['shop', 'shop', 'shop', 'heart'] : [type];
+  const spots = at || (type === 'shop' ? [[mid[0] - 3, mid[1] - 1], [mid[0], mid[1] - 1], [mid[0] + 3, mid[1] - 1], [mid[0] - 2, mid[1] + 2], [mid[0] + 2, mid[1] + 2]] : [mid]);
+  const kinds = type === 'shop' ? ['shop', 'shop', 'shop', 'heart', 'sand'] : [type];
   room.t4 = { type, tier, altars: spots.map((p, k) => ({ type: kinds[k] || kinds[0], at: p })) };
   return room;
 }

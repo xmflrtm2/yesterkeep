@@ -5,7 +5,7 @@
 //   rar: 'common' | 'rare' | 'legend',  needs: 'sand'(T1 모래가 있어야 나옴),  lock: 런 사이 해금 값(기억). 없으면 처음부터 나옴
 //   글자는 N('…')로 두고 그릴 때 $t (영어는 en.js)
 export const RAR = { common: { w: 60, price: 6, name: N('흔함') }, rare: { w: 30, price: 10, name: N('드묾') }, legend: { w: 10, price: 16, name: N('전설') } };
-export const KIND = { relic: N('유물'), blessing: N('축복') };
+export const KIND = { relic: N('유물'), blessing: N('축복'), curse: N('저주') };
 
 export const ITEMS = [
   // ───────── 흔함 ─────────
@@ -97,7 +97,61 @@ export const ITEMS = [
   { id: 't4-afterimage', kind: 'relic', rar: 'legend', icon: '👤', name: N('잔상 미끼'), lock: 12,
     desc: [N('어제를 떠난 자리에 잔상이 남아요. 어제로 돌아오면 2.5초 동안 둘레 7m의 경비가 잔상을 쳐다봐요 (8초에 한 번)'), N('오늘을 떠날 때도 남아 골렘도 쳐다봐요. 4초 동안, 5초에 한 번')],
     stat(st, lv) { st.decoy = Math.max(st.decoy, lv > 1 ? 4 : 2.5); st.decoyCd = lv > 1 ? 5 : 8; if (lv > 1) st.decoyBoth = 1; } },
+
+  // ───────── 2차 (11/15): T2 적·T3 장치와 얽힌 것 ─────────  (동작은 r2.js · core.js)
+  { id: 't4-crossed-tracks', kind: 'blessing', rar: 'common', icon: '🐾', name: N('엇갈린 발자국'), r2: true,
+    desc: [N('사냥개가 시대를 따라오는 데 0.5초 더 걸려요 (구덩이로 꾈 시간)'), N('0.9초 더 걸려요')],
+    stat(st, lv) { st.follow = Math.max(st.follow, lv > 1 ? 0.9 : 0.5); } },
+  { id: 't4-shield-gap', kind: 'relic', rar: 'rare', icon: '🪖', name: N('방패 틈'), r2: true,
+    desc: [N('방패병이 소리에 돌아서는 데 0.3초 → 0.55초, 듣는 거리 −1m'), N('돌아서는 데 0.75초, 듣는 거리 −1.6m')],
+    stat(st, lv) { st.shieldReact = Math.max(st.shieldReact, lv > 1 ? 0.45 : 0.25); st.shieldHear = Math.max(st.shieldHear, lv > 1 ? 1.6 : 1); } },
+  { id: 't4-shaky-aim', kind: 'blessing', rar: 'common', icon: '🎐', name: N('흔들리는 조준'), r2: true,
+    desc: [N('석궁병이 겨누는 시간이 1.5배 (조준선을 보고 피할 틈)'), N('겨누는 시간 1.9배')],
+    stat(st, lv) { st.aimMul = Math.max(st.aimMul, lv > 1 ? 1.9 : 1.5); } },
+  { id: 't4-deep-sleep', kind: 'relic', rar: 'rare', icon: '🕯️', name: N('깊은 잠'), r2: true,
+    desc: [N('내가 쓰러뜨린 적은 시간 마법사가 되살리는 데 4초 더 걸려요'), N('8초 더 걸려요')],
+    stat(st, lv) { st.revDelay = Math.max(st.revDelay, lv > 1 ? 8 : 4); } },
+  { id: 't4-beast-hide', kind: 'relic', rar: 'common', icon: '🐗', name: N('짐승 가죽'), r2: true,
+    desc: [N('방마다 한 번, 사냥개·미믹·쥐 떼에게 물려도 하트가 안 줄어요'), N('방마다 두 번, 물리면 그 짐승이 1.5초 움찔해요')],
+    stat(st, lv) { st.beast += lv; if (lv > 1) st.beastStun = 1.5; } },
+  { id: 't4-spirit-charm', kind: 'relic', rar: 'rare', icon: '🧿', name: N('혼령 부적'), r2: true,
+    desc: [N('방마다 한 번, 메아리·망령에 닿아도 하트가 안 줄어요'), N('방마다 두 번')],
+    stat(st, lv) { st.spirit += lv; } },
+  { id: 't4-winding-key', kind: 'relic', rar: 'common', icon: '🗝️', name: N('태엽 열쇠'), r2: true,
+    desc: [N('태엽을 두 배 빨리 감고, 8초까지 감겨요'), N('세 배 빨리, 10초까지')],
+    stat(st, lv) { st.springRate = Math.max(st.springRate, lv > 1 ? 3 : 2); st.springMax = Math.max(st.springMax, lv > 1 ? 10 : 8); } },
+  { id: 't4-feather-ankle', kind: 'blessing', rar: 'common', icon: '🪽', name: N('깃털 발목'), r2: true,
+    desc: [N('방마다 한 번, 구덩이·물·무너진 바닥에 떨어져도 하트가 안 줄어요'), N('방마다 두 번')],
+    stat(st, lv) { st.feather += lv; } },
+  { id: 't4-elite-hunter', kind: 'relic', rar: 'rare', icon: '🏹', name: N('정예 사냥꾼'), r2: true,
+    desc: [N('정예를 쓰러뜨리면 금화 +4, 하트 +1'), N('금화 +6, 하트 +1, 모래 +3초')],
+    stat(st, lv) { st.eliteHunt = Math.max(st.eliteHunt, lv); } },
+  { id: 't4-moon-edge', kind: 'relic', rar: 'legend', icon: '🌕', name: N('달빛 칼날'), r2: true,
+    desc: [N('오늘의 달빛 줄기 위에 선 적은 그 자리에 묶여요 (거울로 줄기를 옮겨 붙잡기)'), N('묶인 적은 앞에서 찔러도 한 방')],
+    stat(st, lv) { st.moonEdge = Math.max(st.moonEdge, lv); } },
+
+  // ───────── 저주 (대가가 있는 유물): 강하지만 손해가 있다. 런 끝 기억이 늘어난다(memBonus). 강화 안 됨, 쉼터에서 정화 ─────────
+  { id: 't4-curse-blood', kind: 'curse', rar: 'curse', icon: '🩸', name: N('피의 계약'), memBonus: 0.25,
+    desc: [N('쓰러뜨릴 때 금화 두 배')], cost: N('경비 시야 +20%, 골렘 감지 +15%'),
+    stat(st) { st.coinMul *= 2; st.mul.range *= 1.2; st.mul.sense *= 1.15; } },
+  { id: 't4-curse-lead', kind: 'curse', rar: 'curse', icon: '⚓', name: N('납 모래시계'), memBonus: 0.25,
+    desc: [N('전환 기습 +0.6초, 얼어붙는 범위 ×1.5')], cost: N('시대 전환 대기 0.5초 → 1.2초'),
+    stat(st) { st.strike += 0.6; st.mul.shock *= 1.5; st.mul.shiftCd *= 2.4; } },
+  { id: 't4-curse-glass', kind: 'curse', rar: 'curse', icon: '🫙', name: N('금 간 심장'), memBonus: 0.25,
+    desc: [N('최대 하트 +2')], cost: N('맞을 때마다 하트가 2개씩 줄어요 (떨어질 땐 1개)'),
+    stat(st) { st.add.maxHearts += 2; st.glassHeart = 1; } },
+  { id: 't4-curse-thin', kind: 'curse', rar: 'curse', icon: '🌫️', name: N('얇은 오늘'), memBonus: 0.25,
+    desc: [N('오늘에서 걸음 +40% (성채지기 앞에선 빼고)')], cost: N('어제에서 걸음 −20%'),
+    stat(st) { st.thinNow = 1.4; st.thinPast = 0.8; } },
+  { id: 't4-curse-debt', kind: 'curse', rar: 'curse', icon: '📜', name: N('빚진 시간'), memBonus: 0.25,
+    desc: [N('지금 금화 +20')], cost: N('상점 값 1.6배'),
+    stat(st) { st.price *= 1.6; }, onGive(T4) { T4.coins += 20; } },
+  { id: 't4-curse-crown', kind: 'curse', rar: 'curse', icon: '👑', name: N('무거운 왕관'), memBonus: 0.5,
+    desc: [N('고르기 창에 카드가 넷, 런 끝 기억 +50%')], cost: N('경비·골렘·방패병·석궁병이 25% 빨라요'),
+    stat(st) { st.pickPlus += 1; st.foeSpeed *= 1.25; } },
 ];
+RAR.curse = { w: 0, price: 0, name: N('저주') };
+export const CURSES = () => ITEMS.filter(it => it.kind === 'curse');
 
 // 시너지: 둘을 함께 가지면 켜진다 (고르기 창에 '시너지!' 표시, HUD 풍선에 이름)
 export const SYN = [
@@ -117,6 +171,10 @@ export const SYN = [
     stat(st) { st.mul.sus *= 0.85; } },
   { id: 'rewound', a: 't4-rewind-spring', b: 't4-hourglass-heart', name: N('되감는 심장'), desc: N('모래시계 심장이 하트 1개 더 남겨요'),
     stat(st) { if (st.phoenix) st.phoenix += 1; } },
+  { id: 'tamer', a: 't4-beast-hide', b: 't4-crossed-tracks', name: N('짐승 길들이기'), desc: N('사냥개를 쓰러뜨리면 금화 +3'),
+    stat(st) { st.houndCoins = 3; } },
+  { id: 'vigil', a: 't4-deep-sleep', b: 't4-spirit-charm', name: N('밤샘'), desc: N('시간 마법사를 쓰러뜨리면 모래 +4초'),
+    stat(st) { st.mageSand = 4; } },
 ];
 
 export const byId = id => ITEMS.find(it => it.id === id);
