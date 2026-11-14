@@ -72,6 +72,7 @@ body:has(#endCard[style*="flex"]) #t4-bar, body:has(#holdCard.on) #t4-bar, body:
 #t4-ov .cd.sel .ico .yi { animation: t4bob 1.6s ease-in-out infinite; }
 @keyframes t4bob { 50% { transform: translateY(-3px); } }
 #t4-ov .cd .nm { font-size: 17px; font-weight: 800; color: var(--rc, var(--pn-ink)); text-shadow: 0 2px 0 #000; }
+#t4-ov .cd.r-plain .nm { color: var(--pn-ink); } #t4-ov .cd.r-plain .ico { border-color: #ffffffaa; }
 #t4-ov .cd .rk { font-size: 12px; opacity: .72; display: flex; align-items: center; justify-content: center; gap: 3px; }
 #t4-ov .cards.grid .cd .rk { justify-content: flex-start; }
 .gm { display: inline-block; width: 7px; height: 7px; transform: rotate(45deg); background: var(--rc, #fff); border: 1px solid #000; margin-right: 2px; box-shadow: 0 0 4px var(--rc, #fff); }
