@@ -3,6 +3,7 @@
 // 글자 처리기가 불리는 그 순간부터 기록이 살아 있어야 한다 → 글자 처리기에서 방을 열고(begin), roomLoad에서 닫는다(sealed).
 import { EXT } from '../../ext.js';
 import { S3 } from './sfx3.js';
+import { icon } from '../t5/icons.js'; // T5: 씨앗·열쇠 HUD 그림
 
 export const C = {
   room: null, sealed: true,
@@ -101,7 +102,7 @@ function makeUi() {
   const host = document.getElementById('ext') || document.body;
   const st = document.createElement('style');
   st.textContent = `#t3hud{position:fixed;left:20px;top:100px;font-size:15px;text-shadow:0 2px 4px #000;pointer-events:none;display:flex;flex-direction:column;gap:5px;color:#fff}
-#t3hud .row{display:none;align-items:center;gap:6px}#t3hud .row.on{display:flex}
+#t3hud .row{display:none;align-items:center;gap:6px}#t3hud .row .yi{width:22px;height:22px}#t3hud .row.on{display:flex}
 #t3hud .bar{width:90px;height:6px;border-radius:3px;background:#ffffff22;overflow:hidden}#t3hud .bar i{display:block;height:100%;background:#ffd27a}
 #t3hud .frozen{color:#7fe8ff}#t3hud .frozen .bar i{background:#7fe8ff}
 #t3hud .stuck{color:#ffb3a8;font-weight:700}#t3hud .stuck kbd{border:1px solid #ffb3a8;border-radius:4px;padding:0 6px;margin-right:4px;animation:t3pulse 1s infinite}
@@ -121,8 +122,9 @@ function drawUi() {
   const show = live() && C.has && !S.ended;
   u.el.style.display = show ? 'flex' : 'none';
   if (!show) return;
-  u.seed.classList.toggle('on', C.inv.seed > 0); if (C.inv.seed > 0) u.seed.textContent = '🌰 ' + $t('씨앗 {0}', C.inv.seed);
-  u.key.classList.toggle('on', C.inv.key > 0); if (C.inv.key > 0) u.key.textContent = '🗝 ' + $t('열쇠 {0}', C.inv.key);
+  // T5: 그린 아이콘, 값이 바뀔 때만 다시 쓴다 (매 프레임 글을 갈아 끼우지 않게)
+  u.seed.classList.toggle('on', C.inv.seed > 0); if (C.inv.seed > 0 && u.seedN !== C.inv.seed) { u.seedN = C.inv.seed; u.seed.innerHTML = icon('seed') + ' ' + $t('씨앗 {0}', C.inv.seed); }
+  u.key.classList.toggle('on', C.inv.key > 0); if (C.inv.key > 0 && u.keyN !== C.inv.key) { u.keyN = C.inv.key; u.key.innerHTML = icon('key') + ' ' + $t('열쇠 {0}', C.inv.key); }
   const sp = HUDX.spring;
   u.spring.classList.toggle('on', !!sp);
   if (sp) { u.springLbl.textContent = $t('태엽 문 {0}초', sp.t.toFixed(1)) + (sp.frozen ? ' · ' + $t('멈춤') : ''); u.springBar.style.width = (100 * sp.t / sp.max) + '%'; u.spring.classList.toggle('frozen', sp.frozen); }

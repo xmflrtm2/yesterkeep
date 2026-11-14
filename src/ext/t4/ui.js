@@ -6,73 +6,98 @@ import { T4, has, lvOf, give, take, upgrade, canUpgrade, roll, priceOf, changed,
 import { RAR, KIND, SYN, byId } from './items.js';
 import { UNLOCKS, loadMeta, buyUnlock } from './meta.js';
 import { snd } from './sfx.js';
+import { icon, iconUrl } from '../t5/icons.js'; // T5: 그린 아이콘 (없는 id면 이모지 그대로)
 
 const CSS = `
+/* T5(11/15): 이모지 → 그린 아이콘(../t5/icons.js), 판넬 색은 시대 변수(--pn-*, ../t5/theme.js). 배치·크기 규칙은 T4 그대로 */
 #t4-bar { position: fixed; right: 12px; top: 128px; display: none; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: auto; z-index: 2; }
 #t4-bar.on { display: flex; }
-body:has(#endCard[style*="flex"]) #t4-bar, body:has(#holdCard.on) #t4-bar { visibility: hidden; } /* 끝 화면·멈춤 카드 뒤로 비치지 않게 */
-#t4-bar .chip { font-size: 14px; padding: 2px 9px; border-radius: 10px; background: #0009; border: 1px solid #ffffff22; text-shadow: 0 1px 2px #000; white-space: nowrap; }
-#t4-bar .coin { color: var(--gold); }
-#t4-bar .ammo { color: #dfefff; } #t4-bar .ammo b { color: var(--gold); font-weight: 600; }
-#t4-bar .icons { display: grid; grid-template-columns: repeat(3, 34px); gap: 5px; direction: rtl; }
-#t4-bar .ic { direction: ltr; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 19px; position: relative;
-  background: radial-gradient(circle at 50% 35%, #2a2f3acc, #0b0d12e6); border: 2px solid var(--rc); box-shadow: 0 0 6px #000a; cursor: default; }
+body:has(#endCard[style*="flex"]) #t4-bar, body:has(#holdCard.on) #t4-bar, body:has(#ext .t1-ov) #t4-bar { visibility: hidden; } /* 끝 화면·멈춤 카드·런 덮개 뒤로 비치지 않게 */
+#t4-bar .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 700; padding: 2px 10px 2px 5px; border-radius: 4px; white-space: nowrap; font-variant-numeric: tabular-nums;
+  background: var(--pn-tex), var(--pn-bg); border: 1px solid var(--pn-edge-dk); box-shadow: 0 0 0 1px #000b, inset 0 1px 0 #ffffff14; text-shadow: 0 1px 2px #000; }
+#t4-bar .chip .yi { width: 21px; height: 21px; }
+#t4-bar .coin { color: #ffe6a0; }
+#t4-bar .ammo { color: #dfefff; gap: 3px; } #t4-bar .ammo b { color: var(--gold); font-weight: 700; } #t4-bar .ammo .sep { width: 6px; }
+#t4-bar .icons { display: grid; grid-template-columns: repeat(3, 36px); gap: 5px; direction: rtl; }
+#t4-bar .ic { direction: ltr; width: 36px; height: 36px; box-sizing: border-box; border-radius: 6px; display: flex; align-items: center; justify-content: center; position: relative; cursor: default;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--rc) 26%, #1c1e26) 0%, #0b0d12f2 78%);
+  border: 2px solid var(--rc); box-shadow: 0 0 0 1px #000c, inset 0 0 0 1px #000a, inset 0 1px 0 #ffffff26, 0 2px 4px #000a; }
+#t4-bar .ic .yi { width: 26px; height: 26px; }
 #t4-bar .ic.blessing { border-radius: 50%; }
-#t4-bar .ic.syn::after { content: '✦'; position: absolute; left: -5px; top: -7px; font-size: 11px; color: var(--gold); text-shadow: 0 0 4px #000; }
-#t4-bar .ic .lv { position: absolute; right: -4px; bottom: -5px; font-size: 10px; font-weight: 700; padding: 0 3px; border-radius: 5px; background: var(--rc); color: #10131a; }
-#t4-bar .ic.used { filter: grayscale(1) brightness(.6); }
-#t4-bar .key { font-size: 11px; opacity: .6; text-shadow: 0 1px 2px #000; }
+#t4-bar .ic.r-legend { box-shadow: 0 0 0 1px #000c, inset 0 0 0 1px #000a, 0 0 10px #ffd27a99; }
+#t4-bar .ic.syn::after { content: ''; position: absolute; left: -7px; top: -8px; width: 15px; height: 15px; background: ${iconUrl('synergy')} center / contain no-repeat; filter: drop-shadow(0 0 3px #000); }
+#t4-bar .ic .lv { position: absolute; right: -5px; bottom: -6px; font-size: 10px; font-weight: 800; padding: 0 3px; border-radius: 3px; background: linear-gradient(180deg, #fff, var(--rc)); color: #10131a; border: 1px solid #000; }
+#t4-bar .ic.used { filter: grayscale(1) brightness(.55); }
+#t4-bar .key { font-size: 11px; opacity: .7; text-shadow: 0 1px 2px #000; }
 .r-common { --rc: #c9d2de; } .r-rare { --rc: #7fe8ff; } .r-legend { --rc: #ffd27a; } .r-curse { --rc: #c38cff; } .r-plain { --rc: #ffffff66; }
-#t4-ov .cd .cost, #t4-tip .c, #t4-near .cost { color: #ff9a9a; font-size: 12.5px; } #t4-ov .cd .mb { color: #c38cff; font-size: 12px; } #t4-bar .ic.curse { box-shadow: 0 0 8px #c38cff88; }
-#t4-tip { position: fixed; display: none; max-width: 270px; padding: 9px 12px; border-radius: 10px; background: #0b0d12f2; border: 1px solid var(--rc, #ffffff33); font-size: 13px; line-height: 1.45; pointer-events: none; z-index: 5; text-shadow: none; word-break: keep-all; overflow-wrap: anywhere; }
-#t4-tip .n { font-size: 15px; font-weight: 700; color: var(--rc); } #t4-tip .r { font-size: 11px; opacity: .7; margin-bottom: 4px; } #t4-tip .s { margin-top: 5px; color: var(--gold); font-size: 12px; }
-#t4-near { position: fixed; left: 50%; top: calc(58% + 42px); transform: translateX(-50%); display: none; width: min(340px, 88vw); box-sizing: border-box; padding: 9px 14px; border-radius: 12px;
-  background: #0b0d12ee; border: 2px solid var(--rc, #ffffff44); text-align: left; font-size: 13.5px; line-height: 1.45; pointer-events: none; word-break: keep-all; overflow-wrap: anywhere; }
-#t4-near .nm { font-size: 16px; font-weight: 700; color: var(--rc); } #t4-near .rk { font-size: 12px; opacity: .7; } #t4-near .p { margin-top: 3px; color: var(--gold); }
+#t4-ov .cd .cost, #t4-tip .c, #t4-near .cost { color: #ff9a9a; font-size: 12.5px; } #t4-ov .cd .mb { color: #c38cff; font-size: 12px; } #t4-bar .ic.curse { box-shadow: 0 0 0 1px #000c, 0 0 9px #c38cffaa; }
+#t4-tip { position: fixed; display: none; max-width: 270px; padding: 9px 12px; border-radius: 5px; font-size: 13px; line-height: 1.45; pointer-events: none; z-index: 5; text-shadow: none; word-break: keep-all; overflow-wrap: anywhere;
+  background: var(--pn-tex), var(--pn-bg); border: 1.5px solid var(--rc, #ffffff33); box-shadow: 0 0 0 1px #000c, inset 0 0 0 1px #0009, 0 8px 18px #000c; color: var(--pn-ink); }
+#t4-tip .n { font-size: 15px; font-weight: 700; color: var(--rc); display: flex; align-items: center; gap: 6px; } #t4-tip .n .yi { width: 26px; height: 26px; }
+#t4-tip .r { font-size: 11px; opacity: .7; margin-bottom: 4px; } #t4-tip .s { margin-top: 5px; color: var(--gold); font-size: 12px; }
+#t4-near { position: fixed; left: 50%; top: calc(58% + 42px); transform: translateX(-50%); display: none; width: min(340px, 88vw); box-sizing: border-box; padding: 9px 14px; border-radius: 5px;
+  background: var(--pn-tex), var(--pn-bg); border: 2px solid var(--rc, #ffffff44); box-shadow: 0 0 0 1px #000c, inset 0 0 0 1px #000a, 0 10px 22px #000c; color: var(--pn-ink);
+  text-align: left; font-size: 13.5px; line-height: 1.45; pointer-events: none; word-break: keep-all; overflow-wrap: anywhere; }
+#t4-near .nm { font-size: 16px; font-weight: 700; color: var(--rc); } #t4-near .rk { font-size: 12px; opacity: .7; } #t4-near .p { margin-top: 3px; color: var(--gold); font-weight: 700; } #t4-near .p .yi { width: 18px; height: 18px; }
 #t4-near .sy { margin-top: 3px; color: var(--gold); font-size: 12.5px; } #t4-near .ico, #t4-near .k, #t4-near .pr { display: none; }
 #t4-ov { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow-y: auto;
-  background: radial-gradient(ellipse at center, #000a 0%, #000d 100%); pointer-events: auto; z-index: 4; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+  background: radial-gradient(ellipse at center, #000b 0%, #000e 100%); pointer-events: auto; z-index: 4; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
 #t4-ov.on { display: flex; }
 #t4-ov .pn { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 980px; width: 100%; }
-#t4-ov .tt { font-size: 28px; font-weight: 700; color: var(--gold); text-shadow: 0 3px 10px #000; text-align: center; }
-#t4-ov .sb { font-size: 15px; opacity: .85; text-align: center; }
-#t4-ov .cards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; width: 100%; }
+#t4-ov .tt { font-size: 28px; text-align: center; }
+#t4-ov .sb { font-size: 15px; opacity: .88; text-align: center; color: var(--pn-ink); } #t4-ov .sb .yi { width: 20px; height: 20px; }
+#t4-ov .cards { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; width: 100%; }
 #t4-ov .cards.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; max-width: 960px; }
 #t4-ov .cards.grid .cd { width: auto; min-height: 0; flex-direction: row; flex-wrap: wrap; align-items: flex-start; text-align: left; padding: 8px 10px; gap: 1px 10px; }
 #t4-ov .cards.grid .cd.sel { transform: none; }
-#t4-ov .cards.grid .cd .ico { font-size: 26px; width: 34px; text-align: center; line-height: 1.2; }
+#t4-ov .cards.grid .cd .ico { width: 40px; height: 40px; margin: 0; border-width: 1.5px; } #t4-ov .cards.grid .cd .ico .yi { width: 28px; height: 28px; }
 #t4-ov .cards.grid .cd .nm { font-size: 15px; flex: 1; align-self: center; }
-#t4-ov .cards.grid .cd .rk, #t4-ov .cards.grid .cd .ds, #t4-ov .cards.grid .cd .up, #t4-ov .cards.grid .cd .sy, #t4-ov .cards.grid .cd .pr { width: 100%; padding-left: 44px; box-sizing: border-box; font-size: 12.5px; margin: 0; }
+#t4-ov .cards.grid .cd .rk, #t4-ov .cards.grid .cd .ds, #t4-ov .cards.grid .cd .up, #t4-ov .cards.grid .cd .sy, #t4-ov .cards.grid .cd .pr, #t4-ov .cards.grid .cd .cost, #t4-ov .cards.grid .cd .mb { width: 100%; padding-left: 50px; box-sizing: border-box; font-size: 12.5px; margin: 0; }
 #t4-ov .cards.grid .cd .rk { margin-top: -3px; }
-#t4-ov .cd { position: relative; width: 214px; min-height: 236px; box-sizing: border-box; padding: 14px 14px 12px; border-radius: 14px; text-align: center; cursor: pointer;
-  background: linear-gradient(180deg, #1b1f29f2, #0b0d12f2); border: 2px solid color-mix(in srgb, var(--rc, #fff) 45%, transparent); color: var(--ink);
+#t4-ov .cd { position: relative; width: 222px; min-height: 262px; box-sizing: border-box; padding: 16px 14px 13px; border-radius: 7px; text-align: center; cursor: pointer; color: var(--pn-ink);
+  background: radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--rc, #fff) 15%, transparent) 0%, transparent 62%), var(--pn-tex), var(--pn-bg);
+  border: 2px solid color-mix(in srgb, var(--rc, #fff) 50%, #000);
+  box-shadow: 0 0 0 1px #000d, inset 0 0 0 1px #000a, inset 0 0 0 3px color-mix(in srgb, var(--rc, #fff) 14%, transparent), 0 10px 22px #000c;
   display: flex; flex-direction: column; align-items: center; gap: 5px; transition: transform .12s, border-color .12s, box-shadow .12s; font: inherit; }
-#t4-ov .cd.sel { transform: translateY(-6px); border-color: var(--rc, #fff); box-shadow: 0 0 22px color-mix(in srgb, var(--rc, #fff) 40%, transparent), 0 8px 18px #000c; }
-#t4-ov .cd.dis { opacity: .45; cursor: default; }
-#t4-ov .cd .k { position: absolute; left: 9px; top: 7px; font-size: 12px; opacity: .55; }
-#t4-ov .cd .ico { font-size: 40px; line-height: 1.15; filter: drop-shadow(0 3px 6px #000); }
-#t4-ov .cd .nm { font-size: 17px; font-weight: 700; color: var(--rc, var(--ink)); }
-#t4-ov .cd .rk { font-size: 12px; opacity: .65; }
-#t4-ov .cd .ds { font-size: 13.5px; line-height: 1.45; opacity: .92; }
+#t4-ov .cd.sel { transform: translateY(-7px); border-color: var(--rc, #fff); box-shadow: 0 0 0 1px #000d, inset 0 0 0 1px #000a, inset 0 0 0 3px color-mix(in srgb, var(--rc, #fff) 28%, transparent), 0 0 26px color-mix(in srgb, var(--rc, #fff) 45%, transparent), 0 10px 22px #000c; }
+#t4-ov .cd.dis { opacity: .42; cursor: default; }
+#t4-ov .cd .k { position: absolute; left: 8px; top: 7px; min-width: 18px; height: 18px; line-height: 17px; font-size: 11.5px; font-weight: 700; border-radius: 3px; text-align: center; opacity: .8;
+  background: #0008; border: 1px solid color-mix(in srgb, var(--rc, #fff) 45%, #000); color: var(--pn-ink); }
+/* 아이콘 받침 (메달) */
+#t4-ov .cd .ico { width: 78px; height: 78px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 0 4px; box-sizing: border-box;
+  background: radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--rc, #fff) 34%, #22201a) 0%, #0c0b09 72%); border: 2px solid var(--rc, #fff);
+  box-shadow: 0 0 0 2px #000c, inset 0 0 14px #000d, inset 0 2px 0 #ffffff22, 0 0 16px color-mix(in srgb, var(--rc, #fff) 30%, transparent); }
+#t4-ov .cd .ico .yi { width: 52px; height: 52px; filter: drop-shadow(0 3px 3px #000c); }
+#t4-ov .cd.r-curse .ico { border-style: dashed; }
+#t4-ov .cd.sel .ico .yi { animation: t4bob 1.6s ease-in-out infinite; }
+@keyframes t4bob { 50% { transform: translateY(-3px); } }
+#t4-ov .cd .nm { font-size: 17px; font-weight: 800; color: var(--rc, var(--pn-ink)); text-shadow: 0 2px 0 #000; }
+#t4-ov .cd.r-plain .nm { color: var(--pn-ink); } #t4-ov .cd.r-plain .ico { border-color: #ffffffaa; }
+#t4-ov .cd .rk { font-size: 12px; opacity: .72; display: flex; align-items: center; justify-content: center; gap: 3px; }
+#t4-ov .cards.grid .cd .rk { justify-content: flex-start; }
+.gm { display: inline-block; width: 7px; height: 7px; transform: rotate(45deg); background: var(--rc, #fff); border: 1px solid #000; margin-right: 2px; box-shadow: 0 0 4px var(--rc, #fff); }
+.gm:last-of-type { margin-right: 6px; }
+#t4-ov .cd .ds { font-size: 13.5px; line-height: 1.45; opacity: .94; }
 #t4-ov .cd .up { font-size: 12.5px; line-height: 1.4; color: var(--teal); }
-#t4-ov .cd .sy { margin-top: auto; font-size: 12.5px; color: var(--gold); font-weight: 600; }
-#t4-ov .cd .pr { font-size: 14px; color: var(--gold); }
+#t4-ov .cd .sy { margin-top: auto; font-size: 12.5px; color: var(--gold); font-weight: 700; }
+#t4-ov .cd .pr { font-size: 15px; font-weight: 700; color: var(--gold); } #t4-ov .cd .pr .yi { width: 18px; height: 18px; }
 #t4-ov .cd.done { border-style: dashed; }
-#t4-ov .ft { font-size: 13px; opacity: .65; text-align: center; }
+#t4-ov .ft { font-size: 13px; opacity: .7; text-align: center; color: var(--pn-ink); }
 #t4-ov .ft b { color: var(--gold); font-weight: 600; opacity: 1; }
 #t4-ov .syns { font-size: 13px; color: var(--gold); text-align: center; line-height: 1.6; }
-#t4-pop { position: fixed; right: 18px; top: 108px; font-size: 15px; color: var(--gold); text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity .3s, transform .6s; pointer-events: none; }
+#t4-pop { position: fixed; right: 18px; top: 108px; font-size: 15px; font-weight: 700; color: var(--gold); text-shadow: 0 1px 3px #000; opacity: 0; transition: opacity .3s, transform .6s; pointer-events: none; }
 @media (max-width: 640px), (max-height: 520px) {
   #t4-ov .tt { font-size: 21px; } #t4-ov .sb { font-size: 13px; }
   #t4-ov .cards { flex-direction: column; align-items: center; gap: 8px; }
   #t4-ov .cards.grid { grid-template-columns: 1fr; width: min(440px, 92vw); }
   #t4-ov .cd { width: min(440px, 92vw); min-height: 0; flex-direction: row; flex-wrap: wrap; text-align: left; padding: 9px 12px 9px 12px; gap: 2px 10px; }
   #t4-ov .cd.sel { transform: none; }
-  #t4-ov .cd .ico { font-size: 28px; width: 38px; text-align: center; }
-  #t4-ov .cd .nm { font-size: 15px; flex: 1; } #t4-ov .cd .rk { width: 100%; padding-left: 48px; margin-top: -4px; }
-  #t4-ov .cd .ds, #t4-ov .cd .up, #t4-ov .cd .sy, #t4-ov .cd .pr { width: 100%; padding-left: 48px; box-sizing: border-box; }
+  #t4-ov .cd .ico { width: 44px; height: 44px; margin: 0; border-width: 1.5px; } #t4-ov .cd .ico .yi { width: 32px; height: 32px; }
+  #t4-ov .cd .nm { font-size: 15px; flex: 1; align-self: center; } #t4-ov .cd .rk { width: 100%; padding-left: 54px; margin-top: -4px; justify-content: flex-start; }
+  #t4-ov .cd .ds, #t4-ov .cd .up, #t4-ov .cd .sy, #t4-ov .cd .pr, #t4-ov .cd .cost, #t4-ov .cd .mb { width: 100%; padding-left: 54px; box-sizing: border-box; }
   #t4-ov .cd .k { display: none; }
-  #t4-bar { top: 118px; right: 8px; } #t4-bar .icons { grid-template-columns: repeat(2, 30px); } #t4-bar .ic { width: 30px; height: 30px; font-size: 16px; }
+  #t4-bar { top: 118px; right: 8px; } #t4-bar .icons { grid-template-columns: repeat(2, 31px); } #t4-bar .ic { width: 31px; height: 31px; } #t4-bar .ic .yi { width: 22px; height: 22px; }
+  #t4-bar .chip { font-size: 13px; } #t4-bar .chip .yi { width: 18px; height: 18px; }
 }
 `;
 
@@ -89,17 +114,19 @@ function build() {
 // ───────── 글자 조각 ─────────
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const rarLine = it => (it.kind === 'curse' ? $t(KIND.curse) : `${$t(RAR[it.rar].name)} · ${$t(KIND[it.kind])}`);
+const gems = it => '<i class="gm"></i>'.repeat({ common: 1, rare: 2, legend: 3 }[it.rar] || 0); // 희귀도 보석 (T5)
+const ico = it => icon(it.id, { fb: it.icon });
 export const synFor = id => SYN.filter(s => (s.a === id && has(s.b)) || (s.b === id && has(s.a)));
 const synNames = id => synFor(id).map(s => $t(s.name)).join(', ');
 export function itemCard(it, { lv = 1, price = null, note = '', showUp = false, key = '' } = {}) {
   const syn = synFor(it.id);
-  return `${key ? `<div class="k">${key}</div>` : ''}<div class="ico">${it.icon}</div>`
-    + `<div class="nm">${esc($t(it.name))}${lv > 1 ? ' II' : ''}</div><div class="rk">${esc(rarLine(it))}</div>`
+  return `${key ? `<div class="k">${key}</div>` : ''}<div class="ico">${ico(it)}</div>`
+    + `<div class="nm">${esc($t(it.name))}${lv > 1 ? ' II' : ''}</div><div class="rk">${gems(it)}${esc(rarLine(it))}</div>`
     + `<div class="ds">${esc($t(it.desc[Math.min(lv, 2) - 1]))}</div>`
-    + (it.cost ? `<div class="cost">⚠ ${esc($t('대가: {0}', $t(it.cost)))}</div><div class="mb">${esc($t('런 끝 기억 +{0}%', Math.round((it.memBonus || 0.25) * 100)))}</div>` : '')
-    + (showUp && it.desc[1] ? `<div class="up">⬆ ${esc($t(it.desc[1]))}</div>` : '')
-    + (syn.length ? `<div class="sy">✦ ${esc($t('시너지: {0}', syn.map(s => $t(s.name)).join(', ')))}</div>` : '')
-    + (price != null ? `<div class="pr">🪙 ${price}</div>` : '')
+    + (it.cost ? `<div class="cost">${icon('warn')} ${esc($t('대가: {0}', $t(it.cost)))}</div><div class="mb">${esc($t('런 끝 기억 +{0}%', Math.round((it.memBonus || 0.25) * 100)))}</div>` : '')
+    + (showUp && it.desc[1] ? `<div class="up">${icon('up')} ${esc($t(it.desc[1]))}</div>` : '')
+    + (syn.length ? `<div class="sy">${icon('synergy')} ${esc($t('시너지: {0}', syn.map(s => $t(s.name)).join(', ')))}</div>` : '')
+    + (price != null ? `<div class="pr">${icon('coin')} ${price}</div>` : '')
     + (note ? `<div class="rk">${esc(note)}</div>` : '');
 }
 
@@ -111,13 +138,13 @@ export function showHud() {
   bar.classList.toggle('on', on);
   if (!on) { bar.innerHTML = ''; hideTip(); return; }
   const st = T4.st;
-  let h = `<div class="chip coin">🪙 ${T4.coins}</div>`;
-  if (st.knives || st.catch) h += `<div class="chip ammo">${st.knives ? `🔪 <b>${T4.ammo.knife}</b>/${st.knives}` : ''}${st.knives && st.catch ? ' · ' : ''}${st.catch ? `➶ <b>${T4.ammo.arrows}</b>` : ''} <span class="key">Q</span></div>`;
+  let h = `<div class="chip coin">${icon('coin')}${T4.coins}</div>`;
+  if (st.knives || st.catch) h += `<div class="chip ammo">${st.knives ? `${icon('knife')}<b>${T4.ammo.knife}</b>/${st.knives}` : ''}${st.knives && st.catch ? '<span class="sep"></span>' : ''}${st.catch ? `${icon('arrow')}<b>${T4.ammo.arrows}</b>` : ''} <span class="key">Q</span></div>`;
   h += '<div class="icons">';
   for (const e of T4.inv) {
     const it = byId(e.id); if (!it) continue;
     const used = (e.id === 't4-hourglass-heart' && T4.run.phoenixUsed) || (e.id === 't4-cracked-shield' && T4.room.shield <= 0) || (e.id === 't4-rewind-spring' && T4.room.spring <= 0) || (e.id === 't4-afterimage' && T4.decoyCd > 0);
-    h += `<div class="ic r-${it.rar} ${it.kind}${synFor(e.id).length ? ' syn' : ''}${used ? ' used' : ''}" data-id="${e.id}">${it.icon}${e.lv > 1 ? '<span class="lv">II</span>' : ''}</div>`;
+    h += `<div class="ic r-${it.rar} ${it.kind}${synFor(e.id).length ? ' syn' : ''}${used ? ' used' : ''}" data-id="${e.id}">${ico(it)}${e.lv > 1 ? '<span class="lv">II</span>' : ''}</div>`;
   }
   h += '</div>';
   if (T4.inv.length) h += `<div class="key">${$t('Tab 유물 보기')}</div>`;
@@ -125,10 +152,10 @@ export function showHud() {
   // 유물이 많으면 아래로 넘치지 않게 열을 늘린다(왼쪽으로). 창 높이에서 위쪽 HUD·아래 안내 몫을 뺀 만큼만 세로로
   const icons = bar.querySelector('.icons'), n = T4.inv.length;
   if (icons && n) {
-    const small = innerWidth <= 640 || innerHeight <= 520, cell = small ? 35 : 39, base = small ? 2 : 3;
+    const small = innerWidth <= 640 || innerHeight <= 520, cell = small ? 36 : 41, base = small ? 2 : 3;
     const rows = Math.max(3, Math.floor((innerHeight - bar.getBoundingClientRect().top - 90) / cell));
     const cols = Math.max(base, Math.ceil(n / rows));
-    icons.style.gridTemplateColumns = `repeat(${cols}, ${small ? 30 : 34}px)`;
+    icons.style.gridTemplateColumns = `repeat(${cols}, ${small ? 31 : 36}px)`;
   }
   for (const el of bar.querySelectorAll('.ic')) {
     el.addEventListener('pointerenter', () => showTip(el));
@@ -140,9 +167,9 @@ function showTip(el) {
   const it = byId(el.dataset.id); if (!it) return;
   const lv = lvOf(it.id), tip = $('t4-tip');
   tip.className = 'r-' + it.rar;
-  tip.innerHTML = `<div class="n">${it.icon} ${esc($t(it.name))}${lv > 1 ? ' II' : ''}</div><div class="r">${esc(rarLine(it))}</div>${esc($t(it.desc[lv > 1 ? 1 : 0]))}`
-    + (it.cost ? `<div class="c">⚠ ${esc($t('대가: {0}', $t(it.cost)))}</div>` : '')
-    + (synFor(it.id).length ? `<div class="s">✦ ${esc(synFor(it.id).map(s => $t(s.name) + ' — ' + $t(s.desc)).join(' / '))}</div>` : '');
+  tip.innerHTML = `<div class="n">${ico(it)} ${esc($t(it.name))}${lv > 1 ? ' II' : ''}</div><div class="r">${esc(rarLine(it))}</div>${esc($t(it.desc[lv > 1 ? 1 : 0]))}`
+    + (it.cost ? `<div class="c">${icon('warn')} ${esc($t('대가: {0}', $t(it.cost)))}</div>` : '')
+    + (synFor(it.id).length ? `<div class="s">${icon('synergy')} ${esc(synFor(it.id).map(s => $t(s.name) + ' — ' + $t(s.desc)).join(' / '))}</div>` : '');
   tip.style.display = 'block';
   const r = el.getBoundingClientRect(), w = tip.offsetWidth, hgt = tip.offsetHeight;
   tip.style.left = Math.max(8, r.left - w - 10) + 'px';
@@ -151,7 +178,7 @@ function showTip(el) {
 function hideTip() { const t = $('t4-tip'); if (t) t.style.display = 'none'; }
 // 금화 +n 같은 작은 알림 (HUD 옆)
 let popT = 0;
-function pop(txt) { build(); const p = $('t4-pop'); p.textContent = txt; p.style.opacity = 1; p.style.transform = 'translateY(0)'; clearTimeout(popT); popT = setTimeout(() => { p.style.opacity = 0; p.style.transform = 'translateY(-10px)'; }, 900); }
+function pop(html) { build(); const p = $('t4-pop'); p.innerHTML = html; p.style.opacity = 1; p.style.transform = 'translateY(0)'; clearTimeout(popT); popT = setTimeout(() => { p.style.opacity = 0; p.style.transform = 'translateY(-10px)'; }, 900); }
 
 // 상점 받침대 곁에 서면 보이는 설명 카드
 export function showNear(html, rar) {
@@ -176,7 +203,7 @@ export function panel({ title, sub = '', cards, grid = false, foot = '', onCance
   const ov = $('t4-ov');
   const P = { sel: Math.max(0, cards.findIndex(c => !c.disabled)), t0: performance.now(), cards };
   const draw = () => {
-    ov.innerHTML = `<div class="pn"><div class="tt">${esc(title)}</div>${sub ? `<div class="sb">${sub}</div>` : ''}`
+    ov.innerHTML = `<div class="pn"><div class="tt yk-h">${esc(title)}</div>${sub ? `<div class="sb">${sub}</div>` : ''}`
       + `<div class="cards${grid ? ' grid' : ''}">${P.cards.map((c, k) => `<button class="cd ${c.cls || ''}${k === P.sel ? ' sel' : ''}${c.disabled ? ' dis' : ''}" data-k="${k}">${c.html}</button>`).join('')}</div>`
       + `${extra}${foot ? `<div class="ft">${foot}</div>` : ''}</div>`;
     for (const b of ov.querySelectorAll('.cd')) {
@@ -257,11 +284,11 @@ export function openRest({ heal = 2 } = {}) {
     const first = () => panel({
       title: $t('모닥불 앞에서 쉬어요'), sub: $t('하나만 할 수 있어요'),
       cards: [
-        { html: `<div class="ico">❤️</div><div class="nm">${$t('쉬기')}</div><div class="rk">${$t('하트 {0} / {1}', S.hearts, max)}</div><div class="ds">${$t('하트 {0}개 회복', heal)}</div>`,
+        { html: `<div class="ico">${icon('heart')}</div><div class="nm">${$t('쉬기')}</div><div class="rk">${$t('하트 {0} / {1}', S.hearts, max)}</div><div class="ds">${$t('하트 {0}개 회복', heal)}</div>`,
           cls: 'r-common', disabled: S.hearts >= max, onPick: P => { P.close(); S.hearts = Math.min(max, S.hearts + heal); T4.lastHearts = S.hearts; K.drawHearts(); snd.heal(); K.toast($t('하트를 회복했어요'), 1.6); resolve('heal'); } },
-        { html: `<div class="ico">⬆️</div><div class="nm">${$t('유물 강화')}</div><div class="rk">${$t('강화할 수 있는 것 {0}개', ups.length)}</div><div class="ds">${$t('유물 하나를 II로 올려요')}</div>`,
+        { html: `<div class="ico">${icon('upgrade')}</div><div class="nm">${$t('유물 강화')}</div><div class="rk">${$t('강화할 수 있는 것 {0}개', ups.length)}</div><div class="ds">${$t('유물 하나를 II로 올려요')}</div>`,
           cls: 'r-rare', disabled: !ups.length, onPick: () => second() },
-        ...(curses.length ? [{ html: `<div class="ico">🕊️</div><div class="nm">${$t('정화')}</div><div class="rk">${$t('저주 {0}개', curses.length)}</div><div class="ds">${$t('저주 하나를 내려놓아요 (그 저주의 런 끝 기억도 사라져요)')}</div>`,
+        ...(curses.length ? [{ html: `<div class="ico">${icon('purify')}</div><div class="nm">${$t('정화')}</div><div class="rk">${$t('저주 {0}개', curses.length)}</div><div class="ds">${$t('저주 하나를 내려놓아요 (그 저주의 런 끝 기억도 사라져요)')}</div>`,
           cls: 'r-curse', onPick: () => third() }] : []),
       ],
       foot: $t('←→ 고르기 · Enter 정하기 · Esc 그냥 가기'),
@@ -290,7 +317,7 @@ export function openCursePick({ count = 3 } = {}) {
     const list = roll(count, { curse: true });
     if (!list.length) { resolve(null); return; }
     snd.open();
-    const cards = [{ html: `<div class="k">1</div><div class="ico">🕯️</div><div class="nm">${$t('저주 없이')}</div><div class="rk">${$t('보통 런')}</div><div class="ds">${$t('그대로 시작해요')}</div>`, cls: 'r-plain', onPick: P => { P.close(); resolve(null); } }]
+    const cards = [{ html: `<div class="k">1</div><div class="ico">${icon('candle')}</div><div class="nm">${$t('저주 없이')}</div><div class="rk">${$t('보통 런')}</div><div class="ds">${$t('그대로 시작해요')}</div>`, cls: 'r-plain', onPick: P => { P.close(); resolve(null); } }]
       .concat(list.map((id, k) => { const it = byId(id); return { html: itemCard(it, { key: String(k + 2) }), cls: 'r-curse', onPick: P => { P.close(); give(id); snd.take(); resolve(id); } }; }));
     panel({ title: $t('저주를 들고 갈까요?'), sub: $t('강하지만 대가가 있어요. 대신 런이 끝나면 기억을 더 받아요'), cards,
       foot: $t('←→ 고르기 · Enter 정하기 · Esc 저주 없이'), onCancel: P => { P.close(); resolve(null); } });
@@ -303,10 +330,10 @@ export function openInv() {
   const syn = SYN.filter(s => T4.syn.includes(s.id));
   panel({
     title: $t('가진 유물'),
-    sub: `🪙 ${T4.coins}` + (T4.st.knives ? ` · 🔪 ${T4.ammo.knife}/${T4.st.knives}` : '') + (T4.st.catch ? ` · ➶ ${T4.ammo.arrows}` : ''),
+    sub: `${icon('coin')} ${T4.coins}` + (T4.st.knives ? ` · ${icon('knife')} ${T4.ammo.knife}/${T4.st.knives}` : '') + (T4.st.catch ? ` · ${icon('arrow')} ${T4.ammo.arrows}` : ''),
     grid: true,
     cards: T4.inv.map(e => { const it = byId(e.id); return { html: itemCard(it, { lv: e.lv, showUp: e.lv < 2 }), cls: 'r-' + it.rar, onPick: P => P.close() }; }),
-    extra: syn.length ? `<div class="syns">${syn.map(s => `✦ <b>${esc($t(s.name))}</b> — ${esc($t(s.desc))}`).join('<br>')}</div>` : '',
+    extra: syn.length ? `<div class="syns">${syn.map(s => `${icon('synergy')} <b>${esc($t(s.name))}</b> — ${esc($t(s.desc))}`).join('<br>')}</div>` : '',
     foot: $t('Esc·Tab 닫기'),
     onCancel: P => P.close(),
     keys: { Tab: P => P.close(), KeyI: P => P.close() },
@@ -321,12 +348,12 @@ export function openMeta({ gain = 0, title = null, sub = null, cont = null } = {
       const cards = UNLOCKS.map(u => {
         const it = u.item ? byId(u.id) : null, got = m.unlocked.includes(u.id), can = !got && m.memory >= u.cost;
         const html = it
-          ? `<div class="ico">${it.icon}</div><div class="nm">${esc($t(it.name))}</div><div class="rk">${$t('새 유물')} · ${esc(rarLine(it))}</div><div class="ds">${esc($t(it.desc[0]))}</div>`
-          : `<div class="ico">${u.icon}</div><div class="nm">${esc($t(u.name))}</div><div class="rk">${$t('해금')}</div><div class="ds">${esc($t(u.desc))}</div>`;
-        return { html: html + `<div class="pr">${got ? '✓ ' + $t('해금됨') : '🧠 ' + u.cost}</div>`, cls: (it ? 'r-' + it.rar : 'r-rare') + (got ? ' done' : ''), disabled: got,
+          ? `<div class="ico">${ico(it)}</div><div class="nm">${esc($t(it.name))}</div><div class="rk">${gems(it)}${$t('새 유물')} · ${esc(rarLine(it))}</div><div class="ds">${esc($t(it.desc[0]))}</div>`
+          : `<div class="ico">${icon(u.id, { fb: u.icon })}</div><div class="nm">${esc($t(u.name))}</div><div class="rk">${$t('해금')}</div><div class="ds">${esc($t(u.desc))}</div>`;
+        return { html: html + `<div class="pr">${got ? icon('check') + ' ' + $t('해금됨') : icon('memory') + ' ' + u.cost}</div>`, cls: (it ? 'r-' + it.rar : 'r-rare') + (got ? ' done' : ''), disabled: got,
           onPick: P => { if (!can) { snd.deny(); return; } if (buyUnlock(m, u.id)) { snd.upgrade(); P.redraw(mk()); const s = document.querySelector('#t4-ov .sb'); if (s) s.innerHTML = subFn(); } } };
       });
-      cards.push({ html: `<div class="ico">➡️</div><div class="nm">${esc(cont || $t('계속'))}</div>`, cls: 'r-legend', onPick: P => { P.close(); resolve(m); } });
+      cards.push({ html: `<div class="ico">${icon('next')}</div><div class="nm">${esc(cont || $t('계속'))}</div>`, cls: 'r-legend', onPick: P => { P.close(); resolve(m); } });
       return cards;
     };
     const subFn = () => (sub ? sub + '<br>' : '') + (gain ? $t('기억 +{0}', gain) + ' · ' : '') + $t('가진 기억 🧠 {0}', m.memory);
@@ -351,7 +378,7 @@ addEventListener('keydown', e => {
 
 T4.listeners.add(why => {
   showHud();
-  if (typeof why === 'string' && why.startsWith('coins:')) { const n = +why.slice(6); if (n) pop((n > 0 ? '+' : '') + n + ' 🪙'); }
+  if (typeof why === 'string' && why.startsWith('coins:')) { const n = +why.slice(6); if (n) pop((n > 0 ? '+' : '') + n + ' ' + icon('coin')); }
 });
 EXT.on('init', () => { build(); showHud(); });
 addEventListener('resize', () => { if (built) showHud(); }); // 창 크기가 바뀌면 유물 줄 열 수도 다시

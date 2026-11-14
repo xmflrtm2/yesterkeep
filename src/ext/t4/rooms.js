@@ -3,6 +3,7 @@
 // (T1이 조각으로 만든 방에도 EXT.t4.decorate(room, 'shop')로 붙일 수 있다).
 // T1이 없을 때: ?room=t4-treasure 로 열면 시험 런(보물 → 보초 → 시험장 → 상점 → 두 경비 → 쉼터 → 초소 → 보물 → 성채지기)이 돈다.
 import { EXT } from '../../ext.js';
+import { icon, iconImage, hasIcon, glyphIcon } from '../t5/icons.js'; // T5: 받침대·모닥불 그림
 import { T4, give, roll, priceOf, heartPrice, addCoins, resetRun, apply, changed, sandOn } from './core.js';
 import { memMul } from './r2.js';
 import { byId } from './items.js';
@@ -83,6 +84,8 @@ const T1on = () => !!EXT.run;
 
 // ───────── 제단 모양 ─────────
 const texCache = new Map();
+// T5: txt가 아이콘 id(또는 아이콘이 있는 이모지)면 그린 아이콘을 그린다 — 그림은 비동기로 불러지므로 다 되면 텍스처를 다시 올림.
+//     'coin:12'처럼 쓰면 아이콘 + 숫자(값표). 아이콘이 없으면 예전처럼 글자로
 function iconTex(txt, { w = 128, h = 128, font = 84, glow = '#ffd27a', bg = true } = {}) {
   const key = txt + w + h + font + glow + bg;
   if (texCache.has(key)) return texCache.get(key);
@@ -90,8 +93,13 @@ function iconTex(txt, { w = 128, h = 128, font = 84, glow = '#ffd27a', bg = true
   const c = cv.getContext('2d');
   if (bg) { const g = c.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, w / 2); g.addColorStop(0, glow + 'aa'); g.addColorStop(0.45, glow + '33'); g.addColorStop(1, glow + '00'); c.fillStyle = g; c.fillRect(0, 0, w, h); }
   c.font = `${font}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji","Segoe UI",sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.shadowColor = '#000'; c.shadowBlur = 8; c.fillStyle = '#fff'; c.fillText(txt, w / 2, h / 2 + font * 0.06);
+  const [head, num] = String(txt).split(':'), id = hasIcon(head) ? head : glyphIcon(head);
   const t = new K.THREE.CanvasTexture(cv); t.colorSpace = K.THREE.SRGBColorSpace;
+  if (id) {
+    const s = num != null ? h * 0.78 : font * 1.2, x0 = num != null ? w / 2 - (s + c.measureText(num).width) / 2 - 4 : w / 2 - s / 2;
+    if (num != null) { c.textAlign = 'left'; c.shadowColor = '#000'; c.shadowBlur = 8; c.fillStyle = '#ffe6a0'; c.font = `bold ${font}px "Segoe UI",sans-serif`; c.fillText(num, x0 + s + 8, h / 2 + font * 0.06); }
+    iconImage(id, 256).then(im => { if (!im) return; c.save(); c.shadowColor = '#000'; c.shadowBlur = 10; c.drawImage(im, x0, h / 2 - s / 2, s, s); c.restore(); t.needsUpdate = true; });
+  } else { c.shadowColor = '#000'; c.shadowBlur = 8; c.fillStyle = '#fff'; c.fillText(txt, w / 2, h / 2 + font * 0.06); }
   texCache.set(key, t);
   return t;
 }
@@ -114,14 +122,14 @@ function buildAltar(a) {
     if (a.type === 'rest') {
       let br = null; try { br = K.makeMesh('brazier', E); } catch (e) { br = null; }
       if (br) g.add(br); else g.add(pedestal(E, 0.6, 0.5));
-      const fl = sprite(iconTex('🔥', { font: 90, glow: '#ff9e45' }), 1.3); fl.position.y = 1.35; g.add(fl); a.fire = a.fire || []; a.fire.push(fl);
+      const fl = sprite(iconTex('flame', { font: 90, glow: '#ff9e45' }), 1.3); fl.position.y = 1.35; g.add(fl); a.fire = a.fire || []; a.fire.push(fl);
       K.lightSpecs[E].push({ x: a.x, y: 1.8, z: a.z, color: '#ff9e45', I: E === 'past' ? 10 : 8, d: 9, flick: true });
     } else {
       g.add(pedestal(E));
-      const icon = a.type === 'treasure' ? '🎁' : a.type === 'meta' ? '📜' : a.type === 'heart' ? '💗' : a.type === 'sand' ? '⌛' : (byId(a.item) || {}).icon || '❔';
+      const ic = a.type === 'treasure' ? 'treasure' : a.type === 'meta' ? 'scroll' : a.type === 'heart' ? 'heart' : a.type === 'sand' ? 'sand' : byId(a.item) ? (hasIcon(a.item) ? a.item : byId(a.item).icon) : 'unknown'; // T5: 그린 아이콘 id
       const glow = a.type === 'shop' && byId(a.item) ? RCOL[byId(a.item).rar] : a.type === 'heart' ? '#ff6a7a' : a.type === 'sand' ? '#ffe2a8' : a.type === 'meta' ? '#b8a0ff' : '#ffd27a';
-      const sp = sprite(iconTex(icon, { glow }), 1.05); sp.position.y = 1.55; g.add(sp); a.icon = a.icon || []; a.icon.push(sp);
-      if (a.type === 'shop' || a.type === 'heart' || a.type === 'sand') { const tag = sprite(iconTex('🪙' + a.price, { w: 192, h: 64, font: 46, bg: false }), 1.25); tag.position.y = 0.95; tag.position.z = 0.6; g.add(tag); a.tag = a.tag || []; a.tag.push(tag); }
+      const sp = sprite(iconTex(ic, { glow }), 1.05); sp.position.y = 1.55; g.add(sp); a.icon = a.icon || []; a.icon.push(sp);
+      if (a.type === 'shop' || a.type === 'heart' || a.type === 'sand') { const tag = sprite(iconTex('coin:' + a.price, { w: 192, h: 64, font: 46, bg: false }), 1.25); tag.position.y = 0.95; tag.position.z = 0.6; g.add(tag); a.tag = a.tag || []; a.tag.push(tag); }
       K.lightSpecs[E].push({ x: a.x, y: 1.6, z: a.z + 0.3, color: glow, I: 4, d: 5 });
     }
     K.groups[E].add(g); a.parts.push(g);
@@ -250,7 +258,7 @@ EXT.on('prompt', () => {
   if (!a) { showNear(null); return undefined; }
   if (a.type === 'shop' && !a.sold) {
     const it = byId(a.item); a.price = priceOf(it);
-    showNear(itemCard(it) + `<div class="p">🪙 ${a.price}${T4.coins < a.price ? ' · ' + $t('금화 {0}개 가짐', T4.coins) : ''}</div>`, it.rar);
+    showNear(itemCard(it) + `<div class="p">${icon('coin')} ${a.price}${T4.coins < a.price ? ' · ' + $t('금화 {0}개 가짐', T4.coins) : ''}</div>`, it.rar);
     return T4.coins >= a.price ? $t('E 사기 — 금화 {0}', a.price) : $t('금화가 모자라요 ({0} / {1})', T4.coins, a.price);
   }
   showNear(null);
@@ -308,7 +316,7 @@ EXT.on('end', K => {
   if (!T4.run.mini || T1on()) return;
   const gain = endRun({ won: true });
   const box = document.createElement('div'); box.className = 'small';
-  box.innerHTML = `<br>🧠 ${$t('기억 +{0}', gain)} · ${$t('유물 {0}개', T4.inv.length)}`;
+  box.innerHTML = `<br>${icon('memory')} ${$t('기억 +{0}', gain)} · ${$t('유물 {0}개', T4.inv.length)}`;
   K.hud.endStats.appendChild(box);
   const b = document.createElement('button'); b.textContent = $t('기억의 서고 · 새 런');
   b.addEventListener('click', () => { K.hud.end.style.display = 'none'; overAndAgain(true, 0); });

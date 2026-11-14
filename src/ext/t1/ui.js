@@ -1,48 +1,69 @@
 // T1 — #ext 화면: 덮개(시작 메뉴·층 지도·런 요약)와 모래 계량기, 키보드로 고르기.
 // 덮개가 떠 있는 동안 세상은 멈추고(K.freeze), 게임 키(Shift·J·Space·E·WASD)는 덮개가 먹는다. Esc는 그대로 일시정지로.
+import { iconUrl } from '../t5/icons.js'; // T5: 그린 아이콘
 const CSS = `
-#ext .t1-ov { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; box-sizing: border-box;
-  background: radial-gradient(ellipse at center, #0a0d18e8 0%, #000000f2 75%); overflow-y: auto; z-index: 0; }
-#ext .t1-box { margin: auto; width: min(640px, 100%); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; text-wrap: balance; }
-#ext .t1-h { font-size: 30px; font-weight: 700; color: var(--gold); text-shadow: 0 3px 10px #000; letter-spacing: 1px; }
-#ext .t1-sub { font-size: 15px; opacity: .85; line-height: 1.5; }
-#ext .t1-small { font-size: 12.5px; opacity: .6; line-height: 1.45; }
-#ext .t1-btns { display: flex; flex-direction: column; gap: 8px; width: min(340px, 100%); margin-top: 6px; }
-#ext .t1-btn { font: inherit; font-size: 17px; padding: 10px 16px; border-radius: 9px; border: 1px solid #ffffff40; background: #ffffff10; color: inherit; cursor: pointer; text-align: center; }
-#ext .t1-btn small { display: block; font-size: 12.5px; opacity: .7; margin-top: 2px; }
-#ext .t1-btn.sel, #ext .t1-btn:hover { border-color: var(--gold); background: #ffd27a22; box-shadow: 0 0 0 2px #ffd27a55; }
-#ext .t1-btn.main { border-color: #ffd27a99; }
-#ext .t1-stats { display: grid; grid-template-columns: auto auto; gap: 3px 18px; font-size: 15px; margin: 4px 0; }
-#ext .t1-stats b { color: var(--gold); font-weight: 600; text-align: left; }
-#ext .t1-stats span { text-align: right; opacity: .8; }
-#ext .t1-meta { font-size: 17px; color: var(--teal); }
-/* 층 지도 */
-#ext .t1-mapwrap { position: relative; width: min(560px, 100%); height: min(430px, 56vh); min-height: 250px; margin: 2px 0 0; }
+/* T5(11/15): 판넬 틀·제목·단추는 ../t5/theme.js의 .yk-frame·.yk-h·.yk-btn (UI.show가 붙임), 색은 시대 변수(--pn-*). 지도 칸 그림은 ../t5/icons.js */
+#ext .t1-ov { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 18px 14px; box-sizing: border-box;
+  background: radial-gradient(ellipse at center, #05070cd8 0%, #000000f2 75%); overflow-y: auto; z-index: 0; }
+#ext .t1-box { margin: auto; width: min(640px, 100%); box-sizing: border-box; padding: 22px 30px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+#ext .t1-h { font-size: 30px; }
+#ext .t1-logo { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 34px; }
+#ext .t1-logo::after { flex-basis: 100%; }
+#ext .t1-logo .yi { width: 40px; height: 40px; }
+#ext .t1-sub { font-size: 15px; opacity: .88; line-height: 1.55; }
+#ext .t1-small { font-size: 12.5px; opacity: .62; line-height: 1.5; }
+#ext .t1-btns { display: flex; flex-direction: column; gap: 9px; width: min(340px, 100%); margin-top: 6px; }
+#ext .t1-btn { font-size: 17px; padding: 10px 16px; text-align: center; }
+#ext .t1-btn small { display: block; font-size: 12.5px; opacity: .72; margin-top: 2px; }
+#ext .t1-btn small .yi { width: 15px; height: 15px; }
+#ext .t1-btn.main { border-color: var(--pn-edge); color: var(--pn-title); font-weight: 700; }
+#ext .t1-stats { display: grid; grid-template-columns: auto auto; gap: 0 22px; font-size: 15px; margin: 4px 0; padding: 6px 16px; border-radius: 4px; background: #0006; box-shadow: inset 0 0 0 1px var(--pn-edge-dk); }
+#ext .t1-stats b { color: var(--pn-dim); font-weight: 600; text-align: left; padding: 3px 0; border-bottom: 1px dashed #ffffff14; }
+#ext .t1-stats span { text-align: right; color: var(--pn-ink); font-weight: 700; font-variant-numeric: tabular-nums; padding: 3px 0; border-bottom: 1px dashed #ffffff14; }
+#ext .t1-meta { font-size: 17px; font-weight: 700; color: #d9cfff; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; }
+#ext .t1-meta .yi { width: 22px; height: 22px; }
+/* 층 지도: 오래된 지도판 위에 메달 칸 */
+#ext .t1-mapwrap { position: relative; width: min(560px, 100%); height: min(430px, 56vh); min-height: 250px; margin: 2px 0 0; border-radius: 6px;
+  background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--pn-accent) 9%, transparent) 0%, transparent 70%), var(--pn-tex), #0007;
+  box-shadow: inset 0 0 0 1px var(--pn-edge-dk), inset 0 0 30px #000c; }
 #ext .t1-mapwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-#ext .t1-node { position: absolute; transform: translate(-50%, -50%); width: 54px; height: 54px; border-radius: 50%; border: 2px solid #ffffff30;
-  background: #12141c; color: #ffffffaa; font-size: 25px; line-height: 50px; text-align: center; padding: 0; cursor: default; font-family: 'Segoe UI Symbol', 'Segoe UI', sans-serif; }
-#ext .t1-node.done { opacity: .45; border-style: dashed; }
-#ext .t1-node.here { box-shadow: 0 0 0 3px #ffffff55; opacity: 1; }
-#ext .t1-node.can { cursor: pointer; border-color: currentColor; color: inherit; background: #1b1e2a; animation: t1pulse 1.2s ease-in-out infinite; }
-#ext .t1-node.sel { transform: translate(-50%, -50%) scale(1.18); box-shadow: 0 0 0 3px currentColor, 0 0 18px currentColor; animation: none; }
-#ext .t1-node.far { opacity: .55; }
-@keyframes t1pulse { 50% { box-shadow: 0 0 12px currentColor; } }
+#ext .t1-mapwrap line { stroke: #ffffff2e; stroke-width: 2; stroke-dasharray: 4 5; }
+#ext .t1-mapwrap line.open { stroke: var(--pn-edge-lt); stroke-width: 3; stroke-dasharray: 7 4; opacity: .85; }
+#ext .t1-mapwrap line.walked { stroke: var(--pn-accent); stroke-width: 3.5; stroke-dasharray: none; filter: drop-shadow(0 0 4px var(--pn-accent)); }
+#ext .t1-node { position: absolute; transform: translate(-50%, -50%); width: 56px; height: 56px; border-radius: 50%; padding: 0; cursor: default; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; color: #ffffffaa;
+  border: 2px solid color-mix(in srgb, currentColor 55%, #000); background: radial-gradient(circle at 50% 32%, color-mix(in srgb, currentColor 24%, #24211c) 0%, #0d0c0a 76%);
+  box-shadow: 0 0 0 2px #000c, inset 0 2px 0 #ffffff1c, inset 0 0 10px #000d; transition: transform .12s; }
+#ext .t1-node .yi { width: 38px; height: 38px; filter: drop-shadow(0 2px 2px #000c); }
+#ext .t1-node.done { filter: grayscale(.55) brightness(.62); }
+#ext .t1-node.done::after { content: ''; position: absolute; right: -6px; bottom: -5px; width: 20px; height: 20px; background: ${iconUrl('check')} center / contain no-repeat; filter: drop-shadow(0 1px 1px #000); }
+#ext .t1-node.here { filter: none; border-color: #fff; box-shadow: 0 0 0 2px #000c, 0 0 0 4px #ffffff55, inset 0 0 10px #000d; }
+#ext .t1-node.here::before { content: ''; position: absolute; left: 50%; top: -30px; width: 26px; height: 26px; margin-left: -13px; background: ${iconUrl('here')} center / contain no-repeat; filter: drop-shadow(0 2px 2px #000); animation: t1pin 1.1s ease-in-out infinite; }
+#ext .t1-node.here.done::after { display: none; }
+@keyframes t1pin { 50% { transform: translateY(-4px); } }
+#ext .t1-node.can { cursor: pointer; border-color: currentColor; color: inherit; animation: t1pulse 1.2s ease-in-out infinite; }
+#ext .t1-node.sel { transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 0 0 2px #000c, 0 0 0 4px currentColor, 0 0 22px currentColor, inset 0 0 10px #000d; animation: none; z-index: 1; }
+#ext .t1-node.far { opacity: .62; filter: grayscale(.3); }
+@keyframes t1pulse { 50% { box-shadow: 0 0 0 2px #000c, 0 0 16px currentColor, inset 0 0 10px #000d; } }
 #ext .t1-info { min-height: 44px; font-size: 15px; }
-#ext .t1-info b { font-size: 18px; }
-#ext .t1-bar { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; font-size: 15px; }
-#ext .t1-bar .h { color: #ff5d6c; } #ext .t1-bar .s { color: var(--gold); } #ext .t1-bar .m { color: var(--teal); }
-/* 모래 계량기 (#shards 자리) */
-#ext .t1-sand { position: fixed; left: 18px; top: 46px; display: none; align-items: center; gap: 7px; pointer-events: none !important; font-size: 15px; color: var(--gold); text-shadow: 0 2px 4px #000; }
-#ext .t1-sand .gl { font-size: 17px; width: 18px; text-align: center; }
-#ext .t1-sand .bar { position: relative; width: 132px; height: 9px; border-radius: 5px; background: #ffffff1c; border: 1px solid #ffffff30; overflow: hidden; }
-#ext .t1-sand .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #c9902c, var(--gold)); border-radius: 5px; }
-#ext .t1-sand .bar u { position: absolute; top: 0; bottom: 0; width: 2px; background: #ffffff70; }
+#ext .t1-info b { font-size: 18px; display: inline-flex; align-items: center; gap: 6px; } #ext .t1-info b .yi { width: 24px; height: 24px; }
+#ext .t1-bar { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; font-size: 15px; font-weight: 700; }
+#ext .t1-bar span { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border-radius: 4px; background: #0008; box-shadow: inset 0 0 0 1px var(--pn-edge-dk); }
+#ext .t1-bar .yi { width: 19px; height: 19px; }
+#ext .t1-bar .h { color: #ff8a8a; } #ext .t1-bar .s { color: var(--gold); } #ext .t1-bar .m { color: #d9cfff; }
+/* 모래 계량기 (#shards 자리): 모래시계 + 유리관 */
+#ext .t1-sand { position: fixed; left: 16px; top: 46px; display: none; align-items: center; gap: 6px; pointer-events: none !important; font-size: 15px; font-weight: 700; color: var(--gold); text-shadow: 0 2px 4px #000; }
+#ext .t1-sand .gl { width: 24px; height: 24px; display: inline-flex; } #ext .t1-sand .gl .yi { width: 24px; height: 24px; }
+#ext .t1-sand .bar { position: relative; width: 132px; height: 10px; border-radius: 6px; background: linear-gradient(180deg, #ffffff12, #0000 60%), #0009; border: 1px solid #e9bf6399; box-shadow: 0 0 0 1px #000c, inset 0 1px 3px #000c; overflow: hidden; }
+#ext .t1-sand .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(180deg, #fff3c4, #f2c66f 45%, #b8802c); border-radius: 5px; box-shadow: inset 0 1px 0 #ffffff88; }
+#ext .t1-sand .bar u { position: absolute; top: 0; bottom: 0; width: 2px; background: #ffffff80; }
 #ext .t1-sand .n { min-width: 46px; font-variant-numeric: tabular-nums; }
 #ext .t1-sand .plus { color: #fff3c4; opacity: 0; transition: opacity .25s; }
-#ext .t1-sand.drain .bar i { background: linear-gradient(90deg, #e0a030, #fff0b0); }
+#ext .t1-sand.drain .bar i { background: linear-gradient(180deg, #fffbe0, #ffd27a 45%, #d89a3a); }
 #ext .t1-sand.low { color: #ff8a7a; animation: t1low .5s steps(2) infinite; }
-#ext .t1-sand.low .bar i { background: #ff6a5a; }
-#ext .t1-sand.empty { color: #9aa3b8; } #ext .t1-sand.empty .bar i { background: #7fe8ff88; }
+#ext .t1-sand.low .bar i { background: linear-gradient(180deg, #ffc0b0, #ff6a5a 50%, #a8281e); }
+#ext .t1-sand.low .bar { border-color: #ff8a7a; }
+#ext .t1-sand.empty { color: #9aa3b8; } #ext .t1-sand.empty .bar i { background: #7fe8ff88; } #ext .t1-sand.empty .gl { filter: grayscale(1) brightness(.7); }
 @keyframes t1low { 50% { opacity: .55; } }
 body.t1run #shards, body.t1run #era .ptime { display: none !important; }
 /* 2차: 런 방의 첫 안내는 수수께끼 — 기울여 쓰고 따옴표로 (두 번 실패하면 main.js가 .tip으로 바꿈) */
@@ -51,18 +72,19 @@ body.t1run.t1riddle #hint:not(.tip)::before { content: '“'; opacity: .6; margi
 body.t1run.t1riddle #hint:not(.tip)::after { content: '”'; opacity: .6; margin-left: 2px; }
 body.t1run #ext .t1-sand { display: flex; }
 body:has(#ext .t1-ov) #hud #hint, body:has(#ext .t1-ov) #hud #prompt, body:has(#ext .t1-ov) #hud #toast, body:has(#ext .t1-ov) #hud #roomTitle { visibility: hidden; }
-#endCard .t1-endrun { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-#endCard .t1-endrun .t1-btn { font: inherit; font-size: 19px; padding: 10px 26px; border-radius: 9px; border: 1px solid var(--gold); background: #ffd27a26; color: var(--gold); cursor: pointer; }
-#endCard .t1-endrun div { font-size: 15px; opacity: .85; }
+#endCard .t1-endrun { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#endCard .t1-endrun .t1-btn { font-size: 19px; padding: 10px 28px; color: var(--pn-title); font-weight: 700; border-color: var(--pn-edge); }
+#endCard .t1-endrun div { font-size: 15px; opacity: .88; }
 @media (max-width: 520px) {
-  #ext .t1-h { font-size: 24px; }
-  #ext .t1-node { width: 44px; height: 44px; line-height: 40px; font-size: 20px; }
-  #ext .t1-sand { top: 44px; left: 14px; } #ext .t1-sand .bar { width: 96px; }
+  #ext .t1-box { padding: 18px 16px 16px; }
+  #ext .t1-h { font-size: 24px; } #ext .t1-logo { font-size: 27px; gap: 8px; } #ext .t1-logo .yi { width: 30px; height: 30px; }
+  #ext .t1-node { width: 46px; height: 46px; } #ext .t1-node .yi { width: 31px; height: 31px; }
+  #ext .t1-sand { top: 44px; left: 12px; } #ext .t1-sand .bar { width: 96px; }
 }
 /* 낮은 창(960×420 등): 칸이 겹치지 않게 작게 (11/13 창 크기 시험) */
 @media (max-height: 520px) {
-  #ext .t1-mapwrap { height: 60vh; min-height: 240px; } #ext .t1-h { font-size: 20px; } #ext .t1-box { gap: 4px; }
-  #ext .t1-node { width: 38px; height: 38px; line-height: 34px; font-size: 18px; } #ext .t1-info { min-height: 36px; font-size: 13px; } #ext .t1-info b { font-size: 15px; }
+  #ext .t1-mapwrap { height: 60vh; min-height: 240px; } #ext .t1-h { font-size: 20px; } #ext .t1-box { gap: 4px; padding: 12px 22px; } #ext .yk-h::after { margin-top: 2px; }
+  #ext .t1-node { width: 40px; height: 40px; } #ext .t1-node .yi { width: 24px; height: 24px; } #ext .t1-info { min-height: 36px; font-size: 13px; } #ext .t1-info b { font-size: 15px; }
   #ext .t1-btn { padding: 6px 14px; font-size: 15px; } #ext .t1-sub { font-size: 13px; }
 }
 `;
@@ -80,7 +102,9 @@ export const UI = {
     this.close(true);
     const ov = document.createElement('div');
     ov.className = 't1-ov ' + (opts.cls || '');
-    ov.innerHTML = `<div class="t1-box">${html}</div>`;
+    ov.innerHTML = `<div class="t1-box yk-frame">${html}</div>`;
+    for (const el of ov.querySelectorAll('.t1-h')) el.classList.add('yk-h'); // T5 판넬 말투 (src/ext/t5/theme.js)
+    for (const el of ov.querySelectorAll('.t1-btn')) el.classList.add('yk-btn');
     this.root.appendChild(ov);
     this.ov = ov; this.onPick = onPick; this.onKeyExtra = opts.onKey || null;
     this.items = [...ov.querySelectorAll('[data-k]')];

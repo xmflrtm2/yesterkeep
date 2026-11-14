@@ -1,6 +1,7 @@
 // T1 — 층 지도: 줄 5개(아래 → 위). 0~3번 줄은 2~3갈래에서 고르고, 4번 줄은 문지기. 3층만 5번 줄 = 성채지기(2차: 3층도 문지기를 넘어야 성채지기).
 // 같은 시드 + 같은 층이면 같은 지도. T4가 registerRoomType(type, fn, { icon, name, desc, rows, weight })로 새 종류를 넣으면 그 줄의 뽑기에 섞인다.
 import { makeRng } from './rng.js';
+import { icon } from '../t5/icons.js'; // T5: 칸 그림 (없는 종류면 icon 글자 그대로)
 
 export const TYPES = {
   combat: { icon: '⚔', name: N('전투'), desc: N('경비와 골렘을 모두 쓰러뜨려야 출구가 열려요'), color: '#ff9a8a' },
@@ -79,14 +80,14 @@ export function mapHtml(rows, visited, can, here, typeMeta) {
     const [x1, y1] = pts[r + ',' + c], [x2, y2] = pts[(r + 1) + ',' + b];
     const walked = vis.has(r + ',' + c) && vis.has((r + 1) + ',' + b);
     const open = (here && here.row === r && here.col === c && canSet.has((r + 1) + ',' + b)) || (!here && r === -1);
-    lines += `<line x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%" stroke="${walked ? '#ffd27a' : open ? '#ffffffcc' : '#ffffff30'}" stroke-width="${walked || open ? 3 : 2}" ${walked || open ? '' : 'stroke-dasharray="4 5"'} />`;
+    lines += `<line x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%" class="${walked ? 'walked' : open ? 'open' : ''}" />`; // 색·굵기는 t1/ui.js CSS (T5: 시대 색)
   })));
   let nodes = '';
   rows.forEach((row, r) => row.forEach((n, c) => {
     const m = typeMeta(n.type);
     const k = r + ',' + c, [x, y] = pts[k];
     const cls = ['t1-node', vis.has(k) ? 'done' : '', here && here.row === r && here.col === c ? 'here' : '', canSet.has(k) ? 'can' : '', !canSet.has(k) && !vis.has(k) ? 'far' : ''].join(' ');
-    nodes += `<button class="${cls}" ${canSet.has(k) ? `data-k="${k}"` : ''} style="left:${x}%;top:${y}%;color:${m.color}" title="${$t(m.name)}">${m.icon}</button>`;
+    nodes += `<button class="${cls}" ${canSet.has(k) ? `data-k="${k}"` : ''} style="left:${x}%;top:${y}%;color:${m.color}" title="${$t(m.name)}">${icon(n.type, { fb: m.icon })}</button>`;
   }));
   return `<div class="t1-mapwrap"><svg preserveAspectRatio="none">${lines}</svg>${nodes}</div>`;
 }

@@ -12,6 +12,7 @@ import { UI, SND } from './t1/ui.js';
 import { landingRoom, TEMP, FLOOR_NAME, buildAltar } from './t1/temp-rooms.js';
 import { riddleFor } from './t1/riddles.js';
 import { themeWeight, addRubble, applyGrade, ambient, themeRoom } from './t1/theme.js';
+import { icon } from './t5/icons.js'; // T5: 화면 기호 → 그린 아이콘
 
 const KEY = { run: 'yk-run', tut: 'yk-tut', meta: 'yk-meta' };
 // 층마다: 지도 줄(0~4)마다 노리는 조각 단계(tierAt, 소수면 그 비율로 올림), 두 조각을 이어 붙일 확률, 방을 깰 때 받는 모래, 모래 최대
@@ -274,10 +275,10 @@ function metaLine() { const M = meta(); return M.runs ? $t('기억 {0} · 런 {1
 function showMenu() {
   const saved = st && !st.pending;
   const where = saved ? (st.phase === 'room' && st.pos.row >= 0 ? $t('{0}층 · {1}번째 방', st.floor, st.pos.row + 1) : $t('{0}층 입구', st.floor)) : '';
-  const html = `<div class="t1-h">${$t('어제의 성채')}</div>
+  const html = `<div class="t1-h t1-logo">${icon('era-past')}<span>${$t('어제의 성채')}</span>${icon('era-now')}</div>
     <div class="t1-sub">${$t('매번 달라지는 성채를 세 층 내려가 성채지기를 쓰러뜨리세요.')}<br>${$t('하트는 방을 지나도 그대로, 모래는 어제에 머물 시간이에요.')}</div>
     <div class="t1-btns">
-      ${saved ? `<button class="t1-btn main" data-k="cont">${$t('이어하기')}<small>${where} · ♥ ${st.hearts} · ⌛ ${st.sand.toFixed(0)}</small></button>` : ''}
+      ${saved ? `<button class="t1-btn main" data-k="cont">${$t('이어하기')}<small>${where} · ${icon('heart')} ${st.hearts} · ${icon('sand')} ${st.sand.toFixed(0)}</small></button>` : ''}
       <button class="t1-btn ${saved ? '' : 'main'}" data-k="new">${$t('새 런')}${saved ? `<small>${$t('지금 런은 사라져요')}</small>` : ''}</button>
       <button class="t1-btn" data-k="tut">${$t('튜토리얼 다시 하기')}<small>${$t('13개 방 + 성채지기')}</small></button>
     </div>
@@ -320,14 +321,14 @@ function openMap() {
   EXT.emit('mapOpen', can, st);
   const here = st.pos.row >= 0 ? st.pos : null;
   const html = `<div class="t1-h">${$t(FLOOR_NAME[st.floor])}</div>
-    <div class="t1-bar"><span class="h">♥ ${K.S.hearts} / ${K.STAT.maxHearts}</span><span class="s">⌛ ${$t('{0}초', st.sand.toFixed(1))} / ${sandMax()}</span>${T4() ? '' : `<span class="m">✧ ${$t('기억')} ${st.mem}</span>`}</div>
+    <div class="t1-bar"><span class="h">${icon('heart')}${K.S.hearts} / ${K.STAT.maxHearts}</span><span class="s">${icon('sand')}${$t('{0}초', st.sand.toFixed(1))} / ${sandMax()}</span>${T4() ? '' : `<span class="m">${icon('memory')}${$t('기억')} ${st.mem}</span>`}</div>
     ${mapHtml(R.rows, st.visited, can, here, typeMeta)}
     <div class="t1-info"></div>
     <div class="t1-small">${$t('←/→ 고르기 · Enter 들어가기 · 아래에서 위로, 맨 위가 이 층의 끝')}</div>`;
   const ov = UI.show(html, k => pickNode(k), {
     cls: 'map',
     order: (a, b) => parseFloat(a.style.left) - parseFloat(b.style.left),
-    onSel: el => { const [r, c] = el.dataset.k.split(',').map(Number), n = R.rows[r][c], tm = typeMeta(n.type); const box = UI.ov && UI.ov.querySelector('.t1-info'); if (box) box.innerHTML = `<b style="color:${tm.color}">${tm.icon} ${$t(tm.name)}</b><br>${$t(tm.desc)}`; },
+    onSel: el => { const [r, c] = el.dataset.k.split(',').map(Number), n = R.rows[r][c], tm = typeMeta(n.type); const box = UI.ov && UI.ov.querySelector('.t1-info'); if (box) box.innerHTML = `<b style="color:${tm.color}">${icon(n.type, { fb: tm.icon })} ${$t(tm.name)}</b><br>${$t(tm.desc)}`; },
   });
   return ov;
 }
@@ -365,7 +366,7 @@ function endRun(result) {
       ${row($t('내려간 층'), $t('{0}층', old.floor))}${row($t('지난 방'), old.stats.rooms)}${row($t('쓰러뜨린 적'), old.stats.kills)}
       ${row($t('맞은 횟수'), old.stats.hurts)}${row($t('어제에서 쓴 모래'), $t('{0}초', old.stats.sandUsed.toFixed(1)))}${row($t('걸린 시간'), $t('{0}분 {1}초', mm, ss))}
     </div>
-    <div class="t1-meta">✧ ${$t('기억 +{0}', gain)} → ${$t('모두 {0}', M.memory)}</div>
+    <div class="t1-meta">${icon('memory')} ${$t('기억 +{0}', gain)} → ${$t('모두 {0}', M.memory)}</div>
     <div class="t1-small">${$t('기억은 런이 끝나도 남아요.')} · ${$t('시드 {0}', seed)}</div>
     <div class="t1-slot"></div>
     <div class="t1-btns">
@@ -415,7 +416,7 @@ EXT.on('init', k => {
   UI.init(K);
   const el = document.createElement('div');
   el.className = 't1-sand';
-  el.innerHTML = '<span class="gl">⌛</span><div class="bar"><i></i><u></u></div><span class="n"></span><span class="plus"></span>';
+  el.innerHTML = '<span class="gl">' + icon('sand') + '</span><div class="bar"><i></i><u></u></div><span class="n"></span><span class="plus"></span>';
   document.getElementById('ext').appendChild(el);
   R.sandEl = el;
 });
@@ -597,7 +598,7 @@ EXT.on('end', () => {
   const old = inner.querySelector('.t1-endrun'); if (old) old.remove();
   const box = document.createElement('div');
   box.className = 't1-endrun';
-  box.innerHTML = `<div>${$t('튜토리얼 끝! 이제 매번 달라지는 성채를 세 층 내려가요.')}</div><button class="t1-btn">${$t('런 시작')}</button>`;
+  box.innerHTML = `<div>${$t('튜토리얼 끝! 이제 매번 달라지는 성채를 세 층 내려가요.')}</div><button class="t1-btn yk-btn">${$t('런 시작')}</button>`;
   const stats = document.getElementById('endStats');
   inner.insertBefore(box, stats ? stats.nextSibling : null);
   box.querySelector('button').addEventListener('click', () => startRoomNow(enterRun(newSeed())));
