@@ -131,6 +131,7 @@ const ICONS = {
   purse: P('M4.6 10.4h14.8l1.2 8.4c.2 1.6-.8 2.4-2.2 2.4H5.6c-1.4 0-2.4-.8-2.2-2.4z', g('wood')) + R(4.2, 9.2, 15.6, 2.2, 1, g('gold')) + C(10.4, 8.2, 1.4, g('gold')) + C(13.6, 8.2, 1.4, g('gold')) + C(12, 15.8, 2.8, g('gold')) + C(12, 15.8, 1.5, 'none', ' stroke="#9a5d16" stroke-width=".8"'),
   scroll: SCROLL + C(15.6, 15, 2, g('mem')) + spk(15.6, 15, 1.2, '#ffffff'),
   next: P('M3 9.4h10V4.6l8.4 7.4-8.4 7.4v-4.8H3z', g('gold')) + HL('M4.4 10.8h8'),
+  cursor: at(DAG, 12, 12, 0.95, 90), // 메뉴에서 고른 단추 옆의 단검 표시
   unknown: C(12, 12, 9.4, g('stone')) + L('M9.2 9.4a2.8 2.8 0 1 1 3.8 2.6c-.8.4-1 1-1 1.8v.8', '#fff4d6', 2) + C(12, 17.6, 1.4, '#fff4d6', NS),
   purify: `<ellipse cx="7.4" cy="15.6" rx="4.8" ry="3" transform="rotate(-38 7.4 15.6)" fill="none" stroke="${OUT}" stroke-width="4.6"/><ellipse cx="7.4" cy="15.6" rx="4.8" ry="3" transform="rotate(-38 7.4 15.6)" fill="none" stroke="#b98cf0" stroke-width="2.6"/>`
     + `<ellipse cx="16.6" cy="8.4" rx="4.8" ry="3" transform="rotate(-38 16.6 8.4)" fill="none" stroke="${OUT}" stroke-width="4.6"/><ellipse cx="16.6" cy="8.4" rx="4.8" ry="3" transform="rotate(-38 16.6 8.4)" fill="none" stroke="#b98cf0" stroke-width="2.6"/>`
