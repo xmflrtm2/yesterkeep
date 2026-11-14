@@ -3,3 +3,4 @@ import './t1-run.js';
 import './t2-foes.js';
 import './t3-puzzles.js';
 import './t4-items.js';
+import './t5-ui.js';
