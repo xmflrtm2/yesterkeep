@@ -493,12 +493,12 @@ export const LAB = {
 const PAST_RUN = {
   't3-crumble1': 1.8, 't3-clock1': 4, 't3-turn1': 6.9, 't3-mirror2': 3.9, 't3-seedkey': 5, 't3-float': 10.5, 't3-turnkey': 4.6,
   't3-sunkkey': 6.8, 't3-clockcrumble': 3.8, 't3-grand': 7.1,
-  't3-m-houndflood': 6.3, 't3-m-echoplate': 5.5, 't3-m-guardplate': 5.5, 't3-m-shieldroots': 2.4, 't3-m-wraithmirror': 3.6,
-  't3-m-mimiccrumble': 4.5, 't3-m-xbowclock': 8.8, 't3-m-houndturn': 6.3, 't3-m-houndroots': 1.7, 't3-m-mageseal': 5.8,
+  't3-m-houndflood': 6.3, 't3-m-echoplate': 5.5, 't3-m-guardplate': 5.5, 't3-m-shieldroots': 2.4, 't3-m-wraithmirror': 4.4,
+  't3-m-mimiccrumble': 4.5, 't3-m-xbowclock': 8.8, 't3-m-houndturn': 3.5, 't3-m-houndroots': 1.7, 't3-m-mageseal': 5.8,
   't3-m-echoclock': 8.4, 't3-m-tide': 7.9,
 };
 // T1 2차 런은 조각의 riddle을 첫 안내로 쓴다(없으면 T1의 일반 수수께끼) → 내 hint가 이미 수수께끼라 그대로 넘긴다
-for (const c of [...CHUNKS1, ...CHUNKS2]) { if (PAST_RUN[c.id]) c.pastRun = PAST_RUN[c.id]; if (!c.riddle) c.riddle = c.hint; }
+for (const c of [...CHUNKS1, ...CHUNKS2]) { if (PAST_RUN[c.id]) c.pastRun = PAST_RUN[c.id]; if (!c.riddle) c.riddle = c.hint; c.t3chunk = true; } // t3chunk: 방으로 넘어가 core.js 예고가 T3 방에서만 뜨게
 
 const tierMark = t => '◆'.repeat(t) + '◇'.repeat(4 - t);
 function register() {
