@@ -78,7 +78,6 @@ body:has(#ext .t1-ov) #hud #hint, body:has(#ext .t1-ov) #hud #prompt, body:has(#
 @media (max-width: 520px) {
   #ext .t1-box { padding: 18px 16px 16px; }
   #ext .t1-h { font-size: 24px; } #ext .t1-logo { font-size: 27px; gap: 8px; } #ext .t1-logo .yi { width: 30px; height: 30px; }
-  #ext .t1-btn.sel::before { left: -24px; width: 20px; height: 20px; margin-top: -10px; }
   #ext .t1-node { width: 46px; height: 46px; } #ext .t1-node .yi { width: 31px; height: 31px; }
   #ext .t1-sand { top: 44px; left: 12px; } #ext .t1-sand .bar { width: 96px; }
 }
