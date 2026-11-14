@@ -127,7 +127,7 @@ export const ITEMS = [
     desc: [N('정예를 쓰러뜨리면 금화 +4, 하트 +1'), N('금화 +6, 하트 +1, 모래 +3초')],
     stat(st, lv) { st.eliteHunt = Math.max(st.eliteHunt, lv); } },
   { id: 't4-moon-edge', kind: 'relic', rar: 'legend', icon: '🌕', name: N('달빛 칼날'), r2: true,
-    desc: [N('오늘의 달빛 줄기 위에 선 적은 그 자리에 묶여요 (거울로 줄기를 옮겨 붙잡기)'), N('묶인 적은 앞에서 찔러도 한 방')],
+    desc: [N('오늘의 달빛 줄기 위에 선 적은 그 자리에 묶이고, 망령은 흩어져요 (거울로 줄기를 옮겨 붙잡기)'), N('묶인 적은 앞에서 찔러도 한 방')],
     stat(st, lv) { st.moonEdge = Math.max(st.moonEdge, lv); } },
 
   // ───────── 저주 (대가가 있는 유물): 강하지만 손해가 있다. 런 끝 기억이 늘어난다(memBonus). 강화 안 됨, 쉼터에서 정화 ─────────
