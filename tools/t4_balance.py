@@ -7,6 +7,7 @@
     옵션: --rooms ambush,backtoback,golem,pair,outpost,t4-arena   --limit 60(방마다 초)
 
 방 봇 (사람 반응 0.25초, 실제 KeyboardEvent, 시간은 __yk.step):
+  spam1: spam과 같지만 1.1초마다 (T2의 '준비된 전환' 1초를 저절로 채우는 박자)
   spam : 0.5초마다 Shift를 누르며 가장 가까운 적(어느 시대든)에게 길찾기로 걸어가, 같은 시대 2.2m 안이면 찌른다 — 생각 없이 Shift 연타
   rush : 가장 가까운 적의 시대로 바꾸고 곧장 걸어가 찌른다 — 숨지도 돌아가지도 않음
   hold : 가만히 서서 Shift만 누른다 (적이 오면 찌름)
@@ -51,9 +52,9 @@ window.__T4B = (() => {
       if (S().alarms !== lastAl) { if (S().alarms > lastAl) alarms += S().alarms - lastAl; lastAl = S().alarms; }
       if (S().down || S().trans) { P.wait(0.1); lastAl = S().alarms; continue; }
       const [f] = nearest(null), tick = S().time;
-      if (bot === 'spam') {
+      if (bot === 'spam' || bot === 'spam1') {
         stepToward(f, 0.25);
-        if (S().time - shiftT > 0.5) { P.shift(); shiftT = S().time; shifts++; }
+        if (S().time - shiftT > (bot === 'spam1' ? 1.1 : 0.5)) { P.shift(); shiftT = S().time; shifts++; }
       } else if (bot === 'rush') {
         if (f.era !== S().era && S().shiftCd <= 0) { P.shift(); shifts++; P.react(); }
         stepToward(f, 0.25);

@@ -2,7 +2,7 @@
 // 창이 떠 있는 동안 세상은 멈춘다(K.freeze). 키보드(←→/AD 고르기, Enter·Space·J·E 가져가기, Esc 닫기)와 마우스 모두.
 // 창이 열려 있을 때의 키는 main.js보다 먼저(캡처 단계) 받아서 게임으로 안 넘긴다 (Shift를 눌러도 시대가 안 바뀌게)
 import { EXT } from '../../ext.js';
-import { T4, has, lvOf, give, upgrade, canUpgrade, roll, priceOf, changed, throwIt, addCoins } from './core.js';
+import { T4, has, lvOf, give, take, upgrade, canUpgrade, roll, priceOf, changed, throwIt, addCoins } from './core.js';
 import { RAR, KIND, SYN, byId } from './items.js';
 import { UNLOCKS, loadMeta, buyUnlock } from './meta.js';
 import { snd } from './sfx.js';
@@ -22,7 +22,8 @@ body:has(#endCard[style*="flex"]) #t4-bar, body:has(#holdCard.on) #t4-bar { visi
 #t4-bar .ic .lv { position: absolute; right: -4px; bottom: -5px; font-size: 10px; font-weight: 700; padding: 0 3px; border-radius: 5px; background: var(--rc); color: #10131a; }
 #t4-bar .ic.used { filter: grayscale(1) brightness(.6); }
 #t4-bar .key { font-size: 11px; opacity: .6; text-shadow: 0 1px 2px #000; }
-.r-common { --rc: #c9d2de; } .r-rare { --rc: #7fe8ff; } .r-legend { --rc: #ffd27a; }
+.r-common { --rc: #c9d2de; } .r-rare { --rc: #7fe8ff; } .r-legend { --rc: #ffd27a; } .r-curse { --rc: #c38cff; } .r-plain { --rc: #ffffff66; }
+#t4-ov .cd .cost, #t4-tip .c, #t4-near .cost { color: #ff9a9a; font-size: 12.5px; } #t4-ov .cd .mb { color: #c38cff; font-size: 12px; } #t4-bar .ic.curse { box-shadow: 0 0 8px #c38cff88; }
 #t4-tip { position: fixed; display: none; max-width: 270px; padding: 9px 12px; border-radius: 10px; background: #0b0d12f2; border: 1px solid var(--rc, #ffffff33); font-size: 13px; line-height: 1.45; pointer-events: none; z-index: 5; text-shadow: none; word-break: keep-all; overflow-wrap: anywhere; }
 #t4-tip .n { font-size: 15px; font-weight: 700; color: var(--rc); } #t4-tip .r { font-size: 11px; opacity: .7; margin-bottom: 4px; } #t4-tip .s { margin-top: 5px; color: var(--gold); font-size: 12px; }
 #t4-near { position: fixed; left: 50%; top: calc(58% + 42px); transform: translateX(-50%); display: none; width: min(340px, 88vw); box-sizing: border-box; padding: 9px 14px; border-radius: 12px;
@@ -87,7 +88,7 @@ function build() {
 
 // ───────── 글자 조각 ─────────
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-const rarLine = it => `${$t(RAR[it.rar].name)} · ${$t(KIND[it.kind])}`;
+const rarLine = it => (it.kind === 'curse' ? $t(KIND.curse) : `${$t(RAR[it.rar].name)} · ${$t(KIND[it.kind])}`);
 export const synFor = id => SYN.filter(s => (s.a === id && has(s.b)) || (s.b === id && has(s.a)));
 const synNames = id => synFor(id).map(s => $t(s.name)).join(', ');
 export function itemCard(it, { lv = 1, price = null, note = '', showUp = false, key = '' } = {}) {
@@ -95,6 +96,7 @@ export function itemCard(it, { lv = 1, price = null, note = '', showUp = false, 
   return `${key ? `<div class="k">${key}</div>` : ''}<div class="ico">${it.icon}</div>`
     + `<div class="nm">${esc($t(it.name))}${lv > 1 ? ' II' : ''}</div><div class="rk">${esc(rarLine(it))}</div>`
     + `<div class="ds">${esc($t(it.desc[Math.min(lv, 2) - 1]))}</div>`
+    + (it.cost ? `<div class="cost">⚠ ${esc($t('대가: {0}', $t(it.cost)))}</div><div class="mb">${esc($t('런 끝 기억 +{0}%', Math.round((it.memBonus || 0.25) * 100)))}</div>` : '')
     + (showUp && it.desc[1] ? `<div class="up">⬆ ${esc($t(it.desc[1]))}</div>` : '')
     + (syn.length ? `<div class="sy">✦ ${esc($t('시너지: {0}', syn.map(s => $t(s.name)).join(', ')))}</div>` : '')
     + (price != null ? `<div class="pr">🪙 ${price}</div>` : '')
@@ -120,6 +122,14 @@ export function showHud() {
   h += '</div>';
   if (T4.inv.length) h += `<div class="key">${$t('Tab 유물 보기')}</div>`;
   bar.innerHTML = h;
+  // 유물이 많으면 아래로 넘치지 않게 열을 늘린다(왼쪽으로). 창 높이에서 위쪽 HUD·아래 안내 몫을 뺀 만큼만 세로로
+  const icons = bar.querySelector('.icons'), n = T4.inv.length;
+  if (icons && n) {
+    const small = innerWidth <= 640 || innerHeight <= 520, cell = small ? 35 : 39, base = small ? 2 : 3;
+    const rows = Math.max(3, Math.floor((innerHeight - bar.getBoundingClientRect().top - 90) / cell));
+    const cols = Math.max(base, Math.ceil(n / rows));
+    icons.style.gridTemplateColumns = `repeat(${cols}, ${small ? 30 : 34}px)`;
+  }
   for (const el of bar.querySelectorAll('.ic')) {
     el.addEventListener('pointerenter', () => showTip(el));
     el.addEventListener('pointerleave', hideTip);
@@ -131,6 +141,7 @@ function showTip(el) {
   const lv = lvOf(it.id), tip = $('t4-tip');
   tip.className = 'r-' + it.rar;
   tip.innerHTML = `<div class="n">${it.icon} ${esc($t(it.name))}${lv > 1 ? ' II' : ''}</div><div class="r">${esc(rarLine(it))}</div>${esc($t(it.desc[lv > 1 ? 1 : 0]))}`
+    + (it.cost ? `<div class="c">⚠ ${esc($t('대가: {0}', $t(it.cost)))}</div>` : '')
     + (synFor(it.id).length ? `<div class="s">✦ ${esc(synFor(it.id).map(s => $t(s.name) + ' — ' + $t(s.desc)).join(' / '))}</div>` : '');
   tip.style.display = 'block';
   const r = el.getBoundingClientRect(), w = tip.offsetWidth, hgt = tip.offsetHeight;
@@ -206,9 +217,12 @@ export function panel({ title, sub = '', cards, grid = false, foot = '', onCance
 }
 
 // 셋 중 하나 고르기 → 고른 id(없으면 null)
-export function openPick({ ids = null, count = 3, tier = 1, title = null, sub = null, kinds = null, skipCoins = 4, meta = null } = {}) {
+export function openPick({ ids = null, count = 3, tier = 1, title = null, sub = null, kinds = null, skipCoins = 4, meta = null, curseChance = 0 } = {}) {
   return new Promise(resolve => {
+    if (!ids && T4.st && T4.st.pickPlus) count += T4.st.pickPlus; // 저주 '무거운 왕관': 카드 하나 더
     let list = ids || roll(count, { tier, kinds, meta: meta || loadMeta() });
+    // 보물 고르기엔 가끔 저주 한 장(강하지만 대가가 있다 — 고르는 건 플레이어 몫)
+    if (!ids && curseChance && list.length > 1 && Math.random() < curseChance) { const c = roll(1, { curse: true }); if (c.length) list[list.length - 1] = c[0]; }
     if (!list.length) { addCoinsUI(skipCoins); resolve(null); return; }
     snd.open();
     const mk = () => list.map((id, k) => {
@@ -238,6 +252,7 @@ export function openRest({ heal = 2 } = {}) {
   return new Promise(resolve => {
     const K = T4.K, S = K.S, max = K.STAT.maxHearts;
     const ups = T4.inv.filter(e => canUpgrade(e.id));
+    const curses = T4.inv.filter(e => (byId(e.id) || {}).kind === 'curse');
     snd.fire();
     const first = () => panel({
       title: $t('모닥불 앞에서 쉬어요'), sub: $t('하나만 할 수 있어요'),
@@ -246,6 +261,8 @@ export function openRest({ heal = 2 } = {}) {
           cls: 'r-common', disabled: S.hearts >= max, onPick: P => { P.close(); S.hearts = Math.min(max, S.hearts + heal); T4.lastHearts = S.hearts; K.drawHearts(); snd.heal(); K.toast($t('하트를 회복했어요'), 1.6); resolve('heal'); } },
         { html: `<div class="ico">⬆️</div><div class="nm">${$t('유물 강화')}</div><div class="rk">${$t('강화할 수 있는 것 {0}개', ups.length)}</div><div class="ds">${$t('유물 하나를 II로 올려요')}</div>`,
           cls: 'r-rare', disabled: !ups.length, onPick: () => second() },
+        ...(curses.length ? [{ html: `<div class="ico">🕊️</div><div class="nm">${$t('정화')}</div><div class="rk">${$t('저주 {0}개', curses.length)}</div><div class="ds">${$t('저주 하나를 내려놓아요 (그 저주의 런 끝 기억도 사라져요)')}</div>`,
+          cls: 'r-curse', onPick: () => third() }] : []),
       ],
       foot: $t('←→ 고르기 · Enter 정하기 · Esc 그냥 가기'),
       onCancel: P => { P.close(); resolve(null); },
@@ -256,8 +273,27 @@ export function openRest({ heal = 2 } = {}) {
       foot: $t('←→ 고르기 · Enter 강화 · Esc 뒤로'),
       onCancel: () => first(),
     });
-    if (S.hearts >= max && !ups.length) { K.toast($t('하트도 가득하고 강화할 유물도 없어요'), 2); resolve(null); return; }
+    const third = () => panel({
+      title: $t('어떤 저주를 내려놓을까요?'),
+      cards: curses.map((e, k) => { const it = byId(e.id); return { html: itemCard(it, { key: String(k + 1) }), cls: 'r-curse', onPick: P => { P.close(); take(e.id); snd.heal(); K.toast($t('{0}을(를) 내려놓았어요', $t(it.name)), 1.8); resolve('purify:' + e.id); } }; }),
+      foot: $t('←→ 고르기 · Enter 정화 · Esc 뒤로'),
+      onCancel: () => first(),
+    });
+    if (S.hearts >= max && !ups.length && !curses.length) { K.toast($t('하트도 가득하고 강화할 유물도 없어요'), 2); resolve(null); return; }
     first();
+  });
+}
+
+// 런 시작: 저주를 들고 시작할지 (난이도 고르기). 첫 카드 = 저주 없이. 한 런이라도 끝낸 뒤부터 뜬다 (rooms.js·t4-items.js startRun)
+export function openCursePick({ count = 3 } = {}) {
+  return new Promise(resolve => {
+    const list = roll(count, { curse: true });
+    if (!list.length) { resolve(null); return; }
+    snd.open();
+    const cards = [{ html: `<div class="k">1</div><div class="ico">🕯️</div><div class="nm">${$t('저주 없이')}</div><div class="rk">${$t('보통 런')}</div><div class="ds">${$t('그대로 시작해요')}</div>`, cls: 'r-plain', onPick: P => { P.close(); resolve(null); } }]
+      .concat(list.map((id, k) => { const it = byId(id); return { html: itemCard(it, { key: String(k + 2) }), cls: 'r-curse', onPick: P => { P.close(); give(id); snd.take(); resolve(id); } }; }));
+    panel({ title: $t('저주를 들고 갈까요?'), sub: $t('강하지만 대가가 있어요. 대신 런이 끝나면 기억을 더 받아요'), cards,
+      foot: $t('←→ 고르기 · Enter 정하기 · Esc 저주 없이'), onCancel: P => { P.close(); resolve(null); } });
   });
 }
 
@@ -318,3 +354,4 @@ T4.listeners.add(why => {
   if (typeof why === 'string' && why.startsWith('coins:')) { const n = +why.slice(6); if (n) pop((n > 0 ? '+' : '') + n + ' 🪙'); }
 });
 EXT.on('init', () => { build(); showHud(); });
+addEventListener('resize', () => { if (built) showHud(); }); // 창 크기가 바뀌면 유물 줄 열 수도 다시

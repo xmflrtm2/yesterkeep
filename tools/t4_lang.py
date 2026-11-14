@@ -26,6 +26,8 @@ have = set(re.findall(r"^\s*'((?:[^'\\]|\\.)*)'\s*:", en, re.M))
 have = {re.sub(r"\\(.)", r'\1', k) for k in have}
 # 게임 본체 글자(피해 메시지 등)는 공용 lang/en.js에 이미 있다
 core = (ROOT / 'lang/en.js').read_text(encoding='utf-8')
+for other in (ROOT / 'src/ext').glob('t[123]/en.js'):  # 다른 트랙 글자(T2 피해 메시지 등)는 그 트랙 사전에
+    core += other.read_text(encoding='utf-8').replace("'", '"')
 keys -= {re.sub(r"\\(.)", r'\1', k) for k in re.findall(r'"((?:[^"\\]|\\.)*)"\s*:', core)} - have
 miss, unused = sorted(keys - have), sorted(have - keys)
 print(f'{len(keys)} T4 strings, en.js has {len(have)}: {len(miss)} missing, {len(unused)} unused')
