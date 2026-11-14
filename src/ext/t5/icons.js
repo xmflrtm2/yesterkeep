@@ -32,13 +32,14 @@ const GRAD = {
   crys: [['#ffffff', 0, 0.95], ['#bff6ff', 0.5, 0.8], ['#4fb4cc', 1, 0.9]],
   ghost: [['#e2fdff', 0, 0.55], ['#74d6e2', 1, 0.3]],
 };
-function gradDefs(prefix) {
+function gradDefs(prefix, only = null) { // only = 이 글에 나오는 그러데이션만 (혼자 서는 SVG를 작게)
   let s = '';
   for (const [n, stops] of Object.entries(GRAD)) {
+    if (only && !only.includes(`#${prefix}${n})`)) continue;
     s += `<linearGradient id="${prefix}${n}" x1="0" y1="0" x2="0" y2="1">${stops.map(([c, o, a]) => `<stop offset="${o}" stop-color="${c}"${a != null ? ` stop-opacity="${a}"` : ''}/>`).join('')}</linearGradient>`;
   }
   // 두 시대 반반 (퍼즐 톱니): 왼쪽 어제 금빛, 오른쪽 오늘 청록
-  s += `<linearGradient id="${prefix}era" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffe7a6"/><stop offset=".5" stop-color="#e9b14a"/><stop offset=".5" stop-color="#6fd0dc"/><stop offset="1" stop-color="#bff6ff"/></linearGradient>`;
+  if (!only || only.includes(`#${prefix}era)`)) s += `<linearGradient id="${prefix}era" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffe7a6"/><stop offset=".5" stop-color="#e9b14a"/><stop offset=".5" stop-color="#6fd0dc"/><stop offset="1" stop-color="#bff6ff"/></linearGradient>`;
   return s;
 }
 const PFX = 'yk5-';
@@ -273,7 +274,7 @@ export function icon(id, { cls = '', fb = null, title = null, size = null } = {}
 /** 혼자 서는 SVG 문서 (CSS 배경·캔버스용) */
 export function iconSvg(id, px = 24) {
   const r = real(id) || 'unknown';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${px}" height="${px}"><defs>${gradDefs(PFX)}</defs><g ${ROOT}>${ICONS[r]}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${px}" height="${px}"><defs>${gradDefs(PFX, ICONS[r])}</defs><g ${ROOT}>${ICONS[r]}</g></svg>`;
 }
 const urlCache = new Map();
 export function iconUrl(id) {
