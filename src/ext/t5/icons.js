@@ -109,7 +109,7 @@ const ICONS = {
   coin: C(12, 12, 9.2, g('gold')) + C(12, 12, 6.6, 'none', ' stroke="#9a5d16" stroke-width="1"') + P('M9.6 8.4h4.8l-2.4 3.6 2.4 3.6H9.6l2.4-3.6z', '#a8661a', NS) + HL('M6.4 9.6a6.2 6.2 0 0 1 3.4-3.6'),
   sand: hourglass(),
   heart: heart(),
-  'heart-empty': P(HEART, '#2b1a20') + P('M12 18.2S5.7 13.9 5.7 9.4a2.5 2.5 0 0 1 4.5-1.5L12 10.1l1.8-2.2a2.5 2.5 0 0 1 4.5 1.5c0 4.5-6.3 8.8-6.3 8.8z', 'none', ' stroke="#6e4650" stroke-width=".9"'),
+  'heart-empty': P(HEART, '#3a2228') + P('M12 18.2S5.7 13.9 5.7 9.4a2.5 2.5 0 0 1 4.5-1.5L12 10.1l1.8-2.2a2.5 2.5 0 0 1 4.5 1.5c0 4.5-6.3 8.8-6.3 8.8z', 'none', ' stroke="#a8707c" stroke-width="1" stroke-dasharray="2 1.6"'),
   knife: at(DAG, 12, 12, 1, 45),
   arrow: at(ARROW, 12, 12, 1, 45),
   memory: P('M12 2l5.4 6.4L12 22 6.6 8.4z', g('mem')) + D('M6.6 8.4h10.8M9.2 8.4 12 22l2.8-13.6M9.2 8.4 12 2l2.8 6.4', '#ffffff', 0.7, 0.6) + spk(19, 4.6, 2.6, '#fff1b8') + spk(4.6, 16.4, 1.8, '#e2dcff'),

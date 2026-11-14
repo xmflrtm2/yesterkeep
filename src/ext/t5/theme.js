@@ -70,7 +70,8 @@ body.now .yk-frame::before, body.now #endCard .inner::before, body.now #holdCard
 #endCard .thanks { color: var(--pn-accent); font-weight: 700; }
 #endCard button { padding: 9px 26px; }
 #endStats .score { color: var(--pn-title); font-weight: 800; }
-#holdCard > div { padding: 22px 34px 18px; max-width: min(640px, 92vw); box-sizing: border-box; cursor: pointer; }
+#holdCard > div { padding: 22px 34px 18px; max-width: min(640px, 92vw); box-sizing: border-box; cursor: pointer; word-break: keep-all; overflow-wrap: anywhere; }
+#endCard .inner { word-break: keep-all; overflow-wrap: anywhere; }
 #holdCard .t { color: var(--pn-title); align-items: center; justify-content: center; gap: 12px; }
 #holdCard.start .t.start, #holdCard.paused .t.paused { display: flex; } /* 보이는 쪽만 (index.html이 다른 쪽을 숨김) */
 #holdCard .t.start::before, #holdCard .t.start::after { content: ''; width: 34px; height: 34px; flex: none; background: ${iconUrl('era-past')} center / contain no-repeat; }
@@ -85,7 +86,7 @@ body:has(#t4-ov.on) #hud #hint, body:has(#t4-ov.on) #hud #prompt, body:has(#t4-o
 #hud::after { content: ''; position: absolute; z-index: -1; right: 0; top: 0; width: 300px; height: 120px; background: radial-gradient(ellipse at 100% 0, #000a 0%, #0005 40%, transparent 72%); pointer-events: none; }
 #hearts { display: flex; gap: 1px; letter-spacing: 0; left: 14px; top: 11px; font-size: 27px; line-height: 1; }
 #hearts span { display: inline-flex; }
-#hearts .off .yi { filter: grayscale(.85) brightness(.34) drop-shadow(0 1px 1px #000d); }
+#hearts .off { background: ${iconUrl('heart-empty')} center / contain no-repeat; } #hearts .off .yi { visibility: hidden; } /* 잃은 하트: 빈 홈 (main.js가 ♥을 그대로 쓰므로 모양만 바꿈) */
 #hearts .yi { transition: transform .2s; }
 #shards .yi, #toast .yi, #roomTitle .yi { width: 1.1em; height: 1.1em; }
 /* 시대 이름 옆 문장(어제 해 · 오늘 이지러진 달) */
