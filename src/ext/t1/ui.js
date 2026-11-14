@@ -34,7 +34,7 @@ const CSS = `
   display: flex; align-items: center; justify-content: center; color: #ffffffaa;
   border: 2px solid color-mix(in srgb, currentColor 55%, #000); background: radial-gradient(circle at 50% 32%, color-mix(in srgb, currentColor 24%, #24211c) 0%, #0d0c0a 76%);
   box-shadow: 0 0 0 2px #000c, inset 0 2px 0 #ffffff1c, inset 0 0 10px #000d; transition: transform .12s; }
-#ext .t1-node .yi { width: 34px; height: 34px; filter: drop-shadow(0 2px 2px #000c); }
+#ext .t1-node .yi { width: 38px; height: 38px; filter: drop-shadow(0 2px 2px #000c); }
 #ext .t1-node.done { filter: grayscale(.55) brightness(.62); }
 #ext .t1-node.done::after { content: ''; position: absolute; right: -6px; bottom: -5px; width: 20px; height: 20px; background: ${iconUrl('check')} center / contain no-repeat; filter: drop-shadow(0 1px 1px #000); }
 #ext .t1-node.here { filter: none; border-color: #fff; box-shadow: 0 0 0 2px #000c, 0 0 0 4px #ffffff55, inset 0 0 10px #000d; }
@@ -43,7 +43,7 @@ const CSS = `
 @keyframes t1pin { 50% { transform: translateY(-4px); } }
 #ext .t1-node.can { cursor: pointer; border-color: currentColor; color: inherit; animation: t1pulse 1.2s ease-in-out infinite; }
 #ext .t1-node.sel { transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 0 0 2px #000c, 0 0 0 4px currentColor, 0 0 22px currentColor, inset 0 0 10px #000d; animation: none; z-index: 1; }
-#ext .t1-node.far { opacity: .5; filter: grayscale(.35); }
+#ext .t1-node.far { opacity: .62; filter: grayscale(.3); }
 @keyframes t1pulse { 50% { box-shadow: 0 0 0 2px #000c, 0 0 16px currentColor, inset 0 0 10px #000d; } }
 #ext .t1-info { min-height: 44px; font-size: 15px; }
 #ext .t1-info b { font-size: 18px; display: inline-flex; align-items: center; gap: 6px; } #ext .t1-info b .yi { width: 24px; height: 24px; }
@@ -79,7 +79,7 @@ body:has(#ext .t1-ov) #hud #hint, body:has(#ext .t1-ov) #hud #prompt, body:has(#
   #ext .t1-box { padding: 18px 16px 16px; }
   #ext .t1-h { font-size: 24px; } #ext .t1-logo { font-size: 27px; gap: 8px; } #ext .t1-logo .yi { width: 30px; height: 30px; }
   #ext .t1-btn.sel::before { left: -24px; width: 20px; height: 20px; margin-top: -10px; }
-  #ext .t1-node { width: 46px; height: 46px; } #ext .t1-node .yi { width: 28px; height: 28px; }
+  #ext .t1-node { width: 46px; height: 46px; } #ext .t1-node .yi { width: 31px; height: 31px; }
   #ext .t1-sand { top: 44px; left: 12px; } #ext .t1-sand .bar { width: 96px; }
 }
 /* 낮은 창(960×420 등): 칸이 겹치지 않게 작게 (11/13 창 크기 시험) */
