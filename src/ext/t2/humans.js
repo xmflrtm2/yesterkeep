@@ -8,7 +8,7 @@
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, sees, los, rayLen, turnTo, turnToYaw, moveTo, nextStep, nearestStand,
   fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, laneGeo, makeCone, updateCone, paintCone, makeMark, paintMark, buildHuman, ghostCopy,
-  ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill, thrownToStab } from './core.js';
+  ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill, thrownToStab, ghostProp, syncGhostProps, say } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -87,6 +87,7 @@ export function viewCommon(f, range, half) {
   const K = T2.K, away = f.era !== K.S.era;
   const gh = f.m ? f.m.ghost : f.ghostBody;
   if (gh) { gh.visible = away && f.alive && ringPassed(f.x, f.z); if (!f.m) { gh.position.copy(f.holder.position); gh.rotation.copy(f.holder.rotation); } }
+  syncGhostProps(f); // 방패·석궁·자루 윤곽을 손 자리로
   paintCone(f.cone, f, away);
   if (f.alive) updateCone(f.cone, f, range, half);
   paintMark(f.mark, f);
@@ -138,7 +139,7 @@ EXT.foes['t2-shield'] = {
     const elite = !!def.elite, C = Object.assign({}, SHIELD, elite ? SHIELD_E : {}, { alarmMsg: '방패병이 알아챘어요!', color: '#56657a', lose: 6 });
     const f = base(def, K, 't2-shield', { base: 'guard', scale: elite ? 1.14 : 1.08, tint: elite ? { Armor: '#ffd36a', Shoulders: '#e0a830', Pants: '#3a3550' } : { Armor: '#5d7ea8', Shoulders: '#4a6a96', Pants: '#2a3550' } }, C);
     f.shield = makeShieldMesh(K); f.holder.add(f.shield);
-    if (f.m) { f.shieldGhost = ghostCopy(f.shield); f.m.ghost.add(f.shieldGhost); f.shieldGhost.visible = true; }
+    if (f.m) f.shieldGhost = ghostProp(f, f.shield);
     f.heard = 0;
     f.bashArc = decal(arcGeo(rad(55) * 180 / Math.PI), '#ff3a20');
     place(f); updateCone(f.cone, f, C.range, C.half);
@@ -274,7 +275,7 @@ EXT.foes['t2-xbow'] = {
     const elite = !!def.elite, C = Object.assign({}, XBOW, elite ? XBOW_E : {}, { alarmMsg: '석궁병이 겨눠요! 조준선을 피하세요' });
     const f = base(def, K, 't2-xbow', { base: 'guard', scale: 0.97, dagger: false, tint: elite ? { Armor: '#e8c050', Shoulders: '#b08020', Pants: '#3a3020' } : { Armor: '#5d7a3a', Shoulders: '#4a6030', Pants: '#3a3020' } }, C);
     f.bow = makeCrossbow(K); f.holder.add(f.bow);
-    if (f.m) { const gb = ghostCopy(f.bow); gb.visible = true; f.m.ghost.add(gb); }
+    if (f.m) ghostProp(f, f.bow);
     f.aimT = 0; f.aimYaw = 0; f.reload = 0; f.lastSeen = null;
     f.lines = [0, 1, 2].slice(0, C.fan || 1).map(() => decal(laneGeo(), '#ff2a1a', { order: 5 }));
     place(f); updateCone(f.cone, f, C.range, C.half);
@@ -326,12 +327,29 @@ EXT.foes['t2-xbow'] = {
         ln.material.depthTest = !away;
       });
     };
+    // 2차 고칠 것(11/15): 곧장 돌진하는 봇이 화살 한 대 맞고 장전하는 사이 앞에서 찔러 5.6초에 깼다 → 앞은 개머리판으로 막는다.
+    // 쓰러뜨리는 길: 등 뒤 · 준비된 전환으로 곁에 넘어와 찌르기(시간 충격으로 굳은 사이) · 동료의 화살
+    const snapAim = () => {
+      const S = K.S;
+      if (f.state !== 'alert') alert(f);
+      f.yaw = Math.atan2(S.p.x - f.x, S.p.z - f.z); f.aimYaw = f.yaw; f.lastSeen = [S.p.x, S.p.z];
+      if (f.aimT <= 0) { f.aimT = 0.0001; f.reload = 0; S2.aim({ x: f.x, z: f.z }); } // 장전 중이어도 곧장 겨눈다 (가까우면 closeAim 0.55초 뒤 발사 — 구르면 피함)
+    };
+    f.onShift = (from, to) => {
+      if (to !== f.era || !f.alive || prepared() || pdist(f) > 3.5) return;
+      f.stun = 0; snapAim(); // 흔들림을 느끼고 충격을 털어낸다
+    };
     f.onStab = info => {
-      const how = fromBehind(f, info, 70) ? 'back' : info.shift ? 'shift' : 'front';
-      die(f, how, K.$t(how === 'front' ? '석궁병은 가까이에선 약해요' : how === 'shift' ? '전환 기습!' : '등 뒤에서 한 방'));
-      return 'kill-' + how;
+      if (fromBehind(f, info, 70)) { die(f, 'back', K.$t('등 뒤에서 한 방')); return 'kill-back'; }
+      // 굳어 있어도 앞은 개머리판이 막는다 (맞은 뒤 되감기로 곁의 적이 1.2초 굳는 공용 규칙 → 돌진 봇이 굳은 석궁병을 앞에서 찔렀다). 굳은 사이 등 뒤로는 돌아갈 수 있다
+      if (info.shift && prepared()) { die(f, 'shift', K.$t('전환 기습!')); return 'kill-shift'; }
+      if (f.stun > 0) return blocked(f, info, K.$t('개머리판에 막혔어요 — 굳은 사이 등 뒤로'), 0.8);
+      snapAim(); fail();
+      return blocked(f, info, K.$t('개머리판에 막혔어요 — 오늘에서 다가가 곁으로 넘어오세요'), 1.3);
     };
     f.boltHit = () => { die(f, 'bolt', K.$t('동료의 화살에 맞았어요')); return true; };
+    // 플레이어가 맞아도 굳지 않는다 (가까이 붙은 근접 적만 물러서는 규칙 — 석궁병이 1.3초 굳어 돌진 봇이 앞에서 찔렀다)
+    f.onPlayerHurt = () => {};
     f.revive = () => reviveHuman(f);
     return f;
   },
@@ -419,7 +437,7 @@ EXT.foes['t2-mage'] = {
           reviveAny(K, f.target); f.revT.delete(f.target);
           S2.revive({ x: f.target.x, z: f.target.z });
           K.FX.motes(f.target.x, 0.3, f.target.z, { n: 40, color: ['#c89bff', '#ffffff'], speed: 2, up: 3, life: 1.2 });
-          K.toast(K.$t('마법사가 쓰러진 적을 되살렸어요 — 마법사부터!'), 2.2); fail();
+          say(K.$t('마법사가 쓰러진 적을 되살렸어요 — 마법사부터!'), 2.2); fail();
           f.target = null;
         }
       } else if (f.state === 'alert') { if (h) turnTo(f, S.p.x, S.p.z, dt, 4); play(f, CLIP.idle, 0.2); }
@@ -441,12 +459,20 @@ EXT.foes['t2-mage'] = {
     };
     f.onStab = info => {
       if (fromBehind(f, info, 70)) { die(f, 'back', K.$t('등 뒤에서 한 방')); return 'kill-back'; }
-      if (f.stun > 0 || info.shift) { die(f, 'shift', K.$t('전환 기습!')); return 'kill-shift'; }
+      if ((f.stun > 0 || info.shift) && (prepared() || info.thrown || !info.shift)) { die(f, 'shift', K.$t('전환 기습!')); return 'kill-shift'; }
       if (f.state !== 'alert') alert(f);
-      if (blink()) { K.toast(K.$t('마법사가 피했어요 — 오늘에서 다가가 넘어오며 찌르세요'), 1.8); fail(); return 'dodged'; }
+      if (blink()) { say(K.$t('마법사가 피했어요 — 오늘에서 다가가 넘어오며 찌르세요'), 1.8); fail(); return 'dodged'; }
       die(f, 'front'); return 'kill-front';
     };
     f.boltHit = () => { die(f, 'bolt', K.$t('동료의 화살에 맞았어요')); return true; };
+    // 2차 고칠 것(11/15): 0.5초 연타 봇이 마법사 윤곽 위에서 넘어오는 것만으로(시간 충격 0.6초) 3.2초에 깼다.
+    // 마법사는 시간의 흔들림을 느낀다 → 준비 안 된 전환으로 곁(3.5m)에 넘어오면 충격을 털고 바로 순간이동
+    f.onPlayerHurt = () => {}; // 맞은 플레이어 곁에서 굳으면 공짜 처치가 된다 (마법사는 치지 않으니 물러설 까닭도 없다)
+    f.onShift = (from, to) => {
+      if (to !== f.era || !f.alive || prepared() || pdist(f) > 3.5) return;
+      f.stun = 0; if (f.state !== 'alert') alert(f);
+      if (blink()) { say(K.$t('마법사가 흔들림을 느끼고 피했어요 — 1초 자리를 잡고 넘어오세요'), 2.0); fail(); }
+    };
     // 마법사는 서로를 되살리지 않는다 (마법사 둘 = 끝없는 되살리기가 되지 않게)
     return f;
   },

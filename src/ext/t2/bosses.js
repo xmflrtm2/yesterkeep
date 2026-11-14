@@ -13,7 +13,7 @@
 //    덮치기(붉은 착지 원 — 옆으로 비키면 착지 뒤 1.1초 등이 열림) · 거미줄 쏘기(하얀 줄, 맞으면 묶임) · 물기 · 다리 휘두르기(둘레)
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, los, rayLen, turnTo, moveTo, nextStep, nearestStand,
-  fail, decal, ringGeo, discGeo, arcGeo, laneGeo, buildHuman, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill } from './core.js';
+  fail, decal, ringGeo, discGeo, arcGeo, laneGeo, buildHuman, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill, toastLater, say } from './core.js';
 import { S2 } from './sfx.js';
 import { spawnRat } from './beasts.js';
 
@@ -41,7 +41,8 @@ function updatePips(K, f, y) {
   if (f.pipHp !== f.bossHp) { if (f.pips.material.map) f.pips.material.map.dispose(); f.pips.material.map = pipTex(K, Math.max(0, f.bossHp), f.hpMax, f.pipColor); f.pips.material.needsUpdate = true; f.pipHp = f.bossHp; }
   f.pips.position.set(f.x, y, f.z);
 }
-function banner(K, text, sub) { K.toast(K.$t(text) + (sub ? ' — ' + K.$t(sub) : ''), 3.2); }
+// 이름 → 규칙 두 토막으로 (한 줄로 이으면 휴대폰 세로에서 양옆이 잘렸다 — 11/15 처음 세션 보고)
+function banner(K, text, sub) { say(K.$t(text), 1.8); if (sub) toastLater(K.$t(sub), 1.8, 2.8); }
 
 /* ───────── 쌍둥이 간수 ───────── */
 const TW = {
@@ -108,7 +109,7 @@ EXT.foes['t2-twin'] = {
     const play = (n, fade = 0.2, sp = 1) => { if (f.ani) f.ani.loop(n, fade, sp); };
     const wake = () => {
       for (const o of pairs[f.pair] || []) if (o.state === 'sleep') { o.state = 'alert'; S2.roar({ x: o.x, z: o.z }); }
-      if (!T2.twinBanner) { T2.twinBanner = true; banner(K, '1층 문지기 — 쌍둥이 간수', '하나가 쓰러지면 남은 쪽이 4초 뒤 되살려요'); }
+      if (!T2.twinBanner) { T2.twinBanner = true; banner(K, '1층 문지기 · 쌍둥이 간수', '하나만 쓰러뜨리면 4초 뒤 되살아나요'); }
     };
     f.wakeUp = wake;
     const start = (k, wmul = 1) => {
@@ -147,7 +148,7 @@ EXT.foes['t2-twin'] = {
           if (!K.stand(f.era, cellOf(nx), cellOf(nz))) {
             a.ph = 'stuck'; a.t = 0; S.shake = Math.max(S.shake, 0.3); K.sfx.clang({ x: f.x, z: f.z }); K.clangFx(f.x + ux, f.z + uz);
             if (f.ani) f.ani.once(CLIP.hit, { speed: 0.7, dur: A.stuck });
-            if (h) K.toast(K.$t('벽에 박혔어요 — 등 뒤로!'), 1.2);
+            if (h) say(K.$t('벽에 박혔어요 — 등 뒤로!'), 1.2);
           } else {
             f.x += ux * step; f.z += uz * step; a.gone += step;
             if (!a.hit && h && pdist(f) < 1.1) { a.hit = true; hurtPlayer('돌진 찌르기에 맞았어요'); }
@@ -173,8 +174,8 @@ EXT.foes['t2-twin'] = {
       if (p && p.alive) {
         p.oathT = TW.oath; S2.oath({ x: f.x, z: f.z });
         const where = p.era === 'now' ? '오늘' : '어제';
-        K.toast(K.$t(f.role === 'elder' ? '형이 쓰러졌어요 — {0}의 아우가 {1}초 뒤 되살려요' : '아우가 쓰러졌어요 — {0}의 형이 {1}초 뒤 되살려요', K.$t(where), TW.oath), 3);
-      } else K.toast(K.$t('쌍둥이 간수를 함께 쓰러뜨렸어요!'), 2.6);
+        say(K.$t(f.role === 'elder' ? '형이 쓰러졌어요 — {0}의 아우가 {1}초 뒤 되살려요' : '아우가 쓰러졌어요 — {0}의 형이 {1}초 뒤 되살려요', K.$t(where), TW.oath), 3);
+      } else say(K.$t('쌍둥이 간수를 함께 쓰러뜨렸어요!'), 2.6);
     };
     f.hurtBoss = (how, o = {}) => {
       if (!f.alive) return;
@@ -184,14 +185,14 @@ EXT.foes['t2-twin'] = {
       if (f.bossHp <= 0) { down(how); return; }
       f.act = null; f.stagger = TW.stagger; f.wind = 0;
       if (f.ani) f.ani.once(CLIP.hit, { speed: 0.9, dur: TW.stagger });
-      K.toast(K.$t(o.relic ? '문지기에게 한 칸 — 던진 것도 한 칸뿐' : '한 칸! 남은 쪽도 1칸까지 깎아 두세요'), 1.8);
+      say(K.$t(o.relic ? '문지기에게 한 칸 — 던진 것도 한 칸뿐' : '한 칸! 남은 쪽도 1칸까지 깎아 두세요'), 1.8);
     };
     f.revive = () => {
       f.alive = true; f.counted = false; f._dying = false; f.bossHp = TW.hp; f.stagger = 0.9; f.act = null; f.oathT = 0;
       K.S.kills = Math.max(0, K.S.kills - 1);
       if (f.ani) { f.ani.onceLeft = 0; f.ani.loop(CLIP.idle, 0.4); }
       S2.roar({ x: f.x, z: f.z }); K.FX.motes(f.x, 0.5, f.z, { n: 40, color: ['#7fe8ff', '#ffffff'], speed: 2.5, up: 3, life: 1.2 });
-      K.toast(K.$t('맹세로 되살아났어요 — 둘을 함께 쓰러뜨려야 해요'), 2.4); fail();
+      say(K.$t('맹세로 되살아났어요 — 둘을 함께 쓰러뜨려야 해요'), 2.4); fail();
     };
     f.onShift = (from, to) => {
       if (to === f.era && f.alive) f.heard = 0; // 다른 시대에 있는 동안 멈춰 있던 값이 남지 않게
@@ -277,7 +278,7 @@ EXT.foes['t2-twin'] = {
       if (!f.alive) return 'miss';
       if (f.state === 'sleep') wake();
       // 맞은 뒤 1.1초는 안 맞는다 (휘청이는 사이 두 번 찔러 두 칸을 한꺼번에 빼던 것 — 11/15 직접 플레이)
-      if (K.S.time - (f.hitAt || -9) < 1.1) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); if (!info.thrown) K.toast(K.$t('막 맞은 문지기는 잠깐 버텨요 — 다음 틈을'), 1.2); return 'immune'; }
+      if (K.S.time - (f.hitAt || -9) < 1.1) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); if (!info.thrown) say(K.$t('막 맞은 문지기는 잠깐 버텨요 — 다음 틈을'), 1.2); return 'immune'; }
       const behind = fromBehind(f, info, 70);
       if (behind && (!info.shift || prepared() || info.thrown)) { f.hurtBoss(info.shift ? 'shift' : 'back'); return 'boss-hit'; }
       // 앞·옆: 막고 받아친다
@@ -337,7 +338,7 @@ EXT.foes['t2-queen'] = {
     f.webs = [];
     makePips(K, f, '#ffae3a');
     const place = () => { f.mk.g.position.set(f.x, f.y, f.z); f.mk.g.rotation.y = f.yaw; };
-    const wake = () => { if (f.state !== 'sleep') return; f.state = 'alert'; S2.screech({ x: f.x, z: f.z }); banner(K, '2층 문지기 — 거미 여왕', '어제의 알이 오늘의 새끼가 돼요'); };
+    const wake = () => { if (f.state !== 'sleep') return; f.state = 'alert'; S2.screech({ x: f.x, z: f.z }); banner(K, '2층 문지기 · 거미 여왕', '어제의 알이 오늘의 새끼가 돼요'); };
     // 알 하나 = 오늘의 새끼 하나 (방에 들어올 때 + 여왕이 맞을 때마다)
     const hatch = (why) => {
       let n = 0;
@@ -347,7 +348,7 @@ EXT.foes['t2-queen'] = {
         const sp = spawnRat(K, e, C2(i) + (Math.random() - 0.5) * 0.4, C2(j) + (Math.random() - 0.5) * 0.4, 'spider');
         e.kids.push(sp); n++;
       }
-      if (n && why === 'hit') K.toast(K.$t('어제의 알에서 새끼 {0}마리 — 알을 깨 두면 안 나와요', n), 2.2);
+      if (n && why === 'hit') say(K.$t('어제의 알에서 새끼 {0}마리 — 알을 깨 두면 안 나와요', n), 2.2);
       return n;
     };
     f.hatch = hatch;
@@ -406,7 +407,7 @@ EXT.foes['t2-queen'] = {
         if (!K.stand('now', cellOf(w.x), cellOf(w.z)) && K.ch('now', cellOf(w.x), cellOf(w.z)) === '#' || w.gone > QN.web.max + 2) w.done = true;
         if (!w.done && here(f) && Math.hypot(S.p.x - w.x, S.p.z - w.z) < 0.6 && S.invuln <= 0) {
           w.done = true; T2.root = QN.web.root; T2.rootAt = { x: S.p.x, z: S.p.z };
-          K.toast(K.$t('거미줄에 묶였어요 — 어제로 가면 풀려요'), 1.8); S2.webShot({ x: S.p.x, z: S.p.z });
+          say(K.$t('거미줄에 묶였어요 — 어제로 가면 풀려요'), 1.8); S2.webShot({ x: S.p.x, z: S.p.z });
         }
         w.mesh.position.set(w.x, 1.0, w.z);
         if (w.done) { w.mesh.parent && w.mesh.parent.remove(w.mesh); w.ghost.parent && w.ghost.parent.remove(w.ghost); }
@@ -428,7 +429,7 @@ EXT.foes['t2-queen'] = {
       }
       f.act = null; f.stagger = QN.stagger; f.flee = 0.8;
       hatch('hit');
-      if (o.relic) K.toast(K.$t('문지기에게 한 칸 — 던진 것도 한 칸뿐'), 1.6);
+      if (o.relic) say(K.$t('문지기에게 한 칸 — 던진 것도 한 칸뿐'), 1.6);
     };
     f.update = dt => {
       if (!f.alive) return;
@@ -494,7 +495,7 @@ EXT.foes['t2-queen'] = {
       if (K.S.time - (f.hitAt || -9) < 1.1) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); return 'immune'; }
       const behind = fromBehind(f, info, 70);
       // 등(모래시계 무늬)은 공격이 끝난 직후·휘청일 때만 열린다 — 무늬가 밝게 빛난다 (11/15: 같은 시대에서 빙빙 도는 봇이 12초 만에 이겼다)
-      if (behind && !f.isOpen()) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); if (!info.thrown) K.toast(K.$t('다리가 등을 막아요 — 공격이 끝난 뒤 무늬가 빛날 때'), 1.6); fail(); return 'guarded'; }
+      if (behind && !f.isOpen()) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); if (!info.thrown) say(K.$t('다리가 등을 막아요 — 공격이 끝난 뒤 무늬가 빛날 때'), 1.6); fail(); return 'guarded'; }
       if (behind && (!info.shift || prepared() || info.thrown)) { f.hurtBoss(info.shift ? 'shift' : 'back'); return 'boss-hit'; }
       f.yaw = Math.atan2(info.tx, info.tz);
       if (!f.act && f.stagger <= 0 && !info.thrown) start('bite');
@@ -503,7 +504,9 @@ EXT.foes['t2-queen'] = {
     };
     f.onExternalKill = () => {};
     f.onPlayerHurt = () => { if (f.act && f.act.ph !== 'air') f.act = null; f.hold = 1.2; };
-    f.isOpen = () => f.stagger > 0 || f.hold > 0 || (!!f.act && (f.act.ph === 'rec' || (f.act.k === 'web' && f.act.ph === 'wind')));
+    // 등 뒤 휘두르기(빙빙 도는 상대를 쫓는 기술)의 회복과, 플레이어를 문 뒤 1.3초 쉼(hold)엔 등이 안 열린다 — 11/15 빙빙 봇이
+    // 휘두르기 틈만 찔러 18.8초에, 그다음엔 물리고 되찌르기로(하트 4개 잃고) 23.6초에 깼다. 덮치기·물기·거미줄 뒤에만 열린다
+    f.isOpen = () => f.stagger > 0 || (!!f.act && ((f.act.ph === 'rec' && f.act.k !== 'swipe') || (f.act.k === 'web' && f.act.ph === 'wind')));
     place();
     // 알에서 첫 새끼들 (알이 먼저 생기도록 다음 프레임에)
     f.firstHatch = true;
@@ -536,7 +539,7 @@ EXT.foes['t2-egg'] = {
       S2.eggCrack({ x: f.x, z: f.z }); K.FX.debris(f.x, 0.3, f.z, { n: 8, color: ['#e8e0cc', '#c8b890'], speed: 2, up: 2, size: 0.08 }); K.FX.motes(f.x, 0.4, f.z, { n: 12, color: ['#ffae3a'], speed: 1.5, up: 1, life: 0.6 });
       let n = 0;
       for (const s of f.kids) if (s.alive) { s.alive = false; s.counted = true; s.mk.visible = false; s.ghost.visible = false; n++; }
-      K.toast(K.$t(n ? '어제 알을 깼어요 — 오늘의 새끼 {0}마리도 없어요' : '어제 알을 깼어요 — 여왕이 맞아도 여기선 안 나와요', n), 2);
+      say(K.$t(n ? '어제 알을 깼어요 — 오늘의 새끼 {0}마리도 없어요' : '어제 알을 깼어요 — 여왕이 맞아도 여기선 안 나와요', n), 2);
     };
     f.onStab = info => { crack(info.shift ? 'shift' : 'back'); return 'kill'; };
     f.onExternalKill = () => { f.mk.visible = false; f.ghost.visible = false; for (const s of f.kids) if (s.alive) { s.alive = false; s.mk.visible = false; } };

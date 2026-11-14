@@ -8,7 +8,7 @@
 //       단 **막 넘어온 너는 되감을 수 없다**: 다른 시대에 1초 이상 있다가 넘어온 뒤 1.3초 안의 찌르기는 어느 쪽에서든 통한다(흰 고리가 줄어듦).
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, los, turnTo, turnToYaw, moveTo, nearestStand,
-  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, laneGeo, makeCone, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill } from './core.js';
+  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, laneGeo, makeCone, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, flickering, kill, ghostProp, say } from './core.js';
 import { S2 } from './sfx.js';
 import { base, place, play, senseSight, alert, patrol, chase, viewCommon, die, CLIP } from './humans.js';
 
@@ -56,7 +56,7 @@ EXT.foes['t2-watcher'] = {
           f.meter = 0; f.cool = EYE.cool; T2.lockT = EYE.lockT;
           S2.lock({ x: S.p.x, z: S.p.z }); K.screenFlash('#ff9a2a', 0.18);
           raiseAlarm(f, K.$t('두 시대의 눈에 붙잡혔어요 — 3초 동안 시대를 못 바꿔요'));
-          K.toast(K.$t('두 시대의 눈에 붙잡혔어요 — 3초 동안 시대를 못 바꿔요'), 2.2);
+          say(K.$t('두 시대의 눈에 붙잡혔어요 — 3초 동안 시대를 못 바꿔요'), 2.2);
         }
       } else {
         f.meter = Math.max(0, f.meter - dt * 1.5);
@@ -164,9 +164,9 @@ function explode(b, K) {
     // 오늘 그 자리에 있던 것은 떨어진다
     for (const o of K.enemies()) {
       if (!o.alive || o.era !== 'now' || !fresh.some(([i, j]) => i === cellOf(o.x) && j === cellOf(o.z))) continue;
-      if (o.t2 && o.onCrater) o.onCrater(); else if (o.kind !== 'boss') { K.killFoe(o, 'fall'); if (o.kind === 'golem') K.toast(K.$t('어제의 폭발로 오늘 골렘 밑이 꺼졌어요'), 2.2); }
+      if (o.t2 && o.onCrater) o.onCrater(); else if (o.kind !== 'boss') { K.killFoe(o, 'fall'); if (o.kind === 'golem') say(K.$t('어제의 폭발로 오늘 골렘 밑이 꺼졌어요'), 2.2); }
     }
-    K.toast(K.$t('어제 터진 자리 — 오늘엔 구덩이예요'), 1.8);
+    say(K.$t('어제 터진 자리 — 오늘엔 구덩이예요'), 1.8);
   }
 }
 EXT.on('update', (dt, K) => {
@@ -198,7 +198,7 @@ EXT.foes['t2-sapper'] = {
     const C = Object.assign({}, SAP, { alarmMsg: '폭탄병이 알아챘어요 — 어제 터지면 오늘이 꺼져요' });
     const f = base(def, K, 't2-sapper', { base: 'guard', scale: 0.95, dagger: false, tint: { Armor: '#a86a2a', Shoulders: '#8a5420', Pants: '#3a2a1a' } }, C);
     const bag = new K.THREE.Mesh(new K.THREE.BoxGeometry(0.4, 0.45, 0.25), mat('#5a4030')); bag.position.set(0, 1.0, -0.3); f.holder.add(bag);
-    if (f.m) { const gb = ghostCopy(bag); gb.visible = true; f.m.ghost.add(gb); }
+    if (f.m) ghostProp(f, bag);
     f.throwT = 1.2;
     place(f);
     f.update = dt => {
@@ -210,7 +210,8 @@ EXT.foes['t2-sapper'] = {
       f.throwT = Math.max(0, f.throwT - dt);
       if (f.state === 'alert' && h) {
         turnTo(f, S.p.x, S.p.z, dt, 5);
-        if (seen && f.throwT <= 0 && d < C.range + 2) { throwBomb(f, K); f.throwT = C.throwCd; if (f.ani) f.ani.once(CLIP.atk, { speed: 1.4, dur: 0.5 }); }
+        // 제 발밑엔 안 던진다(폭발 1.9m + 1m 안이면 물러서기만) — 11/15 박자 봇이 폭탄병에 붙어 있으면 제 폭탄에 휘말려 방이 깨졌다
+        if (seen && f.throwT <= 0 && d < C.range + 2 && d > C.blast + 1.0) { throwBomb(f, K); f.throwT = C.throwCd; if (f.ani) f.ani.once(CLIP.atk, { speed: 1.4, dur: 0.5 }); }
         if (d < C.keep) { const u = Math.max(d, 0.01); moveTo(f, f.x - (S.p.x - f.x) / u * 2, f.z - (S.p.z - f.z) / u * 2, C.run, dt, 0); play(f, CLIP.run, 0.15); }
         else play(f, CLIP.idle, 0.2);
       } else if (f.state === 'alert') play(f, CLIP.idle, 0.2);
@@ -219,8 +220,19 @@ EXT.foes['t2-sapper'] = {
       place(f);
     };
     f.view = () => viewCommon(f, C.range, C.half);
+    // 2차 고칠 것(11/15): Shift를 박자로만 누르는 봇이 폭탄병 곁에 넘어와 찔러 7~10초에 깼다(폭탄 심지는 어제만 타서, 오가면 폭탄도 안 터짐)
+    // → 넘어오며 찌르기는 '준비된 전환'만. 같은 시대 앞에서 찌르기(가까이선 약함)도 시대를 흔들며 다가왔으면 뒤로 뛰어 피한다
+    const hop = () => {
+      const S = K.S, d = Math.max(pdist(f), 0.01), bx = f.x - (S.p.x - f.x) / d * 2.6, bz = f.z - (S.p.z - f.z) / d * 2.6;
+      const c = K.stand(f.era, cellOf(bx), cellOf(bz)) ? [bx, bz] : null;
+      if (c) { K.FX.dust(f.x, 0.2, f.z, { n: 6, color: K.FXC[f.era].dust }); f.x = c[0]; f.z = c[1]; }
+      if (f.state !== 'alert') alert(f);
+      f.yaw = Math.atan2(S.p.x - f.x, S.p.z - f.z); f.throwT = Math.min(f.throwT, 0.5); place(f);
+    };
     f.onStab = info => {
       const how = fromBehind(f, info, 70) ? 'back' : info.shift ? 'shift' : 'front';
+      const ok = how === 'back' || info.thrown || (how === 'shift' ? prepared() : !flickering());
+      if (!ok) { hop(); fail(); say(K.$t('폭탄병이 흔들림을 느끼고 물러났어요 — 가만히 다가가세요'), 1.8); return 'dodged'; }
       die(f, how, K.$t(how === 'front' ? '폭탄병은 가까이에선 약해요' : how === 'shift' ? '전환 기습!' : '등 뒤에서 한 방'));
       return 'kill-' + how;
     };
@@ -307,7 +319,7 @@ EXT.foes['t2-duelist'] = {
       if (!f.alive) return 'miss';
       if (open() && !info.thrown) { die(f, info.shift ? 'shift' : 'back', K.$t('막 넘어온 순간 — 되감지 못했어요!')); return 'kill'; }
       rewind(); fail();
-      K.toast(K.$t('되감았어요 — 다른 시대에 1초 있다가 넘어온 직후에만 통해요'), 2);
+      say(K.$t(T2.arrive && T2.arrive.wary ? '되감았어요 — 자꾸 오가서 알아챘어요, 3초 쉬었다 넘어오세요' : '되감았어요 — 다른 시대에 1초 있다가 넘어온 직후에만 통해요'), 2);
       return 'rewound';
     };
     f.boltHit = () => { rewind(); return true; };

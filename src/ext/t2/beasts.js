@@ -6,7 +6,7 @@
 //   쥐구멍: 오늘에 쥐를 계속 내보낸다. 어제의 같은 자리에서 E로 돌을 밀어 막으면 오늘의 구멍도 막혀 있다. 쥐는 한 번 찌르면 앞쪽 여러 마리.
 import { EXT } from '../../ext.js';
 import { T2, cellOf, C2, other, pdist, fwd, here, inFront, fromBehind, sees, los, turnTo, turnToYaw, moveTo, nextStep, nearestStand,
-  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, kill, thrownToStab } from './core.js';
+  fail, raiseAlarm, decal, ringGeo, discGeo, arcGeo, ghostCopy, ringPassed, mat, glowMat, blocked, killFx, t2Foes, prepared, flickering, kill, thrownToStab, say } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -63,8 +63,17 @@ EXT.foes['t2-hound'] = {
     // 내가 시대를 바꾸면: 깨어 있으면 0.7초 뒤 따라온다 (돌아오면 취소)
     f.onShift = (from, to) => {
       if (!f.alive || f.fallT > 0) return;
-      if (from === f.era && f.state === 'alert') f.follow = { t: C.follow, T: C.follow };
-      else if (to === f.era) f.follow = null;
+      // 11/15: 시간이 흔들리는 동안(경계 3초 — core.js waryFor)엔 따라오지 않고 제자리에서 버틴다.
+      // 박자·연타 봇이 띠 근처에서 마구 바꾸다 우연히 떨어뜨렸다(0.5초 봇이 하트 4개 잃고 21초에 깸). 사람은 발밑 고리가 하얄 때 바꾸면 된다
+      // (처음엔 '5초에 3번·같은 박자' 그 순간만 보고 넣었다가 정예 사냥개 둘 풀이가 막혀 뺐는데, '걸리면 3초 쉼'과 고리를 깨어 있는 사냥개 곁에서도 보이게 한 뒤 다시 넣음)
+      if (from === f.era && f.state === 'alert') {
+        if (flickering()) {
+          f.follow = null; S2.growl({ x: f.x, z: f.z });
+          if (!f.bracedMsg && pdist(f) < 9) { f.bracedMsg = true; say(K.$t('사냥개가 흔들림을 알아채고 버텨요 — 3초 쉬었다 바꾸세요'), 2.2); }
+          return;
+        }
+        f.follow = { t: C.follow, T: C.follow };
+      } else if (to === f.era) f.follow = null;
     };
     const landing = () => {
       const S = K.S, E = S.era, i = cellOf(f.x), j = cellOf(f.z);
@@ -78,7 +87,7 @@ EXT.foes['t2-hound'] = {
       f.era = K.S.era; f.follow = null; setEraLook();
       S2.timeJump({ x: f.x, z: f.z }); K.FX.motes(f.x, 0.5, f.z, { n: 18, color: ['#7fe8ff', '#ffffff'], speed: 2, up: 1.4, life: 0.6 });
       if (L.kind === 'pit') { f.fallT = 0.001; f.fall = true; S2.yelp({ x: f.x, z: f.z }); return; }
-      if (L.kind === 'dodge') { f.sniffed = true; S2.growl({ x: f.x, z: f.z }); K.toast(K.$t('정예 사냥개는 구덩이 냄새를 맡아요 — 한 번 더!'), 1.8); }
+      if (L.kind === 'dodge') { f.sniffed = true; S2.growl({ x: f.x, z: f.z }); say(K.$t('정예 사냥개는 구덩이 냄새를 맡아요 — 한 번 더!'), 1.8); }
       if (L.at) { f.x = C2(L.at[0]); f.z = C2(L.at[1]); }
       f.daze = L.kind === 'dodge' ? 0.8 : C.daze; f.wind = 0; f.rec = 0;
       f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z);
@@ -89,7 +98,7 @@ EXT.foes['t2-hound'] = {
       if (!f.alive) return;
       if (f.fallT > 0) { // 구덩이: 빙글 돌며 가라앉고 1초 뒤 사라짐
         f.fallT += dt; f.mk.root.position.y = -9 * f.fallT * f.fallT; f.mk.root.rotation.z += dt * 6;
-        if (f.fallT > 1.0) { f.mk.root.visible = false; kill(K, f, 'fall'); K.toast(K.$t('사냥개가 구덩이에 떨어졌어요'), 1.6); }
+        if (f.fallT > 1.0) { f.mk.root.visible = false; kill(K, f, 'fall'); say(K.$t('사냥개가 구덩이에 떨어졌어요'), 1.6); }
         return;
       }
       if (f.follow) { if (S.era === f.era) f.follow = null; else { f.follow.t -= dt; if (f.follow.t <= 0) arrive(); } return; }
@@ -161,7 +170,7 @@ EXT.foes['t2-hound'] = {
       for (let k = 0; k < 6; k++) moveTo(f, bx, bz, 8, 1 / 30, 0);
       f.daze = 0.25; f.wind = 0; S2.growl({ x: f.x, z: f.z });
       K.FX.dust(f.x, 0.2, f.z, { n: 6, color: K.FXC[f.era].dust });
-      K.toast(K.$t('사냥개는 칼을 피해요 — 한쪽 시대에만 있는 구덩이로 꾀어내세요'), 2);
+      say(K.$t('사냥개는 칼을 피해요 — 한쪽 시대에만 있는 구덩이로 꾀어내세요'), 2);
       fail();
       return 'dodged';
     };
@@ -236,7 +245,7 @@ EXT.foes['t2-mimic'] = {
       f.gone = true; f.mk.g.visible = false;
       K.FX.dust(f.x, 0.3, f.z, { n: 14, color: K.FXC.now.dust }); K.FX.debris(f.x, 0.6, f.z, { n: 6, color: ['#4f4232', '#3a3226'], speed: 2, up: 3, size: 0.12 });
       S2.mimicWake({ x: f.x, z: f.z });
-      kill(K, f, how); if (msg) K.toast(msg, 2.4);
+      kill(K, f, how); if (msg) say(msg, 2.4);
     };
     const wake = () => { if (f.state === 'alert') return; f.state = 'alert'; f.farT = 0; S2.mimicWake({ x: f.x, z: f.z }); K.S.shake = Math.max(K.S.shake, 0.15); fail(); };
     f.update = dt => {
@@ -308,7 +317,7 @@ EXT.foes['t2-mimic'] = {
       ch.pushT = 0;
       const ti = ch.i + dir[0], tj = ch.j + dir[1];
       const busy = K.crates.some(c => c.i === ti && c.j === tj && !c.sunk) || chests.some(o => o !== ch && !o.sunk && o.i === ti && o.j === tj);
-      if (busy || K.solid('past', ti, tj)) { if (!ch.warned) { ch.warned = true; K.toast(K.$t('그쪽으로는 안 밀려요')); } return; }
+      if (busy || K.solid('past', ti, tj)) { if (!ch.warned) { ch.warned = true; say(K.$t('그쪽으로는 안 밀려요')); } return; }
       ch.warned = false;
       ch.i = ti; ch.j = tj; K.sfx.scrape({ x: C2(ti), z: C2(tj) });
       K.FX.dust(C2(ti), 0.2, C2(tj), { n: 6, color: K.FXC.past.dust, speed: 1, up: 0.6, size: 0.45, alpha: 0.4 });
@@ -326,7 +335,8 @@ EXT.foes['t2-mimic'] = {
 EXT.on('update', (dt) => { for (const c of chests) if (c.tryPush) c.tryPush(dt); });
 
 /* ───────── 쥐구멍 · 쥐 떼 ───────── */
-const NEST = { every: 1.7, max: 6, total: 14, start: 3, sealR: 1.7 };
+// sealR = 금빛 고리 반지름, reach = E가 먹는 거리(중심에서). 11/15 T1 보고: 고리 앞 1.5m에서 E가 안 먹고 고리를 밟아야 했다 → 고리 바로 바깥까지
+const NEST = { every: 1.7, max: 6, total: 14, start: 3, sealR: 1.7, reach: 2.6 };
 const NEST_E = { every: 1.1, max: 8, total: 20, start: 4 };
 const RAT = { run: 3.7, r: 0.22, bite: 0.55, gnaw: 1.1, kill: 1.8, killHalf: rad(55) };
 let gnaw = 0, gnawSnd = 0;
@@ -381,7 +391,7 @@ export function spawnRat(K, nest, x, z, look = 'rat') {
       const dx = o.x - S.p.x, dz = o.z - S.p.z, dd = Math.hypot(dx, dz);
       if (o === f || (dd < RAT.kill && (dx * fx + dz * fz) / Math.max(dd, 0.01) > Math.cos(RAT.killHalf))) { ratDie(K, o); n++; }
     }
-    if (n > 1) K.toast(K.$t(f.look === 'spider' ? '새끼 거미 {0}마리를 한 번에' : '쥐 {0}마리를 한 번에', n), 1);
+    if (n > 1) say(K.$t(f.look === 'spider' ? '새끼 거미 {0}마리를 한 번에' : '쥐 {0}마리를 한 번에', n), 1);
     return 'kill-front';
   };
   f.boltHit = () => { ratDie(K, f); return true; };
@@ -444,9 +454,9 @@ EXT.foes['t2-nest'] = {
       f.ghost.visible = f.alive && away && ringPassed(f.x, f.z);
       // 어제에서 막을 자리(금빛 고리) — 가까이 가면 밝게
       f.mark.visible = f.alive && S.era === 'past';
-      if (f.mark.visible) { const near = pdist(f) < C.sealR; f.mark.material.opacity = near ? 0.65 : 0.3 + 0.1 * Math.sin(S.time * 3); }
+      if (f.mark.visible) { const near = pdist(f) < C.reach; f.mark.material.opacity = near ? 0.75 : 0.3 + 0.1 * Math.sin(S.time * 3); }
     };
-    f.onStab = () => { K.toast(K.$t('쥐구멍은 찔러도 소용없어요 — 어제 같은 자리에서 E로 막으세요'), 2); return 'blocked'; };
+    f.onStab = () => { say(K.$t('쥐구멍은 찔러도 소용없어요 — 어제 같은 자리에서 E로 막으세요'), 2); return 'blocked'; };
     f.seal = () => {
       if (!f.alive) return;
       f.sealed = true;
@@ -454,12 +464,12 @@ EXT.foes['t2-nest'] = {
       f.hole.visible = false; f.lid.visible = true; f.ghost.visible = false; f.mark.visible = false;
       S2.seal({ x: f.x, z: f.z }); K.FX.dust(f.x, 0.2, f.z, { n: 12, color: K.FXC.past.dust });
       kill(K, f, 'sealed');
-      K.toast(K.$t('어제 막은 구멍 — 오늘엔 쥐가 더 안 나와요'), 2.2);
+      say(K.$t('어제 막은 구멍 — 오늘엔 쥐가 더 안 나와요'), 2.2);
     };
     return f;
   },
 };
-const nearNest = K => { const S = K.S; if (S.era !== 'past' || S.falling > 0 || S.trans || S.down) return null; return t2Foes().find(o => o.kind === 't2-nest' && o.alive && pdist(o) < (o.elite ? NEST_E.sealR || NEST.sealR : NEST.sealR)) || null; };
+const nearNest = K => { const S = K.S; if (S.era !== 'past' || S.falling > 0 || S.trans || S.down) return null; return t2Foes().find(o => o.kind === 't2-nest' && o.alive && pdist(o) < NEST.reach) || null; };
 EXT.on('prompt', () => (nearNest(T2.K) ? T2.K.$t('E 쥐구멍 막기 (오늘의 구멍도 막혀요)') : undefined));
 EXT.on('interact', () => { const n = nearNest(T2.K); if (!n) return undefined; n.seal(); return 'seal'; });
 // 사냥개는 shift 훅으로 따라온다

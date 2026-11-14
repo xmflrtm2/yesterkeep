@@ -5,7 +5,7 @@
 //   망령: 한 시대(기본 오늘)에 있고 그 시대에선 거의 안 보인다(서리 알갱이·속삭임만). 다른 시대에서 보면 붉게 또렷하다.
 //         벽을 지나 다가와 닿으면 아프다. 칼은 그냥 지나간다. 그 시대로 넘어오는 순간 몸이 겹치면(푸른 원 안) 흩어진다.
 import { EXT } from '../../ext.js';
-import { T2, cellOf, C2, other, pdist, here, fromBehind, turnToYaw, decal, ringGeo, discGeo, ghostCopy, ringPassed, mat, glowMat, killFx, t2Foes, fail, prepared, stayHere, kill, thrownToStab } from './core.js';
+import { T2, cellOf, C2, other, pdist, here, fromBehind, turnToYaw, decal, ringGeo, discGeo, ghostCopy, ringPassed, mat, glowMat, killFx, t2Foes, fail, prepared, stayHere, readyNow, kill, thrownToStab, say } from './core.js';
 import { S2 } from './sfx.js';
 
 const N = k => k;
@@ -83,7 +83,7 @@ EXT.foes['t2-echo'] = {
       const ci = cellOf(f.x), cj = cellOf(f.z);
       if (K.ch(f.era, ci, cj) === 'p') {
         const hold = (S.room && S.room.gateHold) || 2.6;
-        if (S.gateT < hold - 0.05) { if (S.gateT <= 0) { K.sfx.plate({ x: f.x, z: f.z }); K.toast(K.$t('메아리가 발판을 밟았어요')); } S.gateT = hold; }
+        if (S.gateT < hold - 0.05) { if (S.gateT <= 0) { K.sfx.plate({ x: f.x, z: f.z }); say(K.$t('메아리가 발판을 밟았어요')); } S.gateT = hold; }
       }
       place();
     };
@@ -105,7 +105,12 @@ EXT.foes['t2-echo'] = {
       if (f.alive && f.out && !away) { f.mist -= dt; if (f.mist <= 0) { f.mist = 0.12; K.FX.motes(f.x, 0.9, f.z, { n: 2, color: elite ? ['#ffd28a'] : ['#9ff4ff'], speed: 0.4, up: 0.6, life: 0.6, size: 0.12 }); } }
     };
     f.onStab = info => {
-      if (!f.out) return 'miss';
+      if (!f.out) {
+        // 나오기 전에 찌르면 헛친다 — 알림이 없어 헛친 줄 몰랐다(11/15 T1 보고) → 고리를 반짝이고 한 줄
+        K.FX.motes(f.x, 0.4, f.z, { n: 8, color: ['#9ff4ff', '#ffffff'], speed: 1.2, up: 0.8, life: 0.5 });
+        say(K.$t('메아리는 아직 안 나왔어요 — 고리가 다 줄어들면 나와요'), 1.6);
+        return 'miss';
+      }
       if (fromBehind(f, info, 70)) {
         if (!kill(K, f, 'back')) return 'armor';
         f.holder.visible = false; f.ghost.visible = false;
@@ -115,7 +120,7 @@ EXT.foes['t2-echo'] = {
       }
       K.FX.motes(f.x, 1, f.z, { n: 10, color: ['#9ff4ff'], speed: 2, up: 1, life: 0.5 }); S2.echoHum({ x: f.x, z: f.z });
       fail();
-      K.toast(K.$t('메아리는 등 뒤에서만 — 내가 지나온 길로 앞질러 가세요'), 1.8);
+      say(K.$t('메아리는 등 뒤에서만 — 내가 지나온 길로 앞질러 가세요'), 1.8);
       return 'blocked';
     };
     f.revive = () => { f.alive = true; f.counted = false; f.h -= C.delay; K.S.kills = Math.max(0, K.S.kills - 1); };
@@ -185,7 +190,7 @@ EXT.foes['t2-wraith'] = {
       f.kill.visible = f.killFill.visible = showK;
       if (showK) {
         // 고리는 이 시대에 온 지 PREP초 동안 안쪽에서부터 차오른다 → 다 차야 겹쳐 넘어올 때 흩어진다 (연타 방지가 눈에 보이게)
-        const inside = d < C.killR, arm = Math.min(1, stayHere() / T2.PREP);
+        const R = readyNow(), inside = d < C.killR, arm = R.wary ? 0.2 : R.arm; // 흔들림·같은 박자면 덜 찬 채 (넘어와도 안 흩어짐)
         f.kill.position.set(f.x, 0.1, f.z); f.kill.scale.setScalar(C.killR * (0.35 + 0.65 * arm)); f.kill.material.opacity = arm < 1 ? 0.3 : inside ? 0.9 : 0.5;
         f.killFill.position.set(f.x, 0.09, f.z); f.killFill.scale.setScalar(C.killR * arm); f.killFill.material.opacity = arm < 1 ? 0.04 : inside ? 0.25 + 0.1 * Math.sin(S.time * 10) : 0.07;
       }
