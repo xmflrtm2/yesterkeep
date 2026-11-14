@@ -174,17 +174,38 @@ EXT.on('roomLoad', (room, k) => {
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
   drawUi();
 });
+// 2차(11/15) 런의 모래 바닥: 이 조각을 풀려면 어제에 연달아 pastRun초쯤 있어야 한다(조각마다 chunks.js PAST_RUN).
+// 모래가 바닥이면 오늘에서 3초까지만 차오르므로, 모자란 채로 들어오거나 R로 다시 하면 '풀 만큼'까지만 채운다(그 이상은 안 줌)
+export const SANDFLOOR = { on: true, mul: 1.25, add: 1, cap: 12 };
+export const sandNeed = room => room && room.pastRun ? Math.min(SANDFLOOR.cap, Math.ceil(room.pastRun * SANDFLOOR.mul + SANDFLOOR.add)) : 0;
+EXT.on('roomEnter', room => {
+  const run = EXT.run, need = sandNeed(room);
+  if (!SANDFLOOR.on || need <= 3 || !run || !run.active || !run.active() || !run.addSand) return;
+  const have = run.sand();
+  if (have + 0.05 < need && run.addSand(need - have, 't3-puzzle') > 0.05) {
+    // R로 다시 하면 main.js의 "방을 처음부터"가 곧바로 덮으므로 조금 뒤에 띄운다
+    const r = EXT.K.S.room; setTimeout(() => { if (EXT.K.S.room === r) EXT.K.toast($t('풀 만큼 모래를 채웠어요 ({0}초)', need), 2.6); }, 900);
+  }
+});
 EXT.on('update', (dt, k) => {
   if (!live() || !C.has) return;
   C.t += dt;
   for (const m of MECHS) if (m.update) m.update(C.d[m.id], dt, k);
+  // 2차: 내 장치 칸의 바닥이 사라지면(물이 차오름·뿌리 다리가 사라짐·바닥이 무너짐) 그 위에 서 있던 사냥개는 떨어진다.
+  // 사냥개는 시대를 따라올 때만 발밑을 보므로(T2 beasts.js), 다른 시대에서 바꿔 두고 돌아오면 그대로 서 있었다
+  for (const f of k.extFoes) {
+    if (f.kind !== 't2-hound' || !f.alive || f.fall || f.fallT > 0 || f.follow || f.era !== k.S.era) continue;
+    const i = Math.floor(f.x / 2), j = Math.floor(f.z / 2);
+    if (at(f.era, i, j) && !k.floorAt(f.era, i, j)) { f.fallT = 0.001; f.fall = true; k.FX.dust(f.x, 0.2, f.z, { n: 12, color: k.FXC[f.era].dust, speed: 2, up: 1.5, size: 0.5 }); }
+  }
   // 추락은 hurt 훅이 안 오므로 여기서 센다
   const f = k.S.falling > 0;
   if (f && !wasFalling) addFail();
   wasFalling = f;
   if (C.dirty) { C.dirty = false; k.buildGhosts(); }
   // 막다른 길 알아채기 (보이는 상태에서 출구까지 갈 길이 하나도 없으면 R 안내)
-  if (solverMod && !busy()) {
+  // 발밑이 막 꺼진 프레임(떨어지기 직전)에는 계산을 시작하지 않는다 — 그 자리에서 "어제로 건널 수 있다"고 기억해 버려 되감긴 뒤에도 막힘을 못 알렸다(11/15)
+  if (solverMod && !busy() && k.stand(k.S.era, Math.floor(k.S.p.x / 2), Math.floor(k.S.p.z / 2))) {
     const v = solverMod.stuckTick(3); // 세상이 바뀌었을 때만 다시 풀고, 한 프레임에 3ms씩만
     if (v === true && !C.stuck) { C.stuck = true; k.toast($t('길이 막혔어요 — R로 다시 시작'), 3.2); addFail(); }
     else if (v === false) C.stuck = false;

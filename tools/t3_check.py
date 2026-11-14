@@ -1,7 +1,7 @@
 """T3 퍼즐 조각 점검 — 화면 없는 크롬에서 src/ext/t3/dev.js를 불러 조각마다:
   ① 풀이기: 처음 상태에서 최소 몇 번 장치를 써야 출구에 닿는지(상자 밀기 포함), 장치 없이 깨지면 '너무 쉬움'
   ② 봇 풀이: chunks.js의 solve 단계를 진짜 KeyboardEvent로 (시간은 __yk.step), 성공·걸린 게임 시간·잃은 하트
-  ③ 게으른 봇 셋(각 40초): 가만히 / 0.5초마다 Shift + 아무 데나 걷기 / 아무 데나 걷기 + Shift·E 막 누르기 → 깨면 안 됨
+  ③ 게으른 봇 다섯(각 40초): 가만히 / 0.5초마다 Shift + 아무 데나 걷기 / 막 누르기 / 출구로 돌진(가까운 적 찌르기) / 적 둘레 빙빙(등이면 찌르기) → 깨면 안 됨
 
     py -I tools\t3_check.py            -> 표 + 끝 코드(문제 있으면 1)
     py -I tools\t3_check.py t3-garden  -> 한 조각만
@@ -50,18 +50,23 @@ async def main():
                         break
                 except Exception:
                     pass
-            rows = json.loads(await asyncio.wait_for(c.eval(JS.replace('IDS', json.dumps(ids))), 1800))
+            all_ids = ids or json.loads(await c.eval("import('/src/ext/t3/dev.js').then(async m => { await m.default.ready(); return JSON.stringify(m.default.ids()); })"))
+            rows = []
+            for cid in all_ids:  # 조각마다 따로 (한 번에 다 하면 호출 하나가 30분을 넘는다)
+                rows += json.loads(await asyncio.wait_for(c.eval(JS.replace('IDS', json.dumps([cid]))), 900))
+                print('.', end='', flush=True)
+            print()
             pump.cancel()
     finally:
         subprocess.run(['taskkill', '/T', '/F', '/PID', str(ch.pid)], capture_output=True); httpd.shutdown()
     bad = 0
-    print(f"{'조각':16} {'tier':>4} {'최소 행동':>8} {'봇':>4} {'봇 시간':>7} {'하트':>4}  게으른 봇(가만/연타/막누름)  비고")
+    print(f"{'조각':16} {'tier':>4} {'최소 행동':>8} {'봇':>4} {'봇 시간':>7} {'하트':>4}  게으른 봇(가만/연타/막누름/돌진/빙빙)  비고")
     for r in rows:
         v, b = r['solver'], r['bot']
         lazy = ' '.join('깸!' if z['exited'] else '못깸' for z in r['lazy'])
         problems = []
         if not v.get('ok'): problems.append('풀이기 못 풂')
-        if v.get('ok') and v.get('actions') == 0 and v.get('tier', 1) > 1 and not v.get('timing'): problems.append('장치 없이 깨짐')  # timing 조각은 박자·멈추기로 푸는 게 의도
+        if v.get('ok') and v.get('actions') == 0 and v.get('tier', 1) > 1 and not v.get('timing') and not v.get('combat'): problems.append('장치 없이 깨짐')  # timing 조각은 박자·멈추기로 푸는 게 의도, combat 조각은 장치가 적을 다루는 데 쓰여 풀이기(적을 안 봄)엔 0이 정상
         if not b['ok']: problems.append('봇 실패: ' + str(b.get('fail')))
         if any(z['exited'] for z in r['lazy']): problems.append('게으른 봇이 깸')
         if r['errs']: problems.append('오류 ' + '; '.join(r['errs'])[:120])

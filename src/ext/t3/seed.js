@@ -73,10 +73,10 @@ function actBed(b, k) {
   if (b.planted) {
     b.planted = false; C.inv.seed++; markDirty();
     S3.dig(p); k.FX.dust(p.x, 0.2, p.z, { n: 12, color: ['#6b4a2e', '#8a6a44'], speed: 1.6, up: 1.2, size: 0.5 });
-    k.toast($t('씨앗을 캐냈어요 — 오늘의 나무도 사라져요'), 2.2);
+    k.toast($t('캐냈어요 — 오늘의 나무도 사라져요'), 2.2);
     return 'dug';
   }
-  if (C.inv.seed <= 0) { S3.locked(p); k.toast($t('씨앗이 없어요 — 오늘의 폐허를 찾아보세요'), 2.6); return 'noseed'; }
+  if (C.inv.seed <= 0) { S3.locked(p); k.toast($t('씨앗이 없어요 — 오늘 폐허에서 찾아요'), 2.6); return 'noseed'; }
   b.planted = true; C.inv.seed--; markDirty();
   S3.plant(p);
   k.FX.dust(p.x, 0.15, p.z, { n: 10, color: ['#6b4a2e', '#8a6a44'], speed: 1.2, up: 1, size: 0.45 });
