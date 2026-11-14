@@ -39,14 +39,16 @@ export function normalize(src, meta = {}) {
 }
 
 // 좌표 바꾸기 (조각 안 좌표 → 새 좌표). def 안의 at·path·face, 조각의 start·exit·shards, 박자 함수, 그리고 조각이 준 remap()
+// 적 정의 안의 좌표 목록(2차: T2 마법사 blink = 순간이동 자리)
+const DEF_LISTS = ['path', 'blink'];
 function mapDefs(c, f, faceF) {
   for (const k of COORD_DEFS) for (const d of c[k]) {
-    if (d.path) d.path = d.path.map(([i, j]) => f(i, j));
+    for (const L of DEF_LISTS) if (Array.isArray(d[L])) d[L] = d[L].map(([i, j]) => f(i, j));
     if (d.at) d.at = f(d.at[0], d.at[1]);
     if (d.face != null && faceF) d.face = faceF(d.face);
   }
   for (const e of c.extra) for (const k of COORD_DEFS) for (const d of e[k] || []) {
-    if (d.path) d.path = d.path.map(([i, j]) => f(i, j));
+    for (const L of DEF_LISTS) if (Array.isArray(d[L])) d[L] = d[L].map(([i, j]) => f(i, j));
     if (d.at) d.at = f(d.at[0], d.at[1]);
     if (d.face != null && faceF) d.face = faceF(d.face);
   }
@@ -58,8 +60,13 @@ function mapDefs(c, f, faceF) {
 }
 
 /** 좌우 뒤집기. 얼굴 방향(도): 0 = 남, 90 = 동 → 뒤집으면 -90 */
+// 좌우로 뒤집을 때 함께 바꿀 방향 글자 (2차: T3 거울 '/'·'\'를 안 바꿔 달빛이 엉뚱하게 꺾였다). 다른 트랙은 EXT.flipChars에 더하면 된다
+export const FLIP_CHARS = { '/': '\\', '\\': '/' };
+let extFlip = null;
+export function setFlipChars(t) { extFlip = t; }
+const flipRow = r => [...r].reverse().map(ch => (extFlip && extFlip[ch]) || FLIP_CHARS[ch] || ch).join('');
 export function flip(c0) {
-  const c = { ...c0, past: c0.past.map(r => [...r].reverse().join('')), now: c0.now.map(r => [...r].reverse().join('')) };
+  const c = { ...c0, past: c0.past.map(flipRow), now: c0.now.map(flipRow) };
   for (const k of COORD_DEFS) c[k] = clone(c0[k]);
   c.shards = clone(c0.shards); c.extra = clone(c0.extra);
   const W = c.w;

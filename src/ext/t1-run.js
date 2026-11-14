@@ -5,7 +5,7 @@
 import { EXT } from '../ext.js';
 import './t1/en.js';
 import { makeRng, newSeed } from './t1/rng.js';
-import { flip, canJoin, join, vary, toRoom, reachCheck } from './t1/gen.js';
+import { flip, canJoin, join, vary, toRoom, reachCheck, setFlipChars } from './t1/gen.js';
 import { library, byId } from './t1/chunks.js';
 import { TYPES, ROWS, genFloor, choices, mapHtml } from './t1/map.js';
 import { UI, SND } from './t1/ui.js';
@@ -32,10 +32,20 @@ const mustJoin = (c, floor, row) => c.think === 0 || THINK0.has(c.id) || (floor 
 export const SAND = { max: 16, start: 16, shard: 3, kill: 1.0, elite: 3, floorBonus: 5, reserve: 5, trickle: 0.3, enterMin: 0.35, low: 4,
   // 성채지기 방: 싸움 자체가 시대 전환이라 모래가 바닥나면 이길 길이 없었다(11/13 봇: 모래 0 → 150초 동안 4번만 맞힘, 런 끝)
   // → 이 방에서는 0.6배로 줄고, 성채지기를 맞힐 때마다 모래가 쏟아진다(+4)
-  bossDrain: 0.6, bossHit: 4 };
+  bossDrain: 0.6, bossHit: 4,
+  // 문지기 칸(1·2층 끝): 11/16 직접 플레이 — 오늘에서 5초까지만 차오른 채 쌍둥이 앞에 서서 싸움 중 모래가 2초까지 떨어졌다 → 들어설 때(R도) 최소 8초
+  guardMin: 8 };
 const CHALLENGE = new Set(['combat', 'puzzle', 'elite', 'guard']);
 EXT.stats.sandMax = EXT.stats.sandMax ?? SAND.max;   // T4가 늘리거나 줄인다
 EXT.stats.sandDrain = EXT.stats.sandDrain ?? 1;      // T4가 바꾼다 (0.8 = 20% 느리게 줄어듦)
+// 좌우 뒤집기 때 바꿀 방향 글자 — 다른 트랙이 { 'a': 'b', 'b': 'a' }처럼 더한다(T1 기본: 거울 '/'↔'\')
+EXT.flipChars = EXT.flipChars || {}; setFlipChars(EXT.flipChars);
+// T4 꼴로 등록된 보물·상점·쉼터의 지도 설명 (2차: T4 방인데 지도엔 T1 임시 방 설명이 떠 맞지 않았다 — T4 문서 11장 기준)
+const T4_DESC = {
+  treasure: N('제단에서 유물·축복 셋 중 하나 (건너뛰면 금화 +4)'),
+  shop: N('금화로 유물·하트·모래를 사요'),
+  rest: N('하트 2개 회복 또는 유물 강화 — 모래는 가득'),
+};
 
 let K = null;
 let st = null;            // 런 상태 (저장되는 것)
@@ -194,6 +204,8 @@ function buildNodeRoom(node, resume = false) {
     // 2차: 런에서는 시작 칸이 오늘에도 서 있을 수 있으면 오늘에서 시작 — 어제에서 시작하면 방을 읽는 동안 모래가 줄었다(11/15 직접 플레이: 가라앉은 열쇠·달과 물의 방)
     if (room.startEra === 'past') { const j = room.now.findIndex(r => r.includes('@')), i = j >= 0 ? room.now[j].indexOf('@') : -1; const below = i >= 0 ? (built.c.now[j] || '')[i] : null; if (below && '.,%='.includes(below) || below === '@') room.startEra = 'now'; }
     setHints(room);
+    // 적 없는 함정 방(가시·화살·칼날뿐): 함정에 맞으면 방을 처음부터 — 2차: Shift 연타 봇이 '가시 회랑'을 하트 2개 내고 조금씩 전진해 밀고 지나갔다
+    room.t1trap = !(room.guards || []).length && !(room.golems || []).length && !(room.foes || []).length && /[\^$AY]/.test(room.past.join(''));
     const tparts = (room.t1parts || []).filter(p => /^(t1|tut)-/.test(p.id));
     addRubble(room, f, makeRng(st.seed, 'rubble', f, node.row, node.col), (i, j) => tparts.some(p => i >= p.x && i < p.x + p.w && j >= p.y && j < p.y + p.h));
     st.recipe = rec;
@@ -445,6 +457,7 @@ EXT.on('roomLoad', room => {
   }
   if (m.kind === 'landing' && m.floor > 1 && !restart && !R.warned['f' + m.floor]) { R.warned['f' + m.floor] = 1; SND.floor(K); }
   // 쉼터 칸: 모래는 T1 몫이라 들어서면 가득 (T4 모닥불은 하트·유물 강화만 — 11/15 합친 판 직접 플레이에서 모래가 안 차서)
+  if (m.kind === 'node' && m.type === 'guard' && !room.boss && st.sand < SAND.guardMin) { const got = addSand(SAND.guardMin - st.sand, 'guard'); if (got > 0.05) setTimeout(() => { if (K.S.room === room) K.toast($t('문지기 앞 — 모래를 {0}초까지 채웠어요', SAND.guardMin), 2.4); }, 900); }
   if (m.kind === 'node' && m.type === 'rest' && !restart && st.sand < sandMax()) { const got = addSand(sandMax(), 'rest'); if (got > 0.05) K.toast($t('모닥불 곁에서 모래가 차올라요 (+{0}초)', got.toFixed(1)), 2); }
   EXT.emit('roomEnter', room, m, st);
 });
@@ -452,6 +465,12 @@ EXT.on('update', dt => {
   if (UI.open || R.waiting) { K.freeze(true); const tr = K.S.trans; if (tr && !tr.loaded) tr.t = Math.min(tr.t, 0.3); return; }
   if (R.mode !== 'run' || !R.cur || !st) return;
   const S = K.S, m = R.cur.t1;
+  if (R.trapReset && !S.down) { // 함정 방: 맞으면 처음부터 — 실패 횟수와 이미 열린 안내는 이어 간다 (loadRoom이 0으로 되돌려서 안내가 안 열렸음)
+    R.trapReset = false; const fails = S.roomFails, tipShown = S.tipShown;
+    K.restartRoom(false); S.roomFails = fails;
+    if (tipShown && S.room.tip) { S.tipShown = true; K.hud.hint.textContent = $t(S.room.tip); K.hud.hint.classList.add('tip'); }
+    K.toast($t('함정 방은 맞으면 처음부터예요'), 2.2); return;
+  }
   st.stats.time += dt;
   R.saveT = (R.saveT || 0) + dt; if (R.saveT > 3) { R.saveT = 0; saveLive(); }
   if (S.got.size > R.gotN) { // main.js의 "모래시계 조각 n / 튜토리얼 합계" 알림 대신 (런에서는 그 합계가 틀림)
@@ -556,7 +575,7 @@ EXT.on('death', () => {
 });
 // 2차: 방 안에서도 하트·모래를 저장(맞을 때·처치할 때·3초마다). 전엔 방에 들어올 때만 저장해서, 창을 닫았다 열면 들어올 때의 하트·모래로 되돌아가는 구멍이 있었다
 function saveLive() { if (R.mode !== 'run' || !st || st.pending || !R.cur) return; st.hearts = K.S.hearts; save(); }
-EXT.on('hurt', () => { if (R.mode === 'run' && st) { st.stats.hurts++; saveLive(); } });
+EXT.on('hurt', () => { if (R.mode === 'run' && st) { st.stats.hurts++; saveLive(); if (R.cur && R.cur.t1trap) R.trapReset = true; } });
 EXT.on('shift', () => { if (R.mode === 'run' && st) st.stats.shifts++; });
 EXT.on('kill', foe => {
   if (R.mode !== 'run' || !st || !R.cur || R.cur.t1.kind !== 'node') return;
@@ -602,6 +621,7 @@ EXT.run = {
   registerRoomType(type, fn, m) {
     ROOMTYPES[type] = fn;
     if (fn && typeof fn === 'object' && !m && fn.meta) m = fn.meta;
+    if (fn && typeof fn === 'object' && !m && T4_DESC[type]) m = { desc: fn.desc || T4_DESC[type] };
     if (m) { TYPES[type] = { ...(TYPES[type] || { icon: '?', name: type, desc: '', color: '#ccc' }), ...m }; if (m.rows && !['treasure', 'shop', 'rest', 'combat', 'puzzle', 'elite', 'guard', 'boss'].includes(type)) EXTRA_TYPES[type] = { rows: m.rows, weight: m.weight ?? 1 }; }
   },
   meta: { get: meta, add(n) { const M = meta(); M.memory += n; ls.set(KEY.meta, M); return M.memory; }, spend(n) { const M = meta(); if (M.memory < n) return false; M.memory -= n; ls.set(KEY.meta, M); return true; } },
@@ -619,6 +639,17 @@ EXT.run = {
       const node = R.rows.flat().find(n => n.type === type) || { type, row: type === 'boss' || type === 'guard' ? 4 : 1, col: 0 };
       st.pos = { row: node.row, col: node.col };
       startRoomNow(buildNodeRoom(node));
+      return K.S.room.id;
+    },
+    // 시험용: 조각 하나를 런 방으로 바로 연다 (뒤집기 fa, 변형은 시드대로). 예) _dev.jumpChunk('tut-spikes', 1, 'x')
+    jumpChunk(id, floor = 1, seed, fa = false) {
+      if (!st || seed) enterRun(seed || newSeed());
+      UI.close(true);
+      const A = byId(EXT, id); if (!A) return null;
+      st.floor = floor; R.rows = genFloor(st.seed, floor, EXTRA_TYPES);
+      const node = { type: A.tags.includes('puzzle') && !A.tags.includes('combat') ? 'puzzle' : 'combat', row: 1, col: 0 };
+      st.pos = { row: 1, col: 0 }; st.recipe = { a: id, fa, b: null, fb: false, dir: null, tier: A.tier || 1, type: node.type };
+      startRoomNow(buildNodeRoom(node, true));
       return K.S.room.id;
     },
     // 시드 여러 개로 세 층의 모든 칸을 만들어 보고 대강의 풀림 검사 (런 상태는 그대로 돌려놓음)
