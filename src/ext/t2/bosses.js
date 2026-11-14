@@ -28,7 +28,13 @@ const bossSand = () => { if (inRun() && EXT.run.addSand) EXT.run.addSand(1.5, 'b
 function pipTex(K, hp, max, color) {
   const c = document.createElement('canvas'); c.width = 128; c.height = 32;
   const x = c.getContext('2d');
-  for (let k = 0; k < max; k++) { const cx = 64 + (k - (max - 1) / 2) * 30; x.beginPath(); x.arc(cx, 16, 11, 0, 6.29); x.fillStyle = k < hp ? color : 'rgba(40,40,40,0.8)'; x.fill(); x.lineWidth = 3; x.strokeStyle = '#000'; x.stroke(); }
+  // T5: 성채지기 HUD와 같은 보석 점 (마름모 + 위쪽 빛)
+  for (let k = 0; k < max; k++) {
+    const cx = 64 + (k - (max - 1) / 2) * 30, on = k < hp;
+    x.beginPath(); x.moveTo(cx, 3); x.lineTo(cx + 13, 16); x.lineTo(cx, 29); x.lineTo(cx - 13, 16); x.closePath();
+    if (on) { const gr = x.createLinearGradient(cx - 10, 4, cx + 10, 28); gr.addColorStop(0, '#ffe2c0'); gr.addColorStop(0.28, color); gr.addColorStop(1, '#4a1410'); x.fillStyle = gr; } else x.fillStyle = 'rgba(42,26,28,0.85)';
+    x.fill(); x.lineWidth = 3; x.strokeStyle = '#1a1109'; x.stroke();
+  }
   const t = new K.THREE.CanvasTexture(c); t.colorSpace = K.THREE.SRGBColorSpace; return t;
 }
 function makePips(K, f, color) {
