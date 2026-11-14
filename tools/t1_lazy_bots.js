@@ -31,6 +31,20 @@ const BOTS = {
       if (f) { Y().stab(); Y().step(0.5, DT); } else walkTo(ex[0], ex[1], 0.5);
     }
   },
+  // 빙빙 돌며 찌르기: 가장 가까운 적 둘레 1.8m를 돌면서 0.4초마다 찌르기, 다른 시대면 Shift (2차 안내의 "빙빙 돌기")
+  circle(sec) {
+    const t0 = Y().S.time, ex = exitXZ(); let ang = 0;
+    while (Y().S.time - t0 < sec && !done()) {
+      const s = st(), fs = foes();
+      if (!fs.length) { walkTo(ex[0], ex[1], 0.3); continue; }
+      fs.sort((a, b) => Math.hypot(a.x - s.x, a.z - s.z) - Math.hypot(b.x - s.x, b.z - s.z));
+      const f = fs[0];
+      if (f.era !== s.era) { if (shift() !== 'ok') walkTo(f.x, f.z, 0.3); continue; }
+      ang += 1.1;
+      walkTo(f.x + Math.cos(ang) * 1.8, f.z + Math.sin(ang) * 1.8, 0.2);
+      Y().stab(); Y().step(0.2, DT);
+    }
+  },
   // 가장 가까운 적에게 곧장: 다른 시대면 Shift, 2m 안이면 찌르기(빙빙 돌기 없이)
   rush(sec) {
     const t0 = Y().S.time, ex = exitXZ();

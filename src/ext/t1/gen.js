@@ -27,9 +27,9 @@ export function normalize(src, meta = {}) {
   if (exit) { if (past[exit[1]][exit[0]] === '#') setCh(past, exit[0], exit[1], '.'); if (now[exit[1]][exit[0]] === '#') setCh(now, exit[0], exit[1], '.'); }
   c.past = past; c.now = now; c.start = start; c.exit = exit; c.startEra = startEra;
   c.w = past[0].length; c.h = past.length;
-  for (const k of COORD_DEFS) c[k] = clone(src[k] || []);
+  for (const k of COORD_DEFS) c[k] = clone((meta[k] ?? src[k]) || []); // meta(T1 표)가 적 배치를 덮어쓸 수 있다 — 튜토리얼 방 자체는 그대로
   c.shards = clone(src.shards || []);
-  c.extra = clone(src.extra || []);
+  c.extra = clone((meta.extra ?? src.extra) || []);
   for (const p of PHASES) c[p] = src[p] || DEF_PHASE[p];
   const all = past.join('') + now.join('');
   c.hasGate = /[Gp]/.test(all); c.hasLever = /[LD]/.test(all); c.hasBoss = !!src.boss;

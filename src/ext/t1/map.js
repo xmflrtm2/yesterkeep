@@ -1,4 +1,4 @@
-// T1 — 층 지도: 줄 5개(아래 → 위). 0~3번 줄은 2~3갈래에서 고르고, 4번 줄은 문지기(1·2층) 또는 성채지기(3층).
+// T1 — 층 지도: 줄 5개(아래 → 위). 0~3번 줄은 2~3갈래에서 고르고, 4번 줄은 문지기. 3층만 5번 줄 = 성채지기(2차: 3층도 문지기를 넘어야 성채지기).
 // 같은 시드 + 같은 층이면 같은 지도. T4가 registerRoomType(type, fn, { icon, name, desc, rows, weight })로 새 종류를 넣으면 그 줄의 뽑기에 섞인다.
 import { makeRng } from './rng.js';
 
@@ -38,9 +38,10 @@ export function genFloor(seed, floor, extra = {}) {
   add(1, draw(1, 3, [['combat', 3], ['puzzle', 3], ['treasure', 1.3], ['elite', floor >= 2 ? 1 : 0]], ['treasure', 'elite']));
   add(2, draw(2, rng.chance(0.6) ? 3 : 2, [['combat', 3], ['puzzle', 2.6], ['elite', floor >= 2 ? 1.6 : 0.9], ['shop', 1.5], ['treasure', 0.5]], ['shop', 'elite', 'treasure']));
   add(3, rng.shuffle(['rest', rng.chance(0.55) ? 'shop' : 'treasure']));
-  add(4, [floor < 3 ? 'guard' : 'boss']);
+  add(4, ['guard']);
+  if (floor >= 3) add(5, ['boss']);
   // 줄 사이 잇기: 비율이 가까운 칸끼리 + 들어오는 길이 없는 칸 채우기 + 엇갈리지 않는 샛길 하나쯤
-  for (let r = 0; r < ROWS - 1; r++) {
+  for (let r = 0; r < rows.length - 1; r++) {
     const A = rows[r], B = rows[r + 1], n = A.length, m = B.length;
     const ratio = (k, len) => (len === 1 ? 0.5 : k / (len - 1));
     const link = (a, b) => { if (!A[a].next.includes(b)) A[a].next.push(b); };

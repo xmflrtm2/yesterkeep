@@ -13,7 +13,8 @@ export const TUT = {
   golem: { tier: 2, tags: ['combat'], weight: 0.45 },
   pair: { tier: 2, tags: ['combat'], weight: 0.55 },
   outpost: { tier: 3, tags: ['combat', 'puzzle'], weight: 0.6 },
-  storehouse: { tier: 3, tags: ['combat', 'puzzle'], weight: 0.6 },
+  // 2차: 런에서는 골렘 순찰 서쪽 끝을 시작 칸(3,9)에서 8m 밖으로 — 어제에서 가만히 있다 모래가 바닥나 오늘로 끌려오면 바로 옆이 골렘이었다
+  storehouse: { tier: 3, tags: ['combat', 'puzzle'], weight: 0.6, golems: [{ path: [[7, 8], [14, 8]], wait: 1.2 }] },
   arrows: { tier: 2, tags: ['puzzle', 'combat'], weight: 0.55 },
   raft: { tier: 2, tags: ['puzzle'], weight: 0.5 },
   blades: { tier: 3, tags: ['puzzle'], weight: 0.55 },
@@ -101,7 +102,7 @@ export const GEN = [
     startEra: 'now',
     arrowPhase: i => i * 0.25,
     guards: [{ path: [[12, 2]], face: -90 }],
-    extra: [{ minTier: 3, golems: [{ path: [[5, 1], [5, 5]], wait: 1.0 }] }],
+    extra: [{ minTier: 2, golems: [{ path: [[5, 1], [5, 5]], wait: 1.0 }] }], // 2차: tier 2부터(경비 하나만이면 쉬웠다)
     past: ['####A##A##A####', '#.............#', '#.............#', '#@...........>#', '#.............#', '#.............#', '###############'],
     now: ['###############', '#..._.._.._...#', '#..._.._.._...#', '#@.._.._.._..>#', '#..._.._.._...#', '#..._.._.._...#', '###############'],
   },
@@ -140,7 +141,8 @@ export const GEN = [
     tip: N('오늘 위쪽 돌길로 건너편에 간 뒤, 멈춘 파수꾼의 등 쪽에 서서 어제로 → J'),
     startEra: 'now',
     guards: [{ path: [[11, 1], [11, 5]], wait: 1.0 }],
-    extra: [{ minTier: 3, golems: [{ path: [[9, 1], [5, 1]], wait: 1.0 }] }],
+    // 2차(11/15): 경비 하나뿐이면 빙빙 돌며 찌르는 게으른 봇이 운으로 깼다 → tier 2부터 돌길에 골렘(오늘 길도 막힘 = 어느 쪽으로 건널지 생각)
+    extra: [{ minTier: 2, golems: [{ path: [[9, 1], [5, 1]], wait: 1.0 }] }],
     past: ['###############', '#...._____....#', '#...._____....#', '#@...=====...>#', '#...._____....#', '#...._____....#', '###############'],
     now: ['###############', '#....,,,,,....#', '#...._____....#', '#@..._____...>#', '#...._____....#', '#...._____....#', '###############'],
   },

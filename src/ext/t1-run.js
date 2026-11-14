@@ -10,18 +10,26 @@ import { library, byId } from './t1/chunks.js';
 import { TYPES, ROWS, genFloor, choices, mapHtml } from './t1/map.js';
 import { UI, SND } from './t1/ui.js';
 import { landingRoom, TEMP, FLOOR_NAME, buildAltar } from './t1/temp-rooms.js';
+import { riddleFor } from './t1/riddles.js';
+import { themeWeight, addRubble, applyGrade, ambient, themeRoom } from './t1/theme.js';
 
 const KEY = { run: 'yk-run', tut: 'yk-tut', meta: 'yk-meta' };
-// 층마다: 뽑을 조각 단계(tier)와 비율, 두 조각을 이어 붙일 확률, 방을 깰 때 받는 모래
+// 층마다: 지도 줄(0~4)마다 노리는 조각 단계(tierAt, 소수면 그 비율로 올림), 두 조각을 이어 붙일 확률, 방을 깰 때 받는 모래, 모래 최대
+// 2차(11/15): 1차는 층마다 tier 1~2/2~3/3~4를 고르게 뽑아 1층 앞쪽이 쉬웠다(합친 판 직접 플레이: 1층을 하트 0개 잃고 깸, 첫 퍼즐은 곧장 뛰면 끝)
+// → 줄마다 단계가 오르고, 1층 첫 두 줄도 tier 2. tier 1·"생각 없는" 조각은 혼자 안 쓰고 다른 조각과 이어 붙일 때만. 깊을수록 모래 최대가 줄어든다
 export const FLOORS = [null,
-  { tiers: [[1, 0.6], [2, 0.4]], join: 0.3, clear: 2.5 },
-  { tiers: [[2, 0.6], [3, 0.4]], join: 0.55, clear: 2 },
-  { tiers: [[3, 0.6], [4, 0.4]], join: 0.75, clear: 1.5 },
+  { tierAt: [2, 2, 2.4, 2, 3], join: 0.4, clear: 2.5, sand: 16 },
+  { tierAt: [2.5, 3, 3.2, 3, 4], join: 0.65, clear: 2, sand: 15 },
+  { tierAt: [3, 3.5, 4, 4, 4, 4], join: 0.85, clear: 1.5, sand: 14 },
 ];
+// 혼자 두면 곧장 걸어서 끝나는 조각 (조각이 think: 0을 주어도 같음)
+const THINK0 = new Set(['tut-bridge', 'tut-bars', 't3-crumble1']);
+const mustJoin = (c, floor, row) => c.think === 0 || THINK0.has(c.id) || (floor === 1 && row <= 1 && (c.tier || 1) <= 1);
 // 모래(초). 어제에 있으면 1초에 1(×EXT.stats.sandDrain)씩 준다. 오늘에서는 reserve까지만 천천히 차올라 갇히지 않게
 // 11/13 직접 플레이(시드 123, 14방): 최대 20·처치 1.5·조각 4로는 방을 나올 때마다 거의 가득 → 모래가 고민거리가 안 됐다(상점에서 쓴 뒤에만 빠듯)
 // → 최대 16, 처치 1, 조각 3, 층 보너스 5, 상점 5. 어제에서 기다리기만 하는 풀이(경비가 돌아서길 어제에서 기다림)는 바닥나게
-export const SAND = { max: 16, start: 16, shard: 3, kill: 1.0, elite: 3, floorBonus: 5, reserve: 3, trickle: 0.3, enterMin: 0.35, low: 4,
+// 2차(11/15 직접 플레이): 오늘에서 차오르는 한도 3초로는 사냥개 꾀기(띠 건너 깨우고 다시 건너오기 ≈ 4초)를 못 해 방이 막혔다 → 5초. 차오르는 빠르기는 그대로(0.3/초, 0→5에 17초)
+export const SAND = { max: 16, start: 16, shard: 3, kill: 1.0, elite: 3, floorBonus: 5, reserve: 5, trickle: 0.3, enterMin: 0.35, low: 4,
   // 성채지기 방: 싸움 자체가 시대 전환이라 모래가 바닥나면 이길 길이 없었다(11/13 봇: 모래 0 → 150초 동안 4번만 맞힘, 런 끝)
   // → 이 방에서는 0.6배로 줄고, 성채지기를 맞힐 때마다 모래가 쏟아진다(+4)
   bossDrain: 0.6, bossHit: 4 };
@@ -61,7 +69,8 @@ function freshState(seed) {
   return { v: 1, seed: String(seed), floor: 1, pos: { row: -1, col: 0 }, visited: [], phase: 'landing', hearts: K ? K.STAT.maxHearts : 5, sand: SAND.start,
     recipe: null, used: [], mem: 0, stats: { rooms: 0, kills: 0, time: 0, hurts: 0, sandUsed: 0, shifts: 0, deepest: 1 }, t4: {}, started: Date.now() };
 }
-const sandMax = () => Math.max(1, (EXT.stats.sandMax || SAND.max) * (EXT.stats.sandMul ?? 1)); // T4 유물(모래주머니)이 sandMul을 바꾼다
+// 층별 최대(16·15·14) + T4가 sandMax를 바꿨으면 그 차이만큼, × sandMul(T4 유물 모래주머니)
+const sandMax = () => Math.max(1, ((st && FLOORS[st.floor] ? FLOORS[st.floor].sand : SAND.max) + ((EXT.stats.sandMax || SAND.max) - SAND.max)) * (EXT.stats.sandMul ?? 1));
 function withMeta(room, m) { room.t1 = m; return room; }
 function landing(floor, opts) { return withMeta(landingRoom(floor, opts), { kind: 'landing', floor }); }
 function enterRun(seed, pending = false) {
@@ -91,26 +100,43 @@ function enterResume(s) {
 }
 
 /* ───────── 방 만들기 ───────── */
-const tierW = (ct, want) => [1, 0.45, 0.08][Math.abs((ct || 1) - want)] || 0;
-function pickPool(lib, wantTags, tier, used, prefer) {
-  const pool = lib.filter(c => !c.hasBoss && !c.tags.includes('link') && c.tags.some(t => wantTags.includes(t)));
-  return { pool, w: c => (c.weight || 1) * tierW(c.tier, tier) * (used.includes(c.id) ? 0.12 : 1) * (prefer && c.tags.includes(prefer) ? 3 : 1) };
+// 2차: 비대칭 — 노린 단계보다 하나 어려운 건 0.4, 하나 쉬운 건 0.15 (쉬운 조각이 수가 많아 평균이 끌려 내려갔다: 3층 첫 줄 평균 2.45)
+const tierW = (ct, want) => ({ 0: 1, 1: 0.4, 2: 0.08, '-1': 0.15, '-2': 0.02 })[(ct || 1) - want] || 0;
+const GATE_TAGS = ['gatekeeper', 'boss'];
+function pickPool(lib, wantTags, tier, used, prefer, floor) {
+  const pool = lib.filter(c => !c.hasBoss && !c.tags.includes('link') && !c.tags.some(t => GATE_TAGS.includes(t)) && c.tags.some(t => wantTags.includes(t)));
+  // 2층부터 전투 칸은 적이 많은 조각을 조금 더 (적 하나당 +12%×(층-1)) — 3층 방의 적 수가 2층과 같았다
+  const nFoes = c => (c.guards || []).length + (c.golems || []).length + (c.foes || []).length;
+  const crowd = c => (prefer === 'combat' || prefer === 'elite') && floor >= 2 ? 1 + 0.12 * (floor - 1) * nFoes(c) : 1;
+  return { pool, w: c => (c.weight || 1) * tierW(c.tier, tier) * (used.includes(c.id) ? 0.12 : 1) * (prefer && c.tags.includes(prefer) ? 3 : 1) * themeWeight(c, floor) * crowd(c) };
 }
-function genRecipe(type, rng, floor) {
+// 지도 줄 → 노리는 tier (소수 부분은 그 확률로 한 단계 위)
+function tierFor(floor, row, rng) { const t = (FLOORS[floor].tierAt[row] ?? FLOORS[floor].tierAt[FLOORS[floor].tierAt.length - 1]); return Math.min(4, Math.floor(t) + (rng.chance(t - Math.floor(t)) ? 1 : 0)); }
+function genRecipe(type, rng, floor, row = 0) {
   const F = FLOORS[floor], lib = library(EXT);
-  let tier = rng.weighted(F.tiers, x => x[1])[0];
+  let tier = tierFor(floor, row, rng);
   const strong = type === 'elite' || type === 'guard';
-  if (strong) tier = Math.min(4, tier + 1);
+  if (type === 'elite') tier = Math.min(4, tier + 1);
+  // 문지기 자리: T2 미니 보스 조각(tags에 'gatekeeper'나 'boss', floor가 이 층이면 우선) → 혼자 쓴다(join:true면 이어 붙임)
+  if (type === 'guard') {
+    const gk = lib.filter(c => !c.hasBoss && c.tags.some(t => GATE_TAGS.includes(t)) && (c.floor == null || c.floor === floor));
+    if (gk.length) {
+      const A = rng.weighted(gk, c => (c.floor === floor ? 4 : 1) * (tierW(c.tier, tier) || 0.05) * (st.used.includes(c.id) ? 0.2 : 1));
+      return { a: A.id, fa: A.flip !== false && rng.chance(0.5), b: null, fb: false, dir: null, tier, type, gate: true };
+    }
+  }
   const wantA = type === 'puzzle' ? ['puzzle'] : ['combat', 'elite'];
-  const { pool, w } = pickPool(lib, wantA, tier, st.used, strong ? 'elite' : type === 'puzzle' ? 'puzzle' : 'combat');
+  const { pool, w } = pickPool(lib, wantA, tier, st.used, strong ? 'elite' : type === 'puzzle' ? 'puzzle' : 'combat', floor);
   if (!pool.length) return null;
-  const A = rng.weighted(pool, w);
+  // 혼자 두면 생각할 거리가 없는 조각은 이어 붙일 수 있을 때만 (1층 첫 두 줄의 tier 1 포함)
+  const cand = pool.filter(c => !(mustJoin(c, floor, row) && c.join === false));
+  const A = rng.weighted(cand.length ? cand : pool, w);
   const fa = A.flip !== false && rng.chance(0.5);
   const rec = { a: A.id, fa, b: null, fb: false, dir: null, tier, type };
-  const joinP = type === 'guard' ? 1 : F.join + (type === 'elite' ? 0.35 : 0);
+  const joinP = type === 'guard' || mustJoin(A, floor, row) ? 1 : F.join + (type === 'elite' ? 0.35 : 0);
   if (A.join !== false && rng.chance(joinP)) {
     const wantB = type === 'puzzle' ? ['puzzle', 'combat'] : ['combat', 'puzzle', 'elite'];
-    const pb = pickPool(lib, wantB, tier, [...st.used, A.id], type === 'puzzle' ? 'puzzle' : 'combat');
+    const pb = pickPool(lib, wantB, tier, [...st.used, A.id], type === 'puzzle' ? 'puzzle' : 'combat', floor);
     const cands = pb.pool.filter(c => c.id !== A.id && c.join !== false);
     const order = [];
     const left = cands.slice();
@@ -121,6 +147,8 @@ function genRecipe(type, rng, floor) {
       if (canJoin(a, fb ? flip(B) : B, dir)) { rec.fa = fa2; rec.b = B.id; rec.fb = fb; rec.dir = dir; break outer; }
     } }
   }
+  // 꼭 이어야 하는 조각인데 짝을 못 찾으면 그 조각을 빼고 다시
+  if (!rec.b && mustJoin(A, floor, row) && cand.length > 1) return genRecipe(type, rng, floor, row);
   return rec;
 }
 function fromRecipe(rec, vrng) {
@@ -134,12 +162,13 @@ function buildNodeRoom(node, resume = false) {
   const f = st.floor;
   const m = { kind: 'node', floor: f, row: node.row, col: node.col, type: node.type };
   const id = `run-${st.seed}-${f}-${node.row}-${node.col}`;
-  const label = $t('{0}층 · {1}', f, `${node.row + 1}/${ROWS}`) + ' · ' + $t(typeMeta(node.type).name);
+  const nRows = (R.rows && R.rows.length) || ROWS;
+  const label = $t('{0}층 · {1}', f, `${node.row + 1}/${nRows}`) + ' · ' + $t(typeMeta(node.type).name);
   const ctx = { floor: f, row: node.row, col: node.col, type: node.type, seed: st.seed, rng: makeRng(st.seed, 'type', f, node.row, node.col), K, state: st, temp: TEMP[node.type] };
   let room = null;
   if (node.type === 'boss') {
     const heart = K.ROOMS.find(r => r.id === 'heart');
-    room = { ...heart, id: 'run-heart', label };
+    room = { ...heart, id: 'run-heart', label, hint: N('공격하는 순간, 그는 시간을 놓친다'), tip: heart.hint, t1tip2: heart.tip, t1riddle: true };
   } else if (ROOMTYPES[node.type] || TEMP[node.type]) {
     const rt = ROOMTYPES[node.type];
     try { room = rt ? (typeof rt === 'function' ? rt(ctx) : rt.make({ tier: f, label, floor: f, rng: ctx.rng, seed: st.seed })) : TEMP[node.type](ctx); } catch (e) { console.error('[T1] room type', node.type, e); }
@@ -149,7 +178,7 @@ function buildNodeRoom(node, resume = false) {
     room = { ...room, id, label };
   } else {
     let rec = resume && st.recipe && st.recipe.a ? st.recipe : null;
-    if (!rec) rec = genRecipe(node.type === 'guard' ? 'guard' : node.type, makeRng(st.seed, 'room', f, node.row, node.col), f);
+    if (!rec) rec = genRecipe(node.type === 'guard' ? 'guard' : node.type, makeRng(st.seed, 'room', f, node.row, node.col), f, node.row);
     const vr = () => makeRng(st.seed, 'vary', f, node.row, node.col);
     let built = rec && fromRecipe(rec, vr());
     if (built) {
@@ -162,10 +191,26 @@ function buildNodeRoom(node, resume = false) {
     }
     if (!built) { rec = { a: 't1-sentry', fa: false, b: null, tier: 1, type: node.type }; built = fromRecipe(rec, vr()); }
     room = toRoom(built.c, { id, name: built.name, label });
+    // 2차: 런에서는 시작 칸이 오늘에도 서 있을 수 있으면 오늘에서 시작 — 어제에서 시작하면 방을 읽는 동안 모래가 줄었다(11/15 직접 플레이: 가라앉은 열쇠·달과 물의 방)
+    if (room.startEra === 'past') { const j = room.now.findIndex(r => r.includes('@')), i = j >= 0 ? room.now[j].indexOf('@') : -1; const below = i >= 0 ? (built.c.now[j] || '')[i] : null; if (below && '.,%='.includes(below) || below === '@') room.startEra = 'now'; }
+    setHints(room);
+    const tparts = (room.t1parts || []).filter(p => /^(t1|tut)-/.test(p.id));
+    addRubble(room, f, makeRng(st.seed, 'rubble', f, node.row, node.col), (i, j) => tparts.some(p => i >= p.x && i < p.x + p.w && j >= p.y && j < p.y + p.h));
     st.recipe = rec;
     if (!resume) { st.used.push(rec.a); if (rec.b) st.used.push(rec.b); }
   }
   return withMeta(room, m);
+}
+// 안내 3단계: 수수께끼 → (두 번 실패) 조각의 원래 안내 → (네 번 실패) tip. 이어 붙인 방은 조각마다(지금 있는 조각 기준)
+function setHints(room) {
+  for (const p of room.t1parts || []) {
+    const c = byId(EXT, p.id) || { id: p.id, tags: [] };
+    p.riddle = riddleFor(c); p.hint0 = p.hint; p.tip0 = p.tip;
+  }
+  const p0 = (room.t1parts || [])[0];
+  if (!p0) return room;
+  room.hint = p0.riddle; room.tip = p0.hint0 || p0.tip0; room.t1tip2 = p0.hint0 ? p0.tip0 : null; room.t1riddle = true;
+  return room;
 }
 export function typeMeta(type) { return TYPES[type] || { icon: '?', name: type, desc: '', color: '#ccc' }; }
 
@@ -383,7 +428,11 @@ EXT.on('roomLoad', room => {
   setRunUI(true);
   const S = K.S;
   const restart = R.cur && R.cur.id === room.id;
-  R.cur = room; R.part = -1; R.gotN = S.got.size; R.bossHp = null;
+  R.cur = room; R.part = -1; R.gotN = S.got.size; R.bossHp = null; R.tip2shown = false; R.tip2 = room.t1tip2 || null;
+  themeRoom(K, st.floor);
+  document.body.classList.toggle('t1riddle', !!room.t1riddle);
+  if (room.boss && R.carryHearts != null) { S.hearts = Math.min(K.STAT.maxHearts, Math.max(3, R.carryHearts)); K.drawHearts(); }
+  R.carryHearts = null;
   if (!restart) { R.killsRewarded = 0; R.enemies0 = K.enemies().filter(e => !e.optional).length; }
   if (R.resumeHearts != null && !room.boss) { S.hearts = Math.max(1, Math.min(R.resumeHearts, K.STAT.maxHearts)); K.drawHearts(); }
   R.resumeHearts = null;
@@ -395,6 +444,8 @@ EXT.on('roomLoad', room => {
     save();
   }
   if (m.kind === 'landing' && m.floor > 1 && !restart && !R.warned['f' + m.floor]) { R.warned['f' + m.floor] = 1; SND.floor(K); }
+  // 쉼터 칸: 모래는 T1 몫이라 들어서면 가득 (T4 모닥불은 하트·유물 강화만 — 11/15 합친 판 직접 플레이에서 모래가 안 차서)
+  if (m.kind === 'node' && m.type === 'rest' && !restart && st.sand < sandMax()) { const got = addSand(sandMax(), 'rest'); if (got > 0.05) K.toast($t('모닥불 곁에서 모래가 차올라요 (+{0}초)', got.toFixed(1)), 2); }
   EXT.emit('roomEnter', room, m, st);
 });
 EXT.on('update', dt => {
@@ -402,6 +453,7 @@ EXT.on('update', dt => {
   if (R.mode !== 'run' || !R.cur || !st) return;
   const S = K.S, m = R.cur.t1;
   st.stats.time += dt;
+  R.saveT = (R.saveT || 0) + dt; if (R.saveT > 3) { R.saveT = 0; saveLive(); }
   if (S.got.size > R.gotN) { // main.js의 "모래시계 조각 n / 튜토리얼 합계" 알림 대신 (런에서는 그 합계가 틀림)
     const got = addSand(SAND.shard * (S.got.size - R.gotN), 'shard'); R.gotN = S.got.size;
     K.toast($t('모래시계 조각 — 모래 +{0}초', (Math.round(got * 10) / 10)), 1.6);
@@ -423,11 +475,17 @@ EXT.on('update', dt => {
     const k = parts.findIndex(p => ci >= p.x && ci < p.x + p.w && cj >= p.y && cj < p.y + p.h);
     if (k >= 0 && k !== R.part) {
       const first = R.part < 0; R.part = k; const p = parts[k];
-      if (!first && p.hint) { S.room.hint = p.hint; S.room.tip = p.tip; S.room.gateTip = p.gateTip || S.room.gateTip; S.tipShown = false; S.roomFails = 0; K.hud.hint.textContent = $t(p.hint); K.hud.hint.classList.remove('tip'); }
+      const h0 = p.riddle || p.hint;
+      if (!first && h0) { S.room.hint = h0; S.room.tip = p.riddle ? (p.hint0 || p.tip0) : p.tip; R.tip2 = p.riddle && p.hint0 ? p.tip0 : null; R.tip2shown = false; S.room.gateTip = p.gateTip || S.room.gateTip; S.tipShown = false; S.roomFails = 0; K.hud.hint.textContent = $t(h0); K.hud.hint.classList.remove('tip'); }
     }
   }
+  // 안내 셋째 단계: 네 번 실패하면 조각의 tip
+  if (R.tip2 && !R.tip2shown && S.roomFails >= 4) { R.tip2shown = true; K.hud.hint.textContent = $t(R.tip2); K.hud.hint.classList.add('tip'); }
 });
-EXT.on('frame', dt => { if (R.mode === 'run' && st) drawSand(dt); if (altar && altar.spin) altar.spin(dt); });
+EXT.on('frame', dt => {
+  if (R.mode === 'run' && st) { drawSand(dt); if (R.cur) { applyGrade(K, st.floor); ambient(K, st.floor, dt); } }
+  if (altar && altar.spin) altar.spin(dt);
+});
 // 제단 칸은 두 시대 모두 막힘 (위에 올라서지 않게)
 EXT.solidAt.push((era, i, j) => (altar && i === altar.i && j === altar.j ? true : undefined));
 // 모래가 없으면 어제로 못 간다 (키를 먹는다 — 오늘에서는 reserve까지 천천히 차오름)
@@ -452,6 +510,15 @@ EXT.on('exit', room => {
     st.mem += m.type === 'guard' ? 3 : m.type === 'elite' ? 2 : CHALLENGE.has(m.type) ? 1 : 0;
     EXT.emit('roomClear', room, m, st);
     if (m.type === 'boss') { endRun('win'); return; }
+    // 3층 문지기를 넘으면 지도 없이 곧장 성채의 심장으로 (유물을 든 채)
+    if (m.type === 'guard' && R.rows && R.rows[m.row + 1] && R.rows[m.row + 1][0] && R.rows[m.row + 1][0].type === 'boss') {
+      const bossNode = R.rows[m.row + 1][0];
+      st.pos = { row: bossNode.row, col: bossNode.col };
+      R.next = buildNodeRoom(bossNode);
+      st.phase = 'room'; st.hearts = S.hearts; save();
+      reward(m, null);
+      return;
+    }
     if (m.type === 'guard') {
       st.floor++; st.pos = { row: -1, col: 0 }; st.visited = []; st.phase = 'landing'; st.recipe = null;
       R.rows = genFloor(st.seed, st.floor, EXTRA_TYPES);
@@ -479,6 +546,7 @@ function reward(m, then) {
 EXT.on('nextRoom', () => {
   if (R.mode !== 'run' || !st) return undefined;
   const r = R.next; R.next = null;
+  R.carryHearts = K.S.hearts; // 성채지기 방은 main.js가 하트를 가득 채우는데, 런에서는 들고 온 하트로(최소 3)
   return r || landing(st.floor, { label: N('이어하기') });
 });
 EXT.on('death', () => {
@@ -486,12 +554,15 @@ EXT.on('death', () => {
   endRun('dead');
   return true;
 });
-EXT.on('hurt', () => { if (R.mode === 'run' && st) st.stats.hurts++; });
+// 2차: 방 안에서도 하트·모래를 저장(맞을 때·처치할 때·3초마다). 전엔 방에 들어올 때만 저장해서, 창을 닫았다 열면 들어올 때의 하트·모래로 되돌아가는 구멍이 있었다
+function saveLive() { if (R.mode !== 'run' || !st || st.pending || !R.cur) return; st.hearts = K.S.hearts; save(); }
+EXT.on('hurt', () => { if (R.mode === 'run' && st) { st.stats.hurts++; saveLive(); } });
 EXT.on('shift', () => { if (R.mode === 'run' && st) st.stats.shifts++; });
 EXT.on('kill', foe => {
   if (R.mode !== 'run' || !st || !R.cur || R.cur.t1.kind !== 'node') return;
   st.stats.kills++;
   if (R.killsRewarded < R.enemies0) { R.killsRewarded++; addSand(SAND.kill, 'kill'); }
+  saveLive();
 });
 EXT.on('prompt', () => {
   if (!altar || !nearAltar()) return undefined;
@@ -561,7 +632,13 @@ EXT.run = {
           for (let r = 0; r < rows.length - 1; r++) for (const n of rows[r]) { if (rows[r + 1].length > 1) { out.decisions = (out.decisions || 0) + 1; out.choiceSum = (out.choiceSum || 0) + n.next.length; if (n.next.length < 2) out.oneWay = (out.oneWay || 0) + 1; } }
           for (const row of rows) for (const node of row) {
             const room = buildNodeRoom(node);
-            if (node.type === 'guard' && !st.recipe.b) out.guardSingle = (out.guardSingle || 0) + 1;
+            if (node.type === 'guard' && !st.recipe.b && !st.recipe.gate) out.guardSingle = (out.guardSingle || 0) + 1;
+            if (CHALLENGE.has(node.type) && st.recipe && st.recipe.a) { // 2차: 줄마다 조각 단계, 1층 첫 두 줄에 혼자 나온 tier 1
+              const A = byId(EXT, st.recipe.a), B = st.recipe.b && byId(EXT, st.recipe.b), k = f + '-' + node.row;
+              const rs = (out.rowStats = out.rowStats || {})[k] = (out.rowStats || {})[k] || { n: 0, tier: 0, joined: 0, enemies: 0 };
+              rs.n++; rs.tier += Math.max(A.tier || 1, (B && B.tier) || 0); if (B) rs.joined++; rs.enemies += (room.guards || []).length + (room.golems || []).length + (room.foes || []).length;
+              if (f === 1 && node.row <= 1 && !B && (A.tier || 1) <= 1) (out.f1single1 = out.f1single1 || []).push(A.id);
+            }
             out.rooms++; out.types[node.type] = (out.types[node.type] || 0) + 1;
             if (st.recipe && node.type !== 'boss') { out.chunks[st.recipe.a] = (out.chunks[st.recipe.a] || 0) + 1; if (st.recipe.b) { out.joined++; out.chunks[st.recipe.b] = (out.chunks[st.recipe.b] || 0) + 1; } }
             const chk = reachCheck(room, EXT.chars);
@@ -569,7 +646,8 @@ EXT.run = {
             if (!chk.ok) out.fail.push([room.id, room.name, chk.why]);
             // 오늘에서 시작하는 방: 골렘 순찰이 시작 칸 5m 안에 들어오면 "서서 생각만 해도 맞는" 방
             const s0 = room.now.findIndex(r => r.includes('@')), sx = s0 >= 0 ? room.now[s0].indexOf('@') : -1;
-            if ((room.startEra || 'now') === 'now' && sx >= 0) for (const g of room.golems || []) for (const [i, j] of g.path || []) if (Math.hypot(i - sx, j - s0) * 2 < 5) { (out.nearStart = out.nearStart || []).push([room.name, [i, j]]); break; }
+            // 2차: 어제에서 시작해도 모래가 바닥나면 오늘로 끌려온다(가만히 있던 봇이 가시 창고에서 그렇게 죽음) → 시작 시대와 상관없이 본다
+            if (sx >= 0) for (const g of room.golems || []) for (const [i, j] of g.path || []) if (Math.hypot(i - sx, j - s0) * 2 < 5) { (out.nearStart = out.nearStart || []).push([room.name, [i, j]]); break; }
             if (load) { try { K.loadRoom(room); } catch (e) { out.fail.push([room.id, 'load', String(e)]); } }
           }
         }

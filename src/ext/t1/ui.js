@@ -45,6 +45,10 @@ const CSS = `
 #ext .t1-sand.empty { color: #9aa3b8; } #ext .t1-sand.empty .bar i { background: #7fe8ff88; }
 @keyframes t1low { 50% { opacity: .55; } }
 body.t1run #shards, body.t1run #era .ptime { display: none !important; }
+/* 2차: 런 방의 첫 안내는 수수께끼 — 기울여 쓰고 따옴표로 (두 번 실패하면 main.js가 .tip으로 바꿈) */
+body.t1run.t1riddle #hint:not(.tip) { font-style: italic; color: #efe3c8; letter-spacing: .5px; }
+body.t1run.t1riddle #hint:not(.tip)::before { content: '“'; opacity: .6; margin-right: 2px; }
+body.t1run.t1riddle #hint:not(.tip)::after { content: '”'; opacity: .6; margin-left: 2px; }
 body.t1run #ext .t1-sand { display: flex; }
 body:has(#ext .t1-ov) #hud #hint, body:has(#ext .t1-ov) #hud #prompt, body:has(#ext .t1-ov) #hud #toast, body:has(#ext .t1-ov) #hud #roomTitle { visibility: hidden; }
 #endCard .t1-endrun { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
