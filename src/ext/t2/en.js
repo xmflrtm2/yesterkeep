@@ -162,4 +162,6 @@ Object.assign(I.en, {
   "막 맞은 문지기는 잠깐 버텨요 — 다음 틈을": "A gatekeeper that was just hit holds for a moment — wait for the next opening",
   "눈은 두 시대를 다 봐요. 방패병은 오늘에서 등 뒤로 가 넘어와야 하는데, 시선에 잡히면 못 넘어가요. 시선이 지나간 뒤에. 눈은 등 뒤에서 깰 수 있어요": "The eye watches both eras. The shieldbearer needs you to shift in behind it from Today — but if the gaze holds you, you cannot shift. Go after it passes. The eye can be broken from behind",
   "단단한 방패병은 등 뒤에서 두 번 넘어와야 해요. 서두르는 석궁병은 조준이 빨라요 — 오늘에서 곁으로. 되감는 경비는 두 번": "The Hardened shieldbearer needs two shift-ins behind it. The Hasty crossbowman aims fast — approach in Today. The Rewinding guard takes two",
+  "다리가 등을 막아요 — 공격이 끝난 뒤 무늬가 빛날 때": "Her legs guard her back — strike when the mark glows after an attack",
+  "이름표를 읽으세요 — 단단한 적은 두 번, 되감는 적은 다시 일어나요": "Read the name tags — Hardened takes two, Rewinding gets back up",
 });

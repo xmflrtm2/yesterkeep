@@ -192,6 +192,8 @@ EXT.foes['t2-shield'] = {
     f.onPlayerHurt = () => { f.rec = Math.max(f.rec, 1.3); }; // 친 뒤 방패를 고쳐 잡는다 (stun은 안 먹으므로)
     // 급히 오가면(다른 시대에 0.6초도 안 머물고 돌아오면) 그 기척을 듣고 이미 돌아서 있다 → Shift 연타로는 등을 못 잡는다
     f.onShift = (from, to) => {
+      // 넘어오는 순간 '들은 시간'은 0부터 (다른 시대에 있는 동안은 이 적의 시간이 멈춰 예전 값이 남아 있었다 → 경보 중인 방패병은 반응 없이 바로 돌아섰다)
+      if (to === f.era && f.alive) f.heard = 0;
       if (to !== f.era || !f.alive || prepared() || pdist(f) > C.hear + 1) return;
       f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z); f.heard = C.react + 1; S2.shieldUp({ x: f.x, z: f.z });
     };

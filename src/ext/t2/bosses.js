@@ -194,6 +194,7 @@ EXT.foes['t2-twin'] = {
       K.toast(K.$t('맹세로 되살아났어요 — 둘을 함께 쓰러뜨려야 해요'), 2.4); fail();
     };
     f.onShift = (from, to) => {
+      if (to === f.era && f.alive) f.heard = 0; // 다른 시대에 있는 동안 멈춰 있던 값이 남지 않게
       if (to !== f.era || !f.alive || f.state === 'sleep') return;
       // 급히 오가면 그 기척에 이미 돌아서 있다 (방패병과 같은 연타 막기)
       if (!prepared() && pdist(f) < 4.5 && !f.act && f.stagger <= 0) { f.yaw = Math.atan2(K.S.p.x - f.x, K.S.p.z - f.z); f.heard = TW.react + 1; }
@@ -471,7 +472,10 @@ EXT.foes['t2-queen'] = {
       updatePips(K, f, 2.9 + f.y);
       // 다리 걷기
       for (const L of f.mk.legs) L.hip.rotation.x = f.alive ? Math.sin(f.gait + L.k * 1.3 + (L.s > 0 ? Math.PI : 0)) * (f.act || f.stagger > 0 ? 0.05 : 0.3) : 0.6;
-      f.mk.hg.children.forEach(c => { c.material.opacity = 0.7 + 0.3 * Math.sin(S.time * 5); });
+      // 모래시계 무늬: 등이 열렸으면 밝게 깜빡, 닫혔으면 흐리게
+      const op = f.alive && f.isOpen();
+      f.mk.hg.children.forEach(c => { c.material.opacity = op ? 0.75 + 0.25 * Math.sin(S.time * 14) : 0.18; });
+      f.mk.hg.scale.setScalar(op ? 1.35 : 1);
       const k = a && a.ph === 'wind' ? Math.min(1, a.t / a.w) : 0;
       const pw = !!a && a.k === 'pounce' && (a.ph === 'wind' || a.ph === 'air');
       f.landD.visible = f.landR.visible = pw;
@@ -489,6 +493,8 @@ EXT.foes['t2-queen'] = {
       wake();
       if (K.S.time - (f.hitAt || -9) < 1.1) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); return 'immune'; }
       const behind = fromBehind(f, info, 70);
+      // 등(모래시계 무늬)은 공격이 끝난 직후·휘청일 때만 열린다 — 무늬가 밝게 빛난다 (11/15: 같은 시대에서 빙빙 도는 봇이 12초 만에 이겼다)
+      if (behind && !f.isOpen()) { S2.parry({ x: f.x, z: f.z }); K.clangFx(f.x, f.z); if (!info.thrown) K.toast(K.$t('다리가 등을 막아요 — 공격이 끝난 뒤 무늬가 빛날 때'), 1.6); fail(); return 'guarded'; }
       if (behind && (!info.shift || prepared() || info.thrown)) { f.hurtBoss(info.shift ? 'shift' : 'back'); return 'boss-hit'; }
       f.yaw = Math.atan2(info.tx, info.tz);
       if (!f.act && f.stagger <= 0 && !info.thrown) start('bite');
@@ -497,6 +503,7 @@ EXT.foes['t2-queen'] = {
     };
     f.onExternalKill = () => {};
     f.onPlayerHurt = () => { if (f.act && f.act.ph !== 'air') f.act = null; f.hold = 1.2; };
+    f.isOpen = () => f.stagger > 0 || f.hold > 0 || (!!f.act && (f.act.ph === 'rec' || (f.act.k === 'web' && f.act.ph === 'wind')));
     place();
     // 알에서 첫 새끼들 (알이 먼저 생기도록 다음 프레임에)
     f.firstHatch = true;

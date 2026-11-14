@@ -83,7 +83,7 @@ const SOLVE = {
     Y().step(0.1); shiftNow(); P.waitUntil(() => !h.alive, 2.5);
     return goExit(13, 4, 'past');
   },
-  't2-shield-wall'() { behindStrike(foe('t2-shield'), 2.1); return goExit(13, 3); },
+  't2-shield-wall'() { behindStrike(foe('t2-shield'), 2.1); return goExit(13, 5); },
   't2-xbow-hall'() {
     goXZ(C2(7), C2(1)); shiftNow(); P.goCell(11, 1); shiftNow();
     nearStrike(foe('t2-xbow'));
