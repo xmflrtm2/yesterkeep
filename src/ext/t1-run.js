@@ -274,19 +274,23 @@ function setRunUI(on) { document.body.classList.toggle('t1run', !!on); }
 function metaLine() { const M = meta(); return M.runs ? $t('기억 {0} · 런 {1}번 · 가장 깊이 {2}층 · 성공 {3}번', M.memory, M.runs, M.bestFloor, M.wins) : $t('기억 {0}', M.memory); }
 function showMenu() {
   const saved = st && !st.pending;
+  // 튜토리얼 첫 방이 뒤에 깔려 있으면(튜토리얼을 안 깼고 이어할 런도 없음) 처음 온 사람의 메뉴:
+  // 튜토리얼부터(추천) / 바로 런 — 11/15 개발자님 "원하는대로 선택 가능하게" (전엔 13방을 다 깨야 런이 열려 심사자가 런을 못 볼 수 있었다)
+  const fresh = !saved && R.mode === 'tut';
   const where = saved ? (st.phase === 'room' && st.pos.row >= 0 ? $t('{0}층 · {1}번째 방', st.floor, st.pos.row + 1) : $t('{0}층 입구', st.floor)) : '';
   const html = `<div class="t1-h t1-logo">${icon('era-past')}<span>${$t('어제의 성채')}</span>${icon('era-now')}</div>
     <div class="t1-sub">${$t('매번 달라지는 성채를 세 층 내려가 성채지기를 쓰러뜨리세요.')}<br>${$t('하트는 방을 지나도 그대로, 모래는 어제에 머물 시간이에요.')}</div>
     <div class="t1-btns">
+      ${fresh ? `<button class="t1-btn main" data-k="tutHere">${$t('튜토리얼부터')}<small>${$t('처음이라면 추천 · 13개 방에서 규칙을 배우고 성채지기까지')}</small></button>` : ''}
       ${saved ? `<button class="t1-btn main" data-k="cont">${$t('이어하기')}<small>${where} · ${icon('heart')} ${st.hearts} · ${icon('sand')} ${st.sand.toFixed(0)}</small></button>` : ''}
-      <button class="t1-btn ${saved ? '' : 'main'}" data-k="new">${$t('새 런')}${saved ? `<small>${$t('지금 런은 사라져요')}</small>` : ''}</button>
-      <button class="t1-btn" data-k="tut">${$t('튜토리얼 다시 하기')}<small>${$t('13개 방 + 성채지기')}</small></button>
+      <button class="t1-btn ${saved || fresh ? '' : 'main'}" data-k="new">${$t(fresh ? '바로 런 시작' : '새 런')}${saved ? `<small>${$t('지금 런은 사라져요')}</small>` : fresh ? `<small>${$t('튜토리얼을 건너뛰고 세 층 내려가기')}</small>` : ''}</button>
+      ${fresh ? '' : `<button class="t1-btn" data-k="tut">${$t(tutDone() ? '튜토리얼 다시 하기' : '튜토리얼 하기')}<small>${$t('13개 방 + 성채지기')}</small></button>`}
     </div>
     <div class="t1-meta">${metaLine()}</div>
     <div class="t1-small">${$t('Shift/L 시대 전환 · WASD 이동 · J 찌르기 · Space 구르기 · E 상호작용')}<br>${$t('Shift를 연달아 눌러 윈도우 고정키 창이 뜨면 \'아니요\'를 누르세요. Shift 대신 L로도 시대를 바꿀 수 있어요.')}</div>`;
   let sure = false;
   UI.show(html, (k, el) => {
-    if (k === 'cont') { UI.close(); return; }
+    if (k === 'cont' || k === 'tutHere') { UI.close(); return; } // tutHere: 뒤에 깔린 튜토리얼 첫 방 그대로
     if (k === 'new') {
       // 이어할 런이 있으면 한 번 더 눌러야 새로 시작 ("클릭해서 시작"을 누른 자리가 바로 이 단추라 실수로 런을 날릴 뻔했다 — 11/13 직접 플레이)
       if (saved && !sure) { sure = true; el.innerHTML = `${$t('새 런')}<small>${$t('한 번 더 누르면 지금 런을 버리고 새로 시작해요')}</small>`; SND.deny(K); return; }
@@ -432,6 +436,7 @@ EXT.on('startRoom', () => {
   if (saved) { const room = enterResume(saved); showMenu(); return room; }
   if (tutDone()) { const room = enterRun(newSeed(), true); showMenu(); return room; }
   R.mode = 'tut';
+  showMenu(); // 처음 온 사람도 고른다: 튜토리얼부터 / 바로 런 (튜토리얼 첫 방은 뒤에 깔림)
   return undefined;
 });
 EXT.on('roomLoad', room => {

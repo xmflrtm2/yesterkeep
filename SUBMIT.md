@@ -80,7 +80,7 @@
 > **11/15 로그라이크 기준으로 다시 씀** (개발자님 "지금 고쳐"). 11/12 판은 "13 rooms and a boss, about 15 minutes", "Score = seconds spent in yesterday"였는데,
 > 11/13 로그라이크로 바꾼 뒤 13방은 튜토리얼이 됐고 "어제에서 쓴 초"는 점수가 아니라 자원(모래)이 됐다. 아래 숫자·이름은 main `adca30d`의 코드와 `docs/roguelike/t1~t4.md`에서 확인했다:
 > 유물·축복 38 + 저주 6(`src/ext/t4/items.js` id 44개), 적 13종(경비·골렘 + T2 열한 종) + 문지기 둘 + 성채지기, 정예 접두어 5, 퍼즐 장치 8종, 모래 최대 16초(1층) · 15 · 14,
-> 처음 접속은 튜토리얼 13방 → 다 깨야 런이 열림(`src/ext/t1-run.js` `yk-tut`). 영어 이름은 게임 안 영어 문구 그대로(Twin Wardens, Spider Queen, Archive of Memory 등).
+> 처음 접속 메뉴에서 튜토리얼 13방 또는 바로 런을 고른다(11/15 저녁에 바꿈, `src/ext/t1-run.js` `showMenu`; 그 전엔 13방을 다 깨야 런이 열렸다). 영어 이름은 게임 안 영어 문구 그대로(Twin Wardens, Spider Queen, Archive of Memory 등).
 > 한 판 길이는 아직 문구에 안 넣었다: T1 직접 플레이가 게임 시간 5분 36초(16방)·6분 52초였지만 생각하느라 멈춘 시간을 뺀 값이다. 개발자님이 한 판 해 보시면 그 시간으로 넣는다.
 
 ### 2-1. itch 프로젝트 페이지
@@ -90,7 +90,7 @@
 - **Short description or tagline**:
   > A stealth roguelike: shift the keep between its golden past and its ruined present. The era you leave freezes.
 - **Classification**: Games · **Kind**: HTML · **Release status**: In development (잼 중) · **Pricing**: No payments (무료, 잼 FAQ 권장)
-- **Embed**: "This file will be played in the browser" 체크, 크기 1280×720(또는 960×540) + Fullscreen button 켜기, Mobile friendly 끄기(키보드 게임)
+- **Embed**: "This file will be played in the browser" 체크, 크기 **1280×720** + Fullscreen button 켜기 (960×540은 피하기: 층 지도 판넬이 572px라 600px 아래 화면에선 지도가 스크롤된다, 11/15 직접 플레이), Mobile friendly 끄기(키보드 게임)
 - **Genre**: Action
 - **Tags (10)**: `roguelike`, `stealth`, `time-travel`, `assassin`, `procedural-generation`, `top-down`, `dungeon`, `3d`, `threejs`, `github-game-off` (11/12 판의 `short`·`singleplayer`를 뺐다 — 이제 짧은 게임이 아니고, itch 태그는 10개까지)
 - **AI generation disclosure**(itch 편집 페이지 체크칸): Code ✅, Text ✅(UI 문구·영어 번역), Sound ✅(효과음·음악을 코드로 합성) / Graphics ❌(Fab 에셋, 사람이 만든 것. 11/15 T5 아이콘은 코드로 그린 SVG — 아래 메모)
@@ -107,8 +107,8 @@ its vision cone frozen on the floor. Arrows hang in the air. A swinging blade st
 Walk around behind the guard in the ruins, then shift back and strike before it can turn.
 
 A ROGUELIKE DESCENT
-Your first visit is a 13-room tutorial that teaches every rule and ends at the Warden.
-After that, every run goes down three floors. On each floor you choose your path on a branching map:
+Start with a 13-room tutorial that teaches every rule and ends at the Warden, or skip it and start a run.
+Every run goes down three floors. On each floor you choose your path on a branching map:
 fights, puzzles, elites, treasure, shops and campfires. Rooms are stitched together from hand-built
 pieces, each one checked to be solvable, so no two runs are alike.
 Each floor ends with a gatekeeper. At the bottom, the Warden waits.
@@ -204,7 +204,7 @@ Game description:
 ```
 A top-down stealth dagger roguelike where one key shifts the whole keep between its golden past and its ruined present.
 The era you leave freezes: guards hang in place as red ghosts, arrows stop in midair, and you walk around behind
-them before shifting back to strike. A 13-room tutorial teaches the rules; then every run descends three floors
+them before shifting back to strike. An optional 13-room tutorial teaches the rules; every run descends three floors
 on a branching map, through rooms stitched from hand-built pieces. Enemies each bend one rule of time, puzzles
 make yesterday's actions build today, and 38 relics and 6 curses change how you play. Two gatekeepers and
 the Warden wait below. Time spent in yesterday is sand, and it runs out.
@@ -243,7 +243,7 @@ AI 공개 문구 (개발자님이 정한 뜻 그대로):
 | ~~첫 로딩 줄이기 12.9MB → 6MB~~ → 11/12 저녁 완료: 5.83MB(gltfpack 없이). 새 Fab 파일을 넣으면 `py -I tools\web_pack.py`를 다시 돌리고 release_check로 첫 로딩이 6MB 안인지 확인 | 완료 |
 | ~~끝 화면 "End of the prototype" → 엔딩 문구 + 크레딧~~ | 완료 (11/12 밤) | 문구를 바꾸려면 index.html `#endCard` + lang/en.js |
 | ~~시작 화면 또는 방 고르기~~ → 로그라이크로 시작 메뉴(이어하기·새 런·튜토리얼 다시 하기)는 생김. 남은 문제는 아래 줄 | — | |
-| **처음 온 사람은 튜토리얼 13방(끝에 성채지기)을 다 깨야 런이 열린다** (`src/ext/t1-run.js` `yk-tut`) → 심사자가 로그라이크를 못 보고 끝낼 수 있음. 고칠 길: 시작 메뉴에 "바로 런"을 처음부터 열기, 또는 튜토리얼 일부를 건너뛰게 | 11/20~27 다듬기 | 개발자님 결정 필요(아래) |
+| ~~처음 온 사람은 튜토리얼 13방을 다 깨야 런이 열린다~~ → 11/15 저녁 개발자님 "원하는대로 선택 가능하게": 처음 온 사람 메뉴에 **튜토리얼부터(추천) / 바로 런 시작**. 이어할 런이 있으면 이어하기 / 새 런 / 튜토리얼 하기 | 완료 | release_check가 처음 온 사람 메뉴를 확인하고 튜토리얼을 고름 |
 | itch 커버 630×500, 스크린샷 4~5장, GIF | 11/28 | `tools/readme_shots.py` 장면을 늘려 영어 화면으로 |
 | README에 로그라이크(층 지도·적·유물·모래) 반영 | 11/28 | 2-1 본문을 줄여서 |
 | 최종 빌드 + `release_check.py` 다시 | 11/27, 11/29 | `clear-all.js`에 새 방 풀이 추가 |
@@ -255,6 +255,6 @@ AI 공개 문구 (개발자님이 정한 뜻 그대로):
 |---|---|
 | ~~itch 초안을 Claude가 만들어도 되는지 답하기~~ → 11/12 "11/27에 만들어 줘" (예약 실행이 만듦) | 완료 |
 | 11/27 예약이 만든 itch 초안 확인 → Public 전환 → 잼 Submit | 11/27~29 |
-| 결정: 최종 제목(Yesterkeep 유지?), 코드 라이선스(All rights reserved 유지 추천), 튜토리얼을 다 깨기 전에도 런을 열지, 잼 폼 AI usage의 Art 칸(UI 아이콘을 AI 코드로 그림) | 11/25 전 |
+| 결정: 최종 제목(Yesterkeep 유지?), 코드 라이선스(All rights reserved 유지 추천), 잼 폼 AI usage의 Art 칸(UI 아이콘을 AI 코드로 그림) | 11/25 전 |
 | 손으로 튜토리얼부터 런 한 판까지(특히 문지기·성채지기) + 소감. 걸린 시간을 알려 주시면 2장 문구에 한 판 길이를 넣음(지금은 길이를 안 적음 — T1 직접 플레이 게임 시간 5분 36초~6분 52초, 생각한 시간 뺀 값) | 11/27 전 |
 | (선택) X·itch 게시판 홍보 문구 승인 | 제출 뒤 |

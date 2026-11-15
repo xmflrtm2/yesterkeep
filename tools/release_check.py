@@ -179,6 +179,9 @@ async def run(root, shots, json_out):
                 for (const e of performance.getEntriesByType('resource')) if (e.responseEnd <= t) seen[decodeURIComponent(new URL(e.name).pathname).slice(1)] = e.encodedBodySize;
                 seen['index.html'] = performance.getEntriesByType('navigation')[0].encodedBodySize; return seen; })()""")
             rep['load_seconds'] = round(time.time() - t0, 2)
+            # 처음 온 사람 메뉴(튜토리얼부터 / 바로 런, 11/15) — 떠 있어야 하고, 튜토리얼을 골라 아래 방 풀이로 간다
+            rep['first_menu'] = await c.eval("""(() => { const b = document.querySelector('.t1-ov [data-k="tutHere"]');
+                const n = document.querySelector('.t1-ov [data-k="new"]'); if (!b || !n) return false; b.click(); return true; })()""")
             rep['lang'] = await c.eval('document.documentElement.lang')
             rep['title'] = await c.eval('document.title')
             if shots:
@@ -256,6 +259,7 @@ def show(rep):
     print(f"  {ok(not rep['failed_requests'])} requests that failed without an HTTP status: {rep['failed_requests'] or 0}")
     print(f"  {ok(not rep['case_mismatch'])} path case mismatches (itch CDN is case-sensitive): {rep['case_mismatch'] or 0}")
     print(f"  {ok(rep['lang'] == 'en')} default language for an en-US browser: {rep['lang']} (title '{rep['title']}')")
+    print(f"  {ok(rep.get('first_menu'))} first-visit menu (tutorial / run now) shown, tutorial picked")
     print(f"  {ok(not rep['i18n_missing_at_runtime'])} translations missing while playing: {len(rep['i18n_missing_at_runtime'])}")
     for k in rep['i18n_missing_at_runtime'][:10]:
         print('        -', k)

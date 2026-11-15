@@ -45,7 +45,7 @@ async def main(wav):
             c = CDP(ws)
             pump = asyncio.ensure_future(c.pump())
             await c.call('Runtime.enable'); await c.call('Page.enable')
-            await c.call('Page.navigate', url=f'http://127.0.0.1:{port}/')
+            await c.call('Page.navigate', url=f'http://127.0.0.1:{port}/?tutorial')
             for _ in range(300):
                 await asyncio.sleep(0.2)
                 try:

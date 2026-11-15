@@ -142,7 +142,7 @@ async def run(out_dir, names):
             await c.call('Page.navigate', url=base)
             await c.until("document.readyState === 'complete'")
             await c.eval("localStorage.setItem('yk-lang', 'en'); true")
-            await c.call('Page.navigate', url=base + '?shots=' + str(int(time.time())))
+            await c.call('Page.navigate', url=base + '?tutorial&shots=' + str(int(time.time())))
             await c.until('window.__yk && __yk.ready()')
             await c.until('__yk.golemModel()', tries=150)
             await c.eval(HELPERS)
