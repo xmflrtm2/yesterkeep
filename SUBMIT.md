@@ -2,6 +2,8 @@
 
 > **1차 점검 2026-11-12** (Claude). 11/27 14:00 예약 실행 `yesterkeep-submit-prep-1127`이 이 파일을 다시 점검해 고쳐 쓰고,
 > 12/1 12:00 `game-off-final-check-1201`이 제출 여부를 확인한다. 개발은 11/29까지 이어질 수 있으니 숫자는 그때 다시 잰다.
+> **11/15: 잼에 내는 것은 로그라이크판**(13방은 처음 한 번 하는 튜토리얼, 그 뒤 3층 + 성채지기 런). 13방만 있는 판(태그 `jam-safe-1113`)은 로그라이크가 늦을 때의 예비판이다.
+> 2장 문구는 11/15에 로그라이크 기준으로 다시 썼다. 1장 표는 11/12(로그라이크 전) 측정이고, 11/15 합친 판 숫자는 튜토리얼 13/13 · T3 29/29 · T2 40방 오류 0 · 시드 10개 327방 오류 0 · 첫 로딩 5.36MB(itch 빌드 5.03MB).
 
 ## 0. 잼 규칙 재확인 (2026-11-12, itch.io/jam/game-off-2026 + FAQ 글)
 
@@ -75,48 +77,75 @@
 
 ## 2. 문구
 
+> **11/15 로그라이크 기준으로 다시 씀** (개발자님 "지금 고쳐"). 11/12 판은 "13 rooms and a boss, about 15 minutes", "Score = seconds spent in yesterday"였는데,
+> 11/13 로그라이크로 바꾼 뒤 13방은 튜토리얼이 됐고 "어제에서 쓴 초"는 점수가 아니라 자원(모래)이 됐다. 아래 숫자·이름은 main `adca30d`의 코드와 `docs/roguelike/t1~t4.md`에서 확인했다:
+> 유물·축복 38 + 저주 6(`src/ext/t4/items.js` id 44개), 적 13종(경비·골렘 + T2 열한 종) + 문지기 둘 + 성채지기, 정예 접두어 5, 퍼즐 장치 8종, 모래 최대 16초(1층) · 15 · 14,
+> 처음 접속은 튜토리얼 13방 → 다 깨야 런이 열림(`src/ext/t1-run.js` `yk-tut`). 영어 이름은 게임 안 영어 문구 그대로(Twin Wardens, Spider Queen, Archive of Memory 등).
+> 한 판 길이는 아직 문구에 안 넣었다: T1 직접 플레이가 게임 시간 5분 36초(16방)·6분 52초였지만 생각하느라 멈춘 시간을 뺀 값이다. 개발자님이 한 판 해 보시면 그 시간으로 넣는다.
+
 ### 2-1. itch 프로젝트 페이지
 
 - **Title**: `Yesterkeep`
 - **Project URL**: `xmflrtm2.itch.io/yesterkeep`
 - **Short description or tagline**:
-  > Shift between the keep's golden past and its ruined present. The era you leave freezes, guards and all.
+  > A stealth roguelike: shift the keep between its golden past and its ruined present. The era you leave freezes.
 - **Classification**: Games · **Kind**: HTML · **Release status**: In development (잼 중) · **Pricing**: No payments (무료, 잼 FAQ 권장)
 - **Embed**: "This file will be played in the browser" 체크, 크기 1280×720(또는 960×540) + Fullscreen button 켜기, Mobile friendly 끄기(키보드 게임)
 - **Genre**: Action
-- **Tags (10)**: `stealth`, `time-travel`, `assassin`, `top-down`, `dungeon`, `3d`, `short`, `singleplayer`, `threejs`, `github-game-off`
-- **AI generation disclosure**(itch 편집 페이지 체크칸): Code ✅, Text ✅(UI 문구·영어 번역), Sound ✅(효과음을 코드로 합성) / Graphics ❌(Fab 에셋, 사람이 만든 것)
+- **Tags (10)**: `roguelike`, `stealth`, `time-travel`, `assassin`, `procedural-generation`, `top-down`, `dungeon`, `3d`, `threejs`, `github-game-off` (11/12 판의 `short`·`singleplayer`를 뺐다 — 이제 짧은 게임이 아니고, itch 태그는 10개까지)
+- **AI generation disclosure**(itch 편집 페이지 체크칸): Code ✅, Text ✅(UI 문구·영어 번역), Sound ✅(효과음·음악을 코드로 합성) / Graphics ❌(Fab 에셋, 사람이 만든 것. 11/15 T5 아이콘은 코드로 그린 SVG — 아래 메모)
 
 **Description** (페이지 본문, 영어):
 
 ```
 Press Shift and the whole keep shifts between its golden past and its ruined present.
+The era you leave freezes. Then the keep rearranges itself, and you go down again.
 
 THE ERA YOU LEAVE FREEZES
 Step into today and yesterday stops mid-breath. A patrolling guard hangs in place as a red ghost,
 its vision cone frozen on the floor. Arrows hang in the air. A swinging blade stops mid-arc.
 Walk around behind the guard in the ruins, then shift back and strike before it can turn.
 
-A STEALTH DAGGER GAME, NOT A PUZZLE BOX
-- Backstab: one hit from behind, even when the guard has spotted you.
-- Shift strike: arrive in an era and every guard within 3 m freezes for a moment. Strike from any side.
-- Stone golems exist only today and bounce a front stab off their shields. Go to yesterday,
-  where they freeze, get behind them, and come back.
-- The Warden, the keep's last guardian, follows you through time and turns to face you. But shift
-  in the middle of its attack and it loses track of time: it stays locked in that swing for 1.5 seconds,
-  then arrives exactly where and how it stood and finishes the blow, back wide open.
+A ROGUELIKE DESCENT
+Your first visit is a 13-room tutorial that teaches every rule and ends at the Warden.
+After that, every run goes down three floors. On each floor you choose your path on a branching map:
+fights, puzzles, elites, treasure, shops and campfires. Rooms are stitched together from hand-built
+pieces, each one checked to be solvable, so no two runs are alike.
+Each floor ends with a gatekeeper. At the bottom, the Warden waits.
+Fall, and the run is over. The memories you carry back unlock new relics and choices for the next one.
+
+SAND: YESTERDAY COSTS TIME
+Your hourglass holds about 16 seconds of yesterday. It drains while you are in the past and refills
+when you take down enemies, pick up hourglass shards and clear rooms. Run dry and you are pulled back
+into today, even if today there is only a pit under your feet. Decide where yesterday is worth spending.
+
+EVERY ENEMY BENDS ONE RULE OF TIME
+- Guards fall to one backstab, even after they have spotted you.
+  Shift in next to them and they freeze for a moment: strike from any side.
+- Stone Golems exist only today and bounce a front stab off their shields. Get behind them in yesterday, then come back.
+- Time Hounds follow you through time 0.7 seconds late. Lure one over a pit that exists only in the other era.
+- Shieldbearers turn at the slightest sound. Wait behind a frozen back in the other era, then shift in.
+- Crossbow bolts fly only in yesterday. Leave, and they hang in midair until you return.
+- Time Mages raise the fallen, but their spell only ticks while you are in yesterday.
+- A Mimic is just a chest yesterday. Push the chest, and today's Mimic moves with it.
+- Echoes walk your own path 2.4 seconds behind you. Wraiths are almost invisible in their own era.
+- The Twin Wardens revive each other. The Spider Queen's eggs yesterday are her brood today.
+- The Warden follows you through time, unless you shift in the middle of its attack. Then it loses
+  track of time, stays locked in that swing, and arrives finishing the blow with its back wide open.
   If that spot is a pit in your era, it falls.
+Elite prefixes (Hasty, Hardened, Time-defying, Keen-eyed, Rewinding) change how each foe has to be beaten.
 
-TWO MAPS OF ONE KEEP
-Today the bridge is gone; yesterday it stands. Yesterday the bars are shut; today the wall beside them
-has crumbled. And yesterday leaves marks on today: push a crate into the moat yesterday and it is
-a rotten stepping stone today. A guard who falls yesterday is a pile of bones today.
+PUZZLES THAT SPAN TWO ERAS
+Plant a seed yesterday and a root bridge stands today. Turn a sluice wheel and the water levels swap.
+Angle mirrors yesterday to bend today's moonlight onto a seal. Carry a key out of the ruins into the past.
+Wind a clockwork door that only unwinds while you are in today.
 
-SCORE = SECONDS SPENT IN YESTERDAY
-Every room counts your time in the past and your alarms. Fewer seconds, fewer alarms, more stars.
-Hourglass shards are hidden for players who read both maps.
+38 RELICS AND BLESSINGS, 6 CURSES
+Relics change how you play, not just your numbers: a wider time-shock ring, throwing daggers,
+a shield that blocks the first hit in every room, moonlight that pins enemies in place.
+Curses make you stronger at a price, and pay out more memories at the end of the run.
 
-13 rooms and a boss, about 15 minutes. Plays in the browser (WebGL). Keyboard required.
+Plays in the browser (WebGL). Keyboard required. Your run is saved: close the tab and continue later.
 Click the game once to start; it pauses when you click outside it.
 
 Made for GitHub Game Off 2026 (theme: SHIFT). Source: https://github.com/xmflrtm2/yesterkeep
@@ -133,8 +162,12 @@ the developer. The art, 3D models and animations are purchased Fab assets made b
 | J / F / Left click | Stab |
 | Space / K | Roll |
 | Shift / L | Shift era (yesterday ↔ today). If Windows asks about Sticky Keys after a few Shift presses, choose No, or use L |
-| E | Interact (levers) |
+| E | Interact (levers, devices, altars, shops) |
+| Q | Throw (when you carry daggers or bolts) |
+| Tab / I | Your relics |
+| Map: A·D / ←→, Enter | Choose the next room |
 | R | Restart room |
+| Esc / P | Pause |
 
 **Credits** (본문 끝):
 ```
@@ -143,15 +176,18 @@ Armored Stone Golem — from Fab, used under the Fab Standard License.
 Engine: three.js (MIT).
 ```
 
-**스크린샷 후보** (itch는 630×500 커버 + 스크린샷 3~5장 권장):
+**스크린샷 후보** (itch는 630×500 커버 + 스크린샷 3~5장 권장). 로그라이크 화면(지도·유물·문지기)은 지금 한국어 화면 스크린샷만 있으니 11/28에 영어로 다시 찍는다:
 1. `docs/readme/banner.jpg` — 같은 방 어제|오늘 사선 (커버 630×500으로 다시 잘라야 함)
 2. `docs/readme/ghost_today.jpg` + `docs/readme/backstab_yesterday.jpg` — 멈춘 경비 → 등 찌르기 (핵심 재미)
-3. `docs/readme/arrows_today.jpg` — 공중에 멈춘 화살
-4. `docs/boss/10-parry-locked.jpg` — 공격 중에 바꿔 묶인 보스(멈춘 윤곽 + 등 뒤 구역). 11/12 오후 규칙 변경 뒤 장면
-5. `docs/boss/05-charge-line.jpg` 또는 `docs/readme/golem_slam.jpg`
+3. **층 지도**(갈림길·방 종류) — 영어로 새로 (참고: `devlog/shots/2026-11-15-t5/` T5 지도 화면)
+4. **유물 고르기 창**(셋 중 하나, 저주 카드 포함이면 더 좋음) — 영어로 새로
+5. **문지기**: 쌍둥이 간수(벽에 박힌 형의 등) 또는 거미 여왕 — 영어로 새로 (참고: `devlog/shots/2026-11-15-merge-r2fix/33-behind-elder.jpg`, `41-twins-down.jpg`)
+6. `docs/boss/10-parry-locked.jpg` — 공격 중에 바꿔 묶인 성채지기
 - 피할 것: 레버·창살만 보이는 장면(These Four Walls와 첫인상이 겹침), 한국어 화면
 
-These Four Walls와 겹쳐 보이지 않게 쓴 점: "퍼즐 플랫포머", "분신", "몸 바꾸기", "고딕" 같은 말을 쓰지 않았고, 첫 문단부터 **세계 전체가 바뀜 + 떠난 시대가 멈춤 + 단검 잠입**을 앞세웠다. 레버는 조작표에만 있다.
+These Four Walls와 겹쳐 보이지 않게 쓴 점: "퍼즐 플랫포머", "분신", "몸 바꾸기", "고딕" 같은 말을 쓰지 않았고, 첫 문단부터 **세계 전체가 바뀜 + 떠난 시대가 멈춤 + 단검 잠입**을 앞세웠다. 레버는 조작표에만 있다. 로그라이크 부분도 "매번 달라지는 성채 + 적마다 시간 규칙 하나"로 다른 점을 앞세웠다.
+
+메모: T5(11/15)의 HUD·지도 아이콘은 코드로 그린 SVG다(AI가 짠 코드가 그림). 그래서 itch 체크칸의 Graphics는 그대로 ❌로 두되, 잼 폼의 AI usage에서는 "Art / graphics"를 켤지 개발자님이 정한다(아래 2-2 표). 켜는 쪽이 더 정직하다.
 
 ### 2-2. 잼 제출 폼 (itch.io/jam/417834/add-game)
 
@@ -161,16 +197,18 @@ These Four Walls와 겹쳐 보이지 않게 쓴 점: "퍼즐 플랫포머", "분
 | GitHub repository URL | `https://github.com/xmflrtm2/yesterkeep` |
 | Game description | 아래 블록 |
 | Theme interpreation (한 줄) | 아래 한 줄 |
-| AI usage | ✅ Code / programming · ✅ Game design / brainstorming · ✅ Testing / debugging · ✅ Writing / dialogue / narrative · ✅ Music / sound effects / voice (효과음 합성 코드) · ❌ Art / graphics / animation · ❌ I didn't use AI · ❌ Other |
-| Extent of AI usage | **A lot - AI played a major role** (코드는 거의 전부 AI, 그림·모델·동작은 사람이 만든 Fab, 설계 결정과 플레이 검토는 개발자) |
+| AI usage | ✅ Code / programming · ✅ Game design / brainstorming · ✅ Testing / debugging · ✅ Writing / dialogue / narrative · ✅ Music / sound effects / voice (효과음·음악 합성 코드) · ❓ Art / graphics / animation (3D·동작은 사람이 만든 Fab, **UI 아이콘 83개는 AI가 코드로 그림** — 켜기 추천, 개발자님 결정) · ❌ I didn't use AI · ❌ Other |
+| Extent of AI usage | **A lot - AI played a major role** (코드는 거의 전부 AI, 3D 그림·모델·동작은 사람이 만든 Fab, 설계 결정과 플레이 검토는 개발자) |
 
 Game description:
 ```
-A top-down stealth dagger game where one key shifts the whole keep between its golden past and its ruined present.
+A top-down stealth dagger roguelike where one key shifts the whole keep between its golden past and its ruined present.
 The era you leave freezes: guards hang in place as red ghosts, arrows stop in midair, and you walk around behind
-them before shifting back to strike. Stone golems exist only today; the Warden follows you through time,
-unless you shift in the middle of its attack.
-Score = seconds spent in yesterday. 13 rooms, about 15 minutes, plays in the browser.
+them before shifting back to strike. A 13-room tutorial teaches the rules; then every run descends three floors
+on a branching map, through rooms stitched from hand-built pieces. Enemies each bend one rule of time, puzzles
+make yesterday's actions build today, and 38 relics and 6 curses change how you play. Two gatekeepers and
+the Warden wait below. Time spent in yesterday is sand, and it runs out.
+Plays in the browser, keyboard required.
 
 AI disclosure: the code was written with the AI coding assistant Claude, directed and reviewed by the developer.
 The art, 3D models and animations are purchased Fab assets made by human artists.
@@ -184,11 +222,12 @@ SHIFT is the key you press: one tap shifts the whole keep between yesterday and 
 AI 공개 문구 (개발자님이 정한 뜻 그대로):
 - 한국어: 코드는 AI 코딩 도우미 Claude로 작성하고 개발자가 지휘·검토했다. 그림·3D 모델·동작은 사람이 만든 Fab 에셋(구매)이다.
 - English: The code was written with the AI coding assistant Claude, directed and reviewed by the developer. The art, 3D models and animations are purchased Fab assets made by human artists.
+- (UI 아이콘을 AI 코드로 그린 것을 밝히려면 한 줄 더: "The UI icons are drawn in code written with Claude." — 위 Art 칸 결정과 같이)
 
 ## 3. 개발자님이 누를 순서
 
 1. **itch 프로젝트 초안** — 11/12 개발자님 답: "11/27에 만들어 줘". 11/27 14:00 예약 실행(`yesterkeep-submit-prep-1127`)이 Chrome에서 `itch.io/game/new`로 **초안(Draft)**을 만들고 zip 올리기·문구·태그·커버·스크린샷·AI 체크칸까지 채운다. 공개 전환·잼 제출·약관 동의는 하지 않는다. 업로드 파일은 그날 다시 만드는 `build/itch/yesterkeep-web.zip`.
-2. 초안 페이지를 열어 직접 한 판 해 보기(브라우저 임베드, 전체 화면 버튼, 소리).
+2. 초안 페이지를 열어 직접 한 판 해 보기(브라우저 임베드, 전체 화면 버튼, 소리). 튜토리얼 13방을 다 깨야 런이 열리니, 런까지 보려면 시간이 걸린다.
 3. 프로젝트를 **Public**으로 바꾸고 저장. (초안은 다른 사람이 열 수 없으니 제출 전에 공개)
 4. 잼 페이지 https://itch.io/jam/game-off-2026 → **Submit your project** → Project에서 Yesterkeep 고르기 → 2-2 표대로 채우기 → **Submit**.
 5. 잼 제출 목록(itch.io/jam/game-off-2026/entries)에 뜨는지, 거기서 게임이 열리는지 확인.
@@ -203,9 +242,10 @@ AI 공개 문구 (개발자님이 정한 뜻 그대로):
 |---|---|---|
 | ~~첫 로딩 줄이기 12.9MB → 6MB~~ → 11/12 저녁 완료: 5.83MB(gltfpack 없이). 새 Fab 파일을 넣으면 `py -I tools\web_pack.py`를 다시 돌리고 release_check로 첫 로딩이 6MB 안인지 확인 | 완료 |
 | ~~끝 화면 "End of the prototype" → 엔딩 문구 + 크레딧~~ | 완료 (11/12 밤) | 문구를 바꾸려면 index.html `#endCard` + lang/en.js |
-| 시작 화면 또는 방 고르기 | 11/27 전 | 심사자가 보스까지 가게. 개발자님 결정 필요(아래) |
+| ~~시작 화면 또는 방 고르기~~ → 로그라이크로 시작 메뉴(이어하기·새 런·튜토리얼 다시 하기)는 생김. 남은 문제는 아래 줄 | — | |
+| **처음 온 사람은 튜토리얼 13방(끝에 성채지기)을 다 깨야 런이 열린다** (`src/ext/t1-run.js` `yk-tut`) → 심사자가 로그라이크를 못 보고 끝낼 수 있음. 고칠 길: 시작 메뉴에 "바로 런"을 처음부터 열기, 또는 튜토리얼 일부를 건너뛰게 | 11/20~27 다듬기 | 개발자님 결정 필요(아래) |
 | itch 커버 630×500, 스크린샷 4~5장, GIF | 11/28 | `tools/readme_shots.py` 장면을 늘려 영어 화면으로 |
-| README에 보스·13방 반영 | 11/28 | 이번엔 AI 공개 문구·빌드/점검 방법만 고침 |
+| README에 로그라이크(층 지도·적·유물·모래) 반영 | 11/28 | 2-1 본문을 줄여서 |
 | 최종 빌드 + `release_check.py` 다시 | 11/27, 11/29 | `clear-all.js`에 새 방 풀이 추가 |
 | 이 파일 갱신 | 11/27 예약 실행 | 숫자·문구·남은 일 |
 | (선택) 가시 창고 엇박 조정, 안 쓰는 파일 4개 빼기 | 아무 때 | 작음 |
@@ -215,6 +255,6 @@ AI 공개 문구 (개발자님이 정한 뜻 그대로):
 |---|---|
 | ~~itch 초안을 Claude가 만들어도 되는지 답하기~~ → 11/12 "11/27에 만들어 줘" (예약 실행이 만듦) | 완료 |
 | 11/27 예약이 만든 itch 초안 확인 → Public 전환 → 잼 Submit | 11/27~29 |
-| 결정: 최종 제목(Yesterkeep 유지?), 코드 라이선스(All rights reserved 유지 추천), 시작 화면/방 고르기 | 11/25 전 |
-| 손으로 처음부터 끝까지 한 판(특히 보스: 공격 중에 바꿔 묶어 두는 게 읽히는지) + 소감. 걸린 시간도 알려 주시면 문구의 "about 15 minutes"를 실측으로 고침(지금은 기획서 목표치, 봇은 2분 28초) | 11/27 전 |
+| 결정: 최종 제목(Yesterkeep 유지?), 코드 라이선스(All rights reserved 유지 추천), 튜토리얼을 다 깨기 전에도 런을 열지, 잼 폼 AI usage의 Art 칸(UI 아이콘을 AI 코드로 그림) | 11/25 전 |
+| 손으로 튜토리얼부터 런 한 판까지(특히 문지기·성채지기) + 소감. 걸린 시간을 알려 주시면 2장 문구에 한 판 길이를 넣음(지금은 길이를 안 적음 — T1 직접 플레이 게임 시간 5분 36초~6분 52초, 생각한 시간 뺀 값) | 11/27 전 |
 | (선택) X·itch 게시판 홍보 문구 승인 | 제출 뒤 |
