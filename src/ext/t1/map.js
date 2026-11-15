@@ -4,7 +4,7 @@ import { makeRng } from './rng.js';
 import { icon } from '../t5/icons.js'; // T5: 칸 그림 (없는 종류면 icon 글자 그대로)
 
 export const TYPES = {
-  combat: { icon: '⚔', name: N('전투'), desc: N('경비와 골렘을 모두 쓰러뜨려야 출구가 열려요'), color: '#ff9a8a' },
+  combat: { icon: '⚔', name: N('전투'), desc: N('적을 모두 쓰러뜨려야 출구가 열려요'), color: '#ff9a8a' },
   puzzle: { icon: '✦', name: N('퍼즐'), desc: N('어제와 오늘을 엮는 장치. 어제를 아끼는 길을 찾아요'), color: '#7fe8ff' },
   elite: { icon: '☠', name: N('정예'), desc: N('더 많은 적 — 모래와 기억을 더 줘요'), color: '#ff5d6c' },
   treasure: { icon: '◆', name: N('보물'), desc: N('모래시계 조각이 있는 방'), color: '#ffd27a' },

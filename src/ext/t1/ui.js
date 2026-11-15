@@ -45,7 +45,7 @@ const CSS = `
 #ext .t1-node.sel { transform: translate(-50%, -50%) scale(1.2); box-shadow: 0 0 0 2px #000c, 0 0 0 4px currentColor, 0 0 22px currentColor, inset 0 0 10px #000d; animation: none; z-index: 1; }
 #ext .t1-node.far { opacity: .62; filter: grayscale(.3); }
 @keyframes t1pulse { 50% { box-shadow: 0 0 0 2px #000c, 0 0 16px currentColor, inset 0 0 10px #000d; } }
-#ext .t1-info { min-height: 44px; font-size: 15px; }
+#ext .t1-info { min-height: 44px; font-size: 15px; } #ext .t1-info .t1-rname { opacity: 0.8; font-size: 14px; } #ext .t1-info .t1-opt { opacity: 0.65; } #ext .t1-info .t1-rule { display: inline-block; }
 #ext .t1-info b { font-size: 18px; display: inline-flex; align-items: center; gap: 6px; } #ext .t1-info b .yi { width: 24px; height: 24px; }
 #ext .t1-bar { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; font-size: 15px; font-weight: 700; }
 #ext .t1-bar span { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px 2px 6px; border-radius: 4px; background: #0008; box-shadow: inset 0 0 0 1px var(--pn-edge-dk); }
@@ -81,6 +81,10 @@ body:has(#ext .t1-ov) #hud #hint, body:has(#ext .t1-ov) #hud #prompt, body:has(#
   #ext .t1-node { width: 46px; height: 46px; } #ext .t1-node .yi { width: 31px; height: 31px; }
   #ext .t1-sand { top: 44px; left: 12px; } #ext .t1-sand .bar { width: 96px; }
 }
+/* 600px 안팎 창(960×600 등): 층 지도 판넬이 화면보다 커서 스크롤됐다(2줄 설명 8px, 적 목록이 긴 3줄 설명 28px — 11/15) → 틈·여백·제목만 줄임 */
+@media (min-height: 521px) and (max-height: 660px) {
+  #ext .t1-box { gap: 6px; padding: 14px 30px 12px; } #ext .t1-h { font-size: 26px; }
+}
 /* 낮은 창(960×420 등): 칸이 겹치지 않게 작게 (11/13 창 크기 시험) */
 @media (max-height: 520px) {
   #ext .t1-mapwrap { height: 60vh; min-height: 240px; } #ext .t1-h { font-size: 20px; } #ext .t1-box { gap: 4px; padding: 12px 22px; } #ext .yk-h::after { margin-top: 2px; }
@@ -112,7 +116,9 @@ export const UI = {
     this.sel = Math.max(0, Math.min(this.items.length - 1, opts.sel || 0));
     for (const el of this.items) {
       el.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); this.pick(el); });
-      el.addEventListener('mouseenter', () => { this.sel = this.items.indexOf(el); this.mark(); });
+      // 마우스를 정말 움직였을 때만 고른 것을 바꾼다. 덮개가 가만히 있는 커서 밑에 뜨면(가운데를 눌러 시작 → 커서가 '새 런' 위) 브라우저가
+      // 움직임 0짜리 마우스 사건을 보내 '새 런'이 골라졌고, Enter 두 번이면 이어하던 런이 사라졌다 (11/15 전체 직접 플레이)
+      el.addEventListener('mousemove', e => { if (!(e.movementX || e.movementY)) return; const k = this.items.indexOf(el); if (k >= 0 && k !== this.sel) { this.sel = k; this.mark(); } });
     }
     this.onSel = opts.onSel || null;
     this.mark();

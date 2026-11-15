@@ -188,19 +188,7 @@ function buildNodeRoom(node, resume = false) {
     if (room && room.start && room.exit && !room.past.some(r => r.includes('@'))) room = toRoom({ ...room, w: room.past[0].length, h: room.past.length, parts: [], shards: room.shards || [] }, {});
     room = { ...room, id, label };
   } else {
-    let rec = resume && st.recipe && st.recipe.a ? st.recipe : null;
-    if (!rec) rec = genRecipe(node.type === 'guard' ? 'guard' : node.type, makeRng(st.seed, 'room', f, node.row, node.col), f, node.row);
-    const vr = () => makeRng(st.seed, 'vary', f, node.row, node.col);
-    let built = rec && fromRecipe(rec, vr());
-    if (built) {
-      const r = toRoom(built.c, { id, name: built.name, label });
-      const chk = reachCheck(r, EXT.chars);
-      if (!chk.ok) { // 이어 붙인 게 안 풀리면 첫 조각만
-        console.warn('[T1] generated room failed reach check, using first chunk', rec, chk.why);
-        rec = { ...rec, b: null }; built = fromRecipe(rec, vr());
-      }
-    }
-    if (!built) { rec = { a: 't1-sentry', fa: false, b: null, tier: 1, type: node.type }; built = fromRecipe(rec, vr()); }
+    const { rec, built } = planNode(node, resume);
     room = toRoom(built.c, { id, name: built.name, label });
     // 2차: 런에서는 시작 칸이 오늘에도 서 있을 수 있으면 오늘에서 시작 — 어제에서 시작하면 방을 읽는 동안 모래가 줄었다(11/15 직접 플레이: 가라앉은 열쇠·달과 물의 방)
     if (room.startEra === 'past') { const j = room.now.findIndex(r => r.includes('@')), i = j >= 0 ? room.now[j].indexOf('@') : -1; const below = i >= 0 ? (built.c.now[j] || '')[i] : null; if (below && '.,%='.includes(below) || below === '@') room.startEra = 'now'; }
@@ -213,6 +201,75 @@ function buildNodeRoom(node, resume = false) {
     if (!resume) { st.used.push(rec.a); if (rec.b) st.used.push(rec.b); }
   }
   return withMeta(room, m);
+}
+// 지도 칸 → 쓸 조각 조합(rec)과 조각(built). 같은 시드·같은 칸·같은 st.used면 늘 같은 결과이고 부작용이 없다
+// → 방 만들기(buildNodeRoom)와 지도 칸 설명(previewNode: 그 방에 실제로 나올 적)이 같이 쓴다
+function planNode(node, resume = false, quiet = false) {
+  const f = st.floor;
+  let rec = resume && st.recipe && st.recipe.a ? st.recipe : null;
+  if (!rec) rec = genRecipe(node.type === 'guard' ? 'guard' : node.type, makeRng(st.seed, 'room', f, node.row, node.col), f, node.row);
+  const vr = () => makeRng(st.seed, 'vary', f, node.row, node.col);
+  let built = rec && fromRecipe(rec, vr());
+  if (built) {
+    const chk = reachCheck(toRoom(built.c, { name: built.name }), EXT.chars);
+    if (!chk.ok) { // 이어 붙인 게 안 풀리면 첫 조각만
+      if (!quiet) console.warn('[T1] generated room failed reach check, using first chunk', rec, chk.why);
+      rec = { ...rec, b: null }; built = fromRecipe(rec, vr());
+    }
+  }
+  if (!built) { rec = { a: 't1-sentry', fa: false, b: null, tier: 1, type: node.type }; built = fromRecipe(rec, vr()); }
+  return { rec, built };
+}
+// 지도 칸 설명: 전투·정예·문지기·퍼즐 칸은 그 칸에 실제로 만들어질 방(같은 레시피)을 미리 짜 보고 방 이름과 적을 적는다
+// (11/15 개발자님 "전투 방 설명도 적에 맞게": 전에는 전투 칸이 늘 "경비와 골렘을 모두 쓰러뜨려야"라 마법사 방에서도 그렇게 나왔다)
+const NAME_GUARD = N('경비'), NAME_GOLEM = N('골렘');
+// 배치에 optional이 없어도 스스로 출구를 안 막는 적: 거미 알, required가 아닌 두 시대의 눈 (t2/bosses.js · t2/deep.js)
+const SELF_OPT = { 't2-egg': () => true, 't2-watcher': d => !d.required };
+const PREV = new Map();
+function previewNode(node) {
+  if (!st || !['combat', 'elite', 'puzzle', 'guard'].includes(node.type) || ROOMTYPES[node.type] || TEMP[node.type]) return null;
+  const key = [st.seed, st.floor, node.row, node.col, st.used.join(',')].join('|');
+  if (PREV.has(key)) return PREV.get(key);
+  let out = null;
+  try {
+    const { built } = planNode(node, false, true);
+    const c = built.c, need = new Map(), opt = new Map(), pairs = new Set();
+    let n = 0, o = 0;
+    const add = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+    for (const g of c.guards || []) { add(need, NAME_GUARD); n++; }
+    for (const g of c.golems || []) { add(need, NAME_GOLEM); n++; }
+    for (const d of c.foes || []) {
+      const isOpt = !!(d.optional || (SELF_OPT[d.kind] && SELF_OPT[d.kind](d)));
+      if (isOpt) o++; else n++;
+      if (d.pair) { if (pairs.has(d.kind + d.pair)) continue; pairs.add(d.kind + d.pair); } // 쌍둥이 간수: 한 쌍을 이름 하나로
+      const F = EXT.foes[d.kind];
+      add(isOpt ? opt : need, (F && F.name) || d.kind);
+    }
+    out = { name: built.name, need, opt, n, o };
+  } catch (e) { console.error('[T1] map preview', e); }
+  if (PREV.size > 200) PREV.clear();
+  PREV.set(key, out);
+  return out;
+}
+function nodeInfo(n) {
+  const tm = typeMeta(n.type), p = previewNode(n);
+  const list = m => [...m].map(([k, v]) => $t(k) + (v > 1 ? ' ×' + v : '')).join(' · ');
+  const head = `<b style="color:${tm.color}">${icon(n.type, { fb: tm.icon })} ${$t(tm.name)}</b>${p ? ` <span class="t1-rname">— ${p.name}</span>` : ''}`;
+  let body = $t(tm.desc);
+  // 규칙 문장은 통째로 줄을 넘긴다(inline-block) — 적 목록이 길면 "… 더 / 줘요"처럼 끝 두 글자만 넘어갔다 (11/15 3층 정예 칸)
+  const rule = k => `<span class="t1-rule">${$t(k)}</span>`;
+  if (p) {
+    const need = list(p.need), opt = p.opt.size ? `<span class="t1-opt">${$t('{0}(선택)', list(p.opt))}</span>` : '';
+    const foes = [need, opt].filter(Boolean).join(' · ');
+    if (n.type === 'guard') {
+      const g = list(new Map([...p.need].filter(([k]) => $t(k) !== p.name))), gf = [g, opt].filter(Boolean).join(' · ');
+      body = (gf ? gf + ' — ' : '') + rule(tm.desc);
+    }
+    else if (n.type === 'elite') body = need ? `${foes} — ${rule('정예 접두어가 붙고, 모래와 기억을 더 줘요')}` : $t(tm.desc);
+    else if (n.type === 'combat') body = need ? `${foes} — ${rule('모두 쓰러뜨려야 출구가 열려요')}` : `${opt ? opt + ' — ' : ''}${rule('꼭 쓰러뜨릴 적은 없어요. 출구까지 가면 돼요')}`;
+    else if (need) body = `${$t('장치와 적')}: ${foes} — ${rule('모두 쓰러뜨려야 출구가 열려요')}`; // 퍼즐 조각 + 전투 조각
+  }
+  return `${head}<br>${body}`;
 }
 // 안내 3단계: 수수께끼 → (두 번 실패) 조각의 원래 안내 → (네 번 실패) tip. 이어 붙인 방은 조각마다(지금 있는 조각 기준)
 function setHints(room) {
@@ -332,7 +389,7 @@ function openMap() {
   const ov = UI.show(html, k => pickNode(k), {
     cls: 'map',
     order: (a, b) => parseFloat(a.style.left) - parseFloat(b.style.left),
-    onSel: el => { const [r, c] = el.dataset.k.split(',').map(Number), n = R.rows[r][c], tm = typeMeta(n.type); const box = UI.ov && UI.ov.querySelector('.t1-info'); if (box) box.innerHTML = `<b style="color:${tm.color}">${icon(n.type, { fb: tm.icon })} ${$t(tm.name)}</b><br>${$t(tm.desc)}`; },
+    onSel: el => { const [r, c] = el.dataset.k.split(',').map(Number), n = R.rows[r][c]; const box = UI.ov && UI.ov.querySelector('.t1-info'); if (box) box.innerHTML = nodeInfo(n); },
   });
   return ov;
 }
@@ -636,7 +693,7 @@ EXT.run = {
   types: TYPES, FLOORS, SAND, ROWS,
   // 시험용
   _dev: {
-    R, library: () => library(EXT), buildNodeRoom, genFloor, openMap, endRun, showMenu, typeMeta, addSand,
+    R, library: () => library(EXT), buildNodeRoom, genFloor, openMap, endRun, showMenu, typeMeta, addSand, previewNode, nodeInfo,
     // 시험용: 런을 시작(또는 지금 런에서) f층의 type 칸으로 바로 간다. 예) __yk.ext.run._dev.jump(3, 'boss')
     jump(floor = 1, type = 'combat', seed) {
       if (!st || seed) { enterRun(seed || newSeed()); }
