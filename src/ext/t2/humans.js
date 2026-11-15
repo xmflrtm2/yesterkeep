@@ -163,7 +163,10 @@ EXT.foes['t2-shield'] = {
       } else if (f.rec > 0) { f.rec -= dt; if (f.heard > C.react) turnTo(f, S.p.x, S.p.z, dt, C.turn); } // 받아친 뒤에도 그대로 돌아선다 (같은 시대에서 빙빙 돌기로는 못 잡게)
       else if (f.state === 'alert') {
         if (h && d < C.reach - 0.25 && inFront(f, S.p.x, S.p.z, rad(70))) { f.wind = C.windup; S2.shieldUp({ x: f.x, z: f.z }); if (f.ani) f.ani.once(CLIP.atk, { speed: 1.3, dur: C.windup + C.recover }); }
-        else { chase(f, dt, C.run, 1.5); if (f.heard > C.react || seen) turnTo(f, S.p.x, S.p.z, dt, C.turn); }
+        // 넘어온 직후 반응 시간(react) 동안은 쫓지도 돌지도 않는다 — chase()의 moveTo가 첫 프레임부터 7rad/s로 몸을 돌려서,
+        // heard를 0부터 세게 한 틈(위 onShift 주석)이 없어졌다 (11/15 3층 문지기 방 직접 플레이: 경보 중 정예 방패병 등 뒤 34° 자리로 넘어와 바로 J → 막힘)
+        else if (f.heard > C.react || seen) { chase(f, dt, C.run, 1.5); turnTo(f, S.p.x, S.p.z, dt, C.turn); }
+        else play(f, CLIP.idle, 0.15);
       } else if (f.heard > C.react) {
         // 경보 전이어도 소리 나는 쪽으로 홱 돌아선다 (이 때문에 같은 시대에선 등 뒤를 못 잡는다)
         if (f.heard - dt <= C.react) S2.shieldUp({ x: f.x, z: f.z });

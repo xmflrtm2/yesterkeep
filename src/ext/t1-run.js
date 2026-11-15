@@ -263,7 +263,9 @@ function nodeInfo(n) {
     const foes = [need, opt].filter(Boolean).join(' · ');
     if (n.type === 'guard') {
       const g = list(new Map([...p.need].filter(([k]) => $t(k) !== p.name))), gf = [g, opt].filter(Boolean).join(' · ');
-      body = (gf ? gf + ' — ' : '') + rule(tm.desc);
+      // 3층 문지기는 이기면 지도 없이 곧장 성채지기에게 (11/15 3층 직접 플레이: "이기면 아래층으로"가 떠 있었다)
+      const toBoss = R.rows && R.rows.some(r => r.some(x => x.type === 'boss'));
+      body = (gf ? gf + ' — ' : '') + rule(toBoss ? N('층의 끝. 이기면 곧장 성채지기에게') : tm.desc);
     }
     else if (n.type === 'elite') body = need ? `${foes} — ${rule('정예 접두어가 붙고, 모래와 기억을 더 줘요')}` : $t(tm.desc);
     else if (n.type === 'combat') body = need ? `${foes} — ${rule('모두 쓰러뜨려야 출구가 열려요')}` : `${opt ? opt + ' — ' : ''}${rule('꼭 쓰러뜨릴 적은 없어요. 출구까지 가면 돼요')}`;

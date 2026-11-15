@@ -38,7 +38,10 @@ export function genFloor(seed, floor, extra = {}) {
   add(0, rng.shuffle(['combat', 'puzzle']));
   add(1, draw(1, 3, [['combat', 3], ['puzzle', 3], ['treasure', 1.3], ['elite', floor >= 2 ? 1 : 0]], ['treasure', 'elite']));
   add(2, draw(2, rng.chance(0.6) ? 3 : 2, [['combat', 3], ['puzzle', 2.6], ['elite', floor >= 2 ? 1.6 : 0.9], ['shop', 1.5], ['treasure', 0.5]], ['shop', 'elite', 'treasure']));
-  add(3, rng.shuffle(['rest', rng.chance(0.55) ? 'shop' : 'treasure']));
+  // 11/15 2층 직접 플레이(시드 77177): 2번 줄 상점에서 갈 수 있는 3번 줄 칸이 또 상점 하나뿐이라 금화 없이 빈 방 둘을 지났다
+  // → 2번 줄에 상점이 있으면 3번 줄 둘째 칸은 보물로 (뽑기 횟수는 그대로라 다른 칸은 그대로)
+  const r3 = rng.chance(0.55) ? 'shop' : 'treasure';
+  add(3, rng.shuffle(['rest', r3 === 'shop' && rows[2].some(n => n.type === 'shop') ? 'treasure' : r3]));
   add(4, ['guard']);
   if (floor >= 3) add(5, ['boss']);
   // 줄 사이 잇기: 비율이 가까운 칸끼리 + 들어오는 길이 없는 칸 채우기 + 엇갈리지 않는 샛길 하나쯤

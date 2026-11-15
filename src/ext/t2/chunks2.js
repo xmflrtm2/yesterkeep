@@ -274,7 +274,8 @@ add({
     '#################',
   ],
   start: [1, 4], exit: [15, 4],
-  foes: [{ kind: 't2-shield', at: [7, 2], face: 90, mods: ['keen'] }, { kind: 't2-duelist', at: [12, 6], face: -90 }],
+  // 검사는 (12,6)이 어제 돌기둥 '*' 칸이라 기둥 속에 서 있었다 → 바로 위 바닥 (11/15 3층 직접 플레이: 찌를 자리가 0.25m뿐)
+  foes: [{ kind: 't2-shield', at: [7, 2], face: 90, mods: ['keen'] }, { kind: 't2-duelist', at: [12, 5], face: -90 }],
 });
 add({
   id: 't2-prefix-court', riddle: N('이름이 곧 약점이다'), kind: 'prefix', tier: 3, floor: 2, tags: ['combat', 'elite'], name: N('정예의 뜰'),

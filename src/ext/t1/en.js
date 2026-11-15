@@ -173,6 +173,7 @@ Object.assign(window.I18N.en, {
   '하트 2개 회복, 모래 가득': '+2 hearts, full sand',
   '문지기': 'Gatekeeper',
   '층의 끝. 이기면 아래층으로': 'The end of the floor. Win to go down',
+  '층의 끝. 이기면 곧장 성채지기에게': 'The end of the floor. Win to face the Warden',
   '성채의 심장 — 마지막 방': 'The heart of the keep — the last room',
   '1층 · 무너진 바깥 회랑': 'Floor 1 · The Fallen Outer Halls',
   '2층 · 가라앉은 창고': 'Floor 2 · The Sunken Stores',
